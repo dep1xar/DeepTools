@@ -25,7 +25,7 @@ namespace DeepTools
 
             Text = "DeepTools Overlay";
             FormBorderStyle = FormBorderStyle.None;
-            Size = new Size(400, 420);
+            Size = new Size(400, 476);
             StartPosition = FormStartPosition.CenterParent;
             BackColor = Theme.BgColor;
             DoubleBuffered = true;
@@ -146,7 +146,7 @@ namespace DeepTools
             StyleSizes();
 
             // Метрики
-            var metricsCard = Theme.MakeCard(this, new Point(16, 156), new Size(368, 216));
+            var metricsCard = Theme.MakeCard(this, new Point(16, 156), new Size(368, 272));
             var metricsTitle = new Label
             {
                 Text = Lang.T("Что показывать", "What to show"),
@@ -161,6 +161,8 @@ namespace DeepTools
             int y = 40;
             MakeMetricRow(metricsCard, "FPS", y, s.ShowFps, v => { s.ShowFps = v; }); y += 28;
             MakeMetricRow(metricsCard, Lang.T("Время кадра (мс)", "Frametime (ms)"), y, s.ShowFrametime, v => { s.ShowFrametime = v; }); y += 28;
+            MakeMetricRow(metricsCard, "1% low FPS", y, s.Show1Low, v => { s.Show1Low = v; }); y += 28;
+            MakeMetricRow(metricsCard, Lang.T("График фреймтайма", "Frametime graph"), y, s.ShowFtGraph, v => { s.ShowFtGraph = v; }); y += 28;
             MakeMetricRow(metricsCard, Lang.T("Загрузка CPU", "CPU load"), y, s.ShowCpu, v => { s.ShowCpu = v; }); y += 28;
             MakeMetricRow(metricsCard, Lang.T("Загрузка GPU", "GPU load"), y, s.ShowGpuLoad, v => { s.ShowGpuLoad = v; }); y += 28;
             MakeMetricRow(metricsCard, Lang.T("Температура GPU", "GPU temperature"), y, s.ShowGpuTemp, v => { s.ShowGpuTemp = v; }); y += 28;
@@ -173,7 +175,7 @@ namespace DeepTools
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(18, 384),
+                Location = new Point(18, 440),
                 Size = new Size(364, 30)
             };
             Controls.Add(hint);

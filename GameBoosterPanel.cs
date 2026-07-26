@@ -147,6 +147,10 @@ namespace DeepTools
             detectTimer.Interval = 1500;
             detectTimer.Tick += (s, e) => DetectFullscreenGame();
 
+            // ETW-трейсер Present-кадров: нужен детекту, чтобы отличать
+            // borderless-игру от просто развёрнутого окна (браузер и т.п.)
+            PresentTracer.Start();
+
             BuildUi();
             LoadPersistedState();
             RefreshHeavyList();
@@ -236,7 +240,7 @@ namespace DeepTools
 
             warningLabel = new Label
             {
-                Text = Lang.T("Игра должна быть в полноэкранном режиме, иначе процесс не определится", "The game must be in fullscreen mode, otherwise the process cannot be detected"),
+                Text = Lang.T("Игра определяется в полноэкранном и borderless режиме", "The game is detected in fullscreen and borderless mode"),
                 ForeColor = Theme.Warning,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
@@ -525,10 +529,20 @@ namespace DeepTools
             bool isFullscreen = rect.Left <= bounds.Left + 2 && rect.Top <= bounds.Top + 2 &&
                                  width >= bounds.Width - 4 && height >= bounds.Height - 4;
 
-            if (!isFullscreen) { WinKeyBlocker.GameActive = false; ClearDetection(); return; }
-
             uint pid;
             NativeMethods.GetWindowThreadProcessId(hwnd, out pid);
+
+            // Borderless/windowed: геометрия не совпадает с экраном пиксель в
+            // пиксель, поэтому смотрим шире - окно занимает большую часть экрана
+            // И процесс реально рисует кадры (Present-события из ETW-трейсера)
+            if (!isFullscreen)
+            {
+                bool bigWindow = width >= bounds.Width * 7 / 10 && height >= bounds.Height * 7 / 10;
+                if (bigWindow && PresentTracer.IsRendering((int)pid, 15))
+                    isFullscreen = true;
+            }
+
+            if (!isFullscreen) { WinKeyBlocker.GameActive = false; ClearDetection(); return; }
 
             try
             {

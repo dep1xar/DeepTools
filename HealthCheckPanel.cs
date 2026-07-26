@@ -162,7 +162,6 @@ namespace DeepTools
 
         private readonly Timer refreshTimer;
         private readonly PerformanceCounter cpuCounter;
-        private readonly PerformanceCounter gpuCounter;
 
         private Label cpuValueLabel;
         private Label ramValueLabel;
@@ -172,8 +171,20 @@ namespace DeepTools
         private Label tempValueLabel;
         private Label statusLabel;
 
-        // Порог перегрева CPU для уведомления из трея
-        private const int OverheatThreshold = 90;
+        // Пороги перегрева для уведомления из трея. Настраиваются степперами
+        // на панели и хранятся в AppConfig (alert_cpu_temp / alert_gpu_temp)
+        private int alertCpuTemp = 90;
+        private int alertGpuTemp = 85;
+        private bool alertEnabled = true;
+        private const int AlertTempMin = 60;
+        private const int AlertTempMax = 105;
+
+        private static int ParseTemp(string v, int def)
+        {
+            int r;
+            if (!int.TryParse(v, out r)) return def;
+            return Math.Max(AlertTempMin, Math.Min(AlertTempMax, r));
+        }
 
         private LoadGraph cpuGraph;
         private LoadGraph ramGraph;
@@ -189,8 +200,11 @@ namespace DeepTools
             Size = new Size(760, 616);
             BackColor = Theme.BgColor;
 
+            alertEnabled = AppConfig.GetBool("alert_enabled", true);
+            alertCpuTemp = ParseTemp(AppConfig.Get("alert_cpu_temp", "90"), 90);
+            alertGpuTemp = ParseTemp(AppConfig.Get("alert_gpu_temp", "85"), 85);
+
             cpuCounter = CreateCpuCounter();
-            gpuCounter = CreateGpuCounter();
             CpuSensor.InitAsync();
             Application.ApplicationExit += (s, e) => CpuSensor.Shutdown();
             refreshTimer = new Timer { Interval = 2000 };
@@ -352,6 +366,34 @@ namespace DeepTools
             minerToggle.CheckedChanged += (s, e) => { MinerGuard.Enabled = minerToggle.Checked; };
             Controls.Add(minerToggle);
 
+            // Тревога перегрева: тумблер + настраиваемые пороги CPU/GPU
+            var alertToggle = new ToggleSwitch { Location = new Point(400, 512), Checked = alertEnabled };
+            alertToggle.CheckedChanged += (s, e) => {
+                alertEnabled = alertToggle.Checked;
+                AppConfig.SetBool("alert_enabled", alertEnabled);
+            };
+            Controls.Add(alertToggle);
+
+            var alertLabel = new Label
+            {
+                Text = Lang.T("Тревога:", "Alert:"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(452, 516),
+                AutoSize = true
+            };
+            Controls.Add(alertLabel);
+
+            MakeTempStepper("CPU", 508, 512, alertCpuTemp, v => {
+                alertCpuTemp = v;
+                AppConfig.Set("alert_cpu_temp", v.ToString());
+            });
+            MakeTempStepper("GPU", 624, 512, alertGpuTemp, v => {
+                alertGpuTemp = v;
+                AppConfig.Set("alert_gpu_temp", v.ToString());
+            });
+
             var disksTitle = new Label
             {
                 Text = Lang.T("Здоровье дисков (SMART)", "Disk health (SMART)"),
@@ -393,8 +435,8 @@ namespace DeepTools
             var futureDesc = new Label
             {
                 Text = Lang.T(
-                    "Темп. CPU читается через LibreHardwareMonitor (при перегреве " + OverheatThreshold + "°C+ придёт уведомление из трея). Темп. GPU - через драйвер NVIDIA (NVML), на ПК без NVIDIA используется ACPI-датчик Windows.",
-                    "CPU temp is read via LibreHardwareMonitor (a tray alert fires at " + OverheatThreshold + "°C+). GPU temp comes from the NVIDIA driver (NVML); PCs without NVIDIA fall back to the Windows ACPI sensor."),
+                    "Темп. CPU читается через LibreHardwareMonitor (при перегреве выше порога придёт уведомление из трея, пороги настраиваются выше). Темп. GPU - через драйвер NVIDIA (NVML), на ПК без NVIDIA используется ACPI-датчик Windows.",
+                    "CPU temp is read via LibreHardwareMonitor (a tray alert fires above the threshold; thresholds are configurable above). GPU temp comes from the NVIDIA driver (NVML); PCs without NVIDIA fall back to the Windows ACPI sensor."),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8F),
@@ -429,6 +471,65 @@ namespace DeepTools
                 AutoSize = true
             };
             Controls.Add(statusLabel);
+        }
+
+        // Компактный степпер порога температуры: «CPU − 90° +»
+        private void MakeTempStepper(string title, int x, int y, int initial, Action<int> onChange)
+        {
+            var lbl = new Label
+            {
+                Text = title,
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(x, y + 5),
+                AutoSize = true
+            };
+            Controls.Add(lbl);
+
+            int value = initial;
+
+            var valLbl = new Label
+            {
+                Text = value + "°",
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Location = new Point(x + 52, y + 3),
+                Size = new Size(34, 18),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            var minusBtn = new RoundedButton
+            {
+                Text = "−",
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Location = new Point(x + 28, y),
+                Size = new Size(24, 24)
+            };
+            minusBtn.Click += (s, e) => {
+                if (value > AlertTempMin) { value -= 5; if (value < AlertTempMin) value = AlertTempMin; valLbl.Text = value + "°"; onChange(value); }
+            };
+            Controls.Add(minusBtn);
+            Controls.Add(valLbl);
+
+            var plusBtn = new RoundedButton
+            {
+                Text = "+",
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Location = new Point(x + 86, y),
+                Size = new Size(24, 24)
+            };
+            plusBtn.Click += (s, e) => {
+                if (value < AlertTempMax) { value += 5; if (value > AlertTempMax) value = AlertTempMax; valLbl.Text = value + "°"; onChange(value); }
+            };
+            Controls.Add(plusBtn);
         }
 
         // Глубокая проверка: SMART-флаг "скоро откажет" + ошибки дисков в журнале событий
@@ -638,11 +739,11 @@ namespace DeepTools
                 if (cpuTemp >= 0)
                 {
                     cpuTempValueLabel.Text = cpuTemp + "°C";
-                    cpuTempValueLabel.ForeColor = cpuTemp >= OverheatThreshold ? Theme.Danger
-                        : (cpuTemp >= OverheatThreshold - 10 ? Theme.Warning : Theme.TextMain);
+                    cpuTempValueLabel.ForeColor = cpuTemp >= alertCpuTemp ? Theme.Danger
+                        : (cpuTemp >= alertCpuTemp - 10 ? Theme.Warning : Theme.TextMain);
                     if (installDriverBtn != null) installDriverBtn.Visible = false;
 
-                    if (cpuTemp >= OverheatThreshold)
+                    if (alertEnabled && cpuTemp >= alertCpuTemp)
                     {
                         TrayNotify.Warn(
                             Lang.T("Перегрев CPU", "CPU overheating"),
@@ -670,6 +771,15 @@ namespace DeepTools
                 SystemStats.CpuLoadNum = cpuCounter == null ? -1 : cpuPercent;
                 SystemStats.CpuTempNum = cpuTemp;
                 SystemStats.GpuTempNum = NvmlGpu.GetTemperature();
+
+                // Тревога перегрева GPU (порог настраивается, кулдаун в TrayNotify)
+                if (alertEnabled && SystemStats.GpuTempNum >= alertGpuTemp)
+                {
+                    TrayNotify.Warn(
+                        Lang.T("Перегрев GPU", "GPU overheating"),
+                        Lang.T("Температура видеокарты ", "GPU temperature is ") + SystemStats.GpuTempNum + "°C. " +
+                        Lang.T("Проверь охлаждение и запылённость.", "Check cooling and dust buildup."));
+                }
 
                 statusLabel.Text = Lang.T("Данные обновлены", "Data updated");
                 statusLabel.ForeColor = Theme.Accent;

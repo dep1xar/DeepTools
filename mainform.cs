@@ -26,6 +26,7 @@ namespace DeepTools
         private ClickerPanel panelClicker;
         private ScreenshotsPanel panelScreenshots;
         private ClipboardManagerPanel panelClipboard;
+        private NetworkPanel panelNetwork;
         private Panel panelSettings;
 
         private SidebarNavButton navHome;
@@ -39,7 +40,9 @@ namespace DeepTools
         private SidebarNavButton navClicker;
         private SidebarNavButton navScreenshots;
         private SidebarNavButton navClipboard;
+        private SidebarNavButton navNetwork;
         private SidebarNavButton navSettings;
+        private Panel navIndicator;
 
         private Label adminStatusLabel;
 
@@ -78,6 +81,19 @@ namespace DeepTools
             Load += (s, e) => RegisterHotkeys();
             FormClosing += (s, e) => OnFormClosing(s, e);
             FormClosed += (s, e) => UnregisterHotkeys();
+        }
+
+        // Системная тень вокруг borderless-окна: без неё окно выглядит плоско
+        // наклеенным на рабочий стол
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                const int CS_DROPSHADOW = 0x20000;
+                CreateParams cp = base.CreateParams;
+                cp.ClassStyle |= CS_DROPSHADOW;
+                return cp;
+            }
         }
 
         // Иконка достаётся из самого exe (вшита при компиляции через /win32icon),
@@ -393,18 +409,34 @@ namespace DeepTools
             var divider = new Panel { Location = new Point(16, 86), Size = new Size(188, 1), BackColor = Theme.BorderColor };
             sidebar.Controls.Add(divider);
 
-            navHome = MakeNavItem("⌂   " + Lang.T("Главная", "Home"), 100);
-            navCleanup = MakeNavItem("♻   SmartCleanup", 140);
-            navBooster = MakeNavItem("⚡   GameBooster", 180);
-            navHealth = MakeNavItem("❤   Health Check", 220);
-            navSysInfo = MakeNavItem("▤   " + Lang.T("Мой ПК", "My PC"), 260);
-            navStartup = MakeNavItem("⭯   " + Lang.T("Автозагрузка", "Startup"), 300);
-            navServices = MakeNavItem("⚙   " + Lang.T("Службы", "Services"), 340);
-            navVisual = MakeNavItem("✦   " + Lang.T("Визуальные эффекты", "Visual effects"), 380);
-            navClicker = MakeNavItem("⊙   Clicker", 420);
-            navScreenshots = MakeNavItem("▣   " + Lang.T("Скриншоты", "Screenshots"), 460);
-            navClipboard = MakeNavItem("❏   " + Lang.T("Буфер обмена", "Clipboard"), 500);
-            navSettings = MakeNavItem("⚙   " + Lang.T("Настройки", "Settings"), 540);
+            // Навигация сгруппирована по смыслу; кнопки чуть компактнее (33px),
+            // чтобы 13 пунктов + 3 заголовка влезли в 616px сайдбара
+            navHome = MakeNavItem("⌂   " + Lang.T("Главная", "Home"), 90);
+
+            MakeNavGroupLabel(Lang.T("ОПТИМИЗАЦИЯ", "OPTIMIZATION"), 129);
+            navCleanup = MakeNavItem("♻   SmartCleanup", 147);
+            navBooster = MakeNavItem("⚡   GameBooster", 182);
+            navStartup = MakeNavItem("⭯   " + Lang.T("Автозагрузка", "Startup"), 217);
+            navServices = MakeNavItem("⚙   " + Lang.T("Службы", "Services"), 252);
+            navVisual = MakeNavItem("✦   " + Lang.T("Визуальные эффекты", "Visual effects"), 287);
+
+            MakeNavGroupLabel(Lang.T("МОНИТОРИНГ", "MONITORING"), 326);
+            navHealth = MakeNavItem("❤   Health Check", 344);
+            navSysInfo = MakeNavItem("▤   " + Lang.T("Мой ПК", "My PC"), 379);
+            navNetwork = MakeNavItem("⇅   " + Lang.T("Сеть", "Network"), 414);
+
+            MakeNavGroupLabel(Lang.T("ИНСТРУМЕНТЫ", "TOOLS"), 453);
+            navClicker = MakeNavItem("⊙   Clicker", 471);
+            navScreenshots = MakeNavItem("▣   " + Lang.T("Скриншоты", "Screenshots"), 506);
+            navClipboard = MakeNavItem("❏   " + Lang.T("Буфер обмена", "Clipboard"), 541);
+
+            navSettings = MakeNavItem("⚙   " + Lang.T("Настройки", "Settings"), 579);
+
+            // Бегущая акцентная полоска: переезжает к активному пункту при
+            // переключении раздела вместо мгновенного скачка
+            navIndicator = new Panel { Size = new Size(3, 21), Location = new Point(12, -30), BackColor = Theme.Accent };
+            sidebar.Controls.Add(navIndicator);
+            navIndicator.BringToFront();
 
             navHome.Click += (s, e) => ShowPanel(panelHome, navHome);
             navSysInfo.Click += (s, e) => ShowPanel(panelSysInfo, navSysInfo);
@@ -417,6 +449,7 @@ namespace DeepTools
             navClicker.Click += (s, e) => ShowPanel(panelClicker, navClicker);
             navScreenshots.Click += (s, e) => ShowPanel(panelScreenshots, navScreenshots);
             navClipboard.Click += (s, e) => ShowPanel(panelClipboard, navClipboard);
+            navNetwork.Click += (s, e) => ShowPanel(panelNetwork, navNetwork);
             navSettings.Click += (s, e) => ShowPanel(panelSettings, navSettings);
 
             contentArea = new Panel { Location = new Point(220, 34), Size = new Size(760, 616), BackColor = Theme.BgColor };
@@ -480,6 +513,10 @@ namespace DeepTools
             contentArea.Controls.Add(panelClipboard);
             panelClipboard.Visible = false;
 
+            panelNetwork = new NetworkPanel();
+            contentArea.Controls.Add(panelNetwork);
+            panelNetwork.Visible = false;
+
             panelSettings = BuildSettingsPanel();
         }
 
@@ -487,10 +524,26 @@ namespace DeepTools
         {
             var item = new SidebarNavButton(text)
             {
-                Location = new Point(12, y)
+                Location = new Point(12, y),
+                Size = new Size(196, 33)
             };
             sidebar.Controls.Add(item);
             return item;
+        }
+
+        // Тонкий заголовок группы в сайдбаре: «ОПТИМИЗАЦИЯ», «МОНИТОРИНГ»...
+        private void MakeNavGroupLabel(string text, int y)
+        {
+            var lbl = new Label
+            {
+                Text = text,
+                ForeColor = Theme.Lerp(Theme.SidebarColor, Theme.TextDim, 0.55f),
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 6.8F, FontStyle.Bold),
+                Location = new Point(24, y),
+                AutoSize = true
+            };
+            sidebar.Controls.Add(lbl);
         }
 
         private void ShowPanel(Panel panel, SidebarNavButton navItem)
@@ -506,6 +559,7 @@ namespace DeepTools
             panelClicker.Visible = false;
             panelScreenshots.Visible = false;
             panelClipboard.Visible = false;
+            panelNetwork.Visible = false;
             panelSettings.Visible = false;
 
             navHome.SetActive(false);
@@ -519,11 +573,38 @@ namespace DeepTools
             navClicker.SetActive(false);
             navScreenshots.SetActive(false);
             navClipboard.SetActive(false);
+            navNetwork.SetActive(false);
             navSettings.SetActive(false);
 
             panel.Visible = true;
             navItem.SetActive(true);
+            MoveNavIndicator(navItem);
             AnimatePanelIn(panel);
+        }
+
+        // Акцентная полоска плавно переезжает к активному пункту навигации
+        private System.Windows.Forms.Timer navIndTimer;
+        private int navIndTarget;
+
+        private void MoveNavIndicator(SidebarNavButton navItem)
+        {
+            navIndTarget = navItem.Top + (navItem.Height - navIndicator.Height) / 2;
+            // Первый показ - без анимации, полоска ещё за краем
+            if (navIndicator.Top < 0)
+            {
+                navIndicator.Top = navIndTarget;
+                return;
+            }
+            if (navIndTimer == null)
+            {
+                navIndTimer = new System.Windows.Forms.Timer { Interval = 12 };
+                navIndTimer.Tick += (s, e) => {
+                    int d = navIndTarget - navIndicator.Top;
+                    if (Math.Abs(d) <= 2) { navIndicator.Top = navIndTarget; navIndTimer.Stop(); return; }
+                    navIndicator.Top += d > 0 ? Math.Max(2, d / 3) : Math.Min(-2, d / 3);
+                };
+            }
+            navIndTimer.Start();
         }
 
         // Лёгкий слайд-въезд панели слева при переключении раздела

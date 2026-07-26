@@ -33,8 +33,8 @@ namespace DeepTools
             Margin = new Padding(0, 4, 0, 0);
             DoubleBuffered = true;
 
-            MouseEnter += (s, e) => { if (!_active) ForeColor = Theme.TextMain; };
-            MouseLeave += (s, e) => { if (!_active) ForeColor = Theme.TextDim; };
+            MouseEnter += (s, e) => { if (!_active) { ForeColor = Theme.TextMain; BackColor = Theme.NavHoverBg; } };
+            MouseLeave += (s, e) => { if (!_active) { ForeColor = Theme.TextDim; BackColor = Color.Transparent; } };
         }
 
         public void SetActive(bool active)
@@ -46,19 +46,6 @@ namespace DeepTools
         {
             BackColor = _active ? Theme.NavActiveBg : Color.Transparent;
             ForeColor = _active ? Theme.Accent : Theme.TextDim;
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-            if (_active)
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (var brush = new SolidBrush(Theme.Accent))
-                {
-                    e.Graphics.FillRectangle(brush, 0, 0, 3, Height);
-                }
-            }
         }
     }
 
@@ -278,6 +265,7 @@ namespace DeepTools
         public static Color KeyColor = Color.FromArgb(40, 50, 70);
         public static Color KeyHover = Color.FromArgb(50, 65, 90);
         public static Color NavActiveBg = Color.FromArgb(34, 42, 60);
+        public static Color NavHoverBg = Color.FromArgb(27, 34, 49);
         public static Color AccentHover = Color.FromArgb(70, 240, 160);
         public static Color DangerHover = Color.FromArgb(220, 50, 50);
 
@@ -298,6 +286,7 @@ namespace DeepTools
                 KeyColor = Color.FromArgb(222, 227, 236);
                 KeyHover = Color.FromArgb(205, 212, 225);
                 NavActiveBg = Color.FromArgb(216, 224, 236);
+                NavHoverBg = Color.FromArgb(228, 233, 242);
                 AccentHover = Color.FromArgb(26, 190, 122);
                 DangerHover = Color.FromArgb(235, 90, 90);
             }
@@ -316,6 +305,7 @@ namespace DeepTools
                 KeyColor = Color.FromArgb(40, 50, 70);
                 KeyHover = Color.FromArgb(50, 65, 90);
                 NavActiveBg = Color.FromArgb(34, 42, 60);
+                NavHoverBg = Color.FromArgb(27, 34, 49);
                 AccentHover = Color.FromArgb(70, 240, 160);
                 DangerHover = Color.FromArgb(220, 50, 50);
             }
@@ -370,6 +360,7 @@ namespace DeepTools
     public class RoundedButton : TransparentControl
     {
         private bool isHovering = false;
+        private bool isPressed = false;
         public Color ButtonColor = Theme.Accent;
         public Color HoverColor = Color.FromArgb(70, 240, 160);
         public Color TextColor = Color.Black;
@@ -402,7 +393,23 @@ namespace DeepTools
         protected override void OnMouseLeave(EventArgs e)
         {
             isHovering = false;
+            isPressed = false;
             if (!hoverTimer.Enabled) hoverTimer.Start();
+        }
+
+        // Тактильный отклик: при нажатии кнопка чуть темнеет
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            isPressed = true;
+            Invalidate();
+            base.OnMouseDown(e);
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            isPressed = false;
+            Invalidate();
+            base.OnMouseUp(e);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -411,6 +418,7 @@ namespace DeepTools
 
             var rect = new Rectangle(0, 0, Width - 1, Height - 1);
             Color currentColor = Theme.Lerp(ButtonColor, HoverColor, hoverAnim);
+            if (isPressed) currentColor = Theme.Lerp(currentColor, Color.Black, 0.18f);
 
             // Радиус не больше половины высоты, иначе углы ломаются на маленьких кнопках
             int radius = Math.Min(CornerRadius, (Height - 1) / 2);

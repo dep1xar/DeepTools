@@ -11,7 +11,7 @@ namespace DeepTools
     // Репозиторий можно переопределить в конфиге ключом github_repo
     public static class UpdateChecker
     {
-        private const string DefaultRepo = "squadbustersfigna-ship-it/DeepTools";
+        private const string DefaultRepo = "dep1xar/DeepTools";
 
         public static string Repo
         {
