@@ -314,9 +314,10 @@ namespace DeepTools
         private Label trafficHintLabel;
         private const int ProcRows = 5;
 
-        // Пинг-тест по этим серверам + свой адрес из поля ввода
-        private static readonly string[] PingHosts = { "1.1.1.1", "8.8.8.8", "77.88.8.8" };
-        private static readonly string[] PingNames = { "Cloudflare", "Google", "Yandex" };
+        // Пинг-тест по этим серверам + свой адрес из поля ввода.
+        // Xbox DNS (xbox-dns.ru) - Smart DNS для Xbox Live/ChatGPT/Supercell, адреса 111.88.96.50/51
+        private static readonly string[] PingHosts = { "1.1.1.1", "8.8.8.8", "111.88.96.50" };
+        private static readonly string[] PingNames = { "Cloudflare", "Google", "Xbox DNS" };
 
         public NetworkPanel()
         {

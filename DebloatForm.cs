@@ -281,6 +281,12 @@ namespace DeepTools
                 MessageBoxIcon.Question);
             if (confirm != DialogResult.Yes) return;
 
+            // Шанс откатиться, если удалили что-то нужное
+            RestorePoint.OfferBefore(this, () => DoRemove(toRemove));
+        }
+
+        private void DoRemove(List<BloatApp> toRemove)
+        {
             working = true;
             removeBtn.Enabled = false;
             removeBtn.Text = Lang.T("Удаляем...", "Removing...");

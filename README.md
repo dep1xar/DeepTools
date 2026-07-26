@@ -5,7 +5,7 @@
 **Smart tweaker, cleaner and monitoring tool for Windows — in one app.**
 **Умный твикер, чистильщик и монитор для Windows — всё в одном.**
 
-[![Version](https://img.shields.io/badge/version-1.5.0-blue)](https://github.com/dep1xar/DeepTools/releases)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue)](https://github.com/dep1xar/DeepTools/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D6)](#)
 [![.NET](https://img.shields.io/badge/.NET%20Framework-4.x-512BD4)](#)
 
@@ -37,12 +37,12 @@ DeepTools is a system tweaker, so it does things real malware also does: elevate
 | Section | What it does |
 |---|---|
 | **Home** | Quick tiles to jump to the most-used tools, live CPU/RAM/temperature monitoring, and an optional always-on-top desktop widget. |
-| **Smart Cleanup** | Clears temp files, caches and shader caches by category, with a size preview before you delete. Includes a **program uninstaller** with leftover cleanup and a **Windows bloatware** remover. |
+| **Smart Cleanup** | Clears temp files, caches and shader caches by category, with a size preview before you delete. Includes **scheduled auto cleanup** (silent, with a tray report), a **program uninstaller** with leftover cleanup and a **Windows bloatware** remover. |
 | **Game Booster** | One-click "Ultimate Performance" power plan, disables core parking, boosts the running game's priority, optional auto-boost for new games, **customizable FPS overlay** with accurate per-game FPS (PresentMon-style ETW tracing), 1% low and a frametime graph, on-screen **crosshair**, and Win-key blocking. Games are detected in both fullscreen and borderless mode. |
 | **Health Check** | Live CPU/GPU/RAM load and temperatures, overheat alerts with **user-adjustable CPU/GPU thresholds**, disk health (SMART), stress test, benchmark, BSOD analyzer and 24h temperature history. |
 | **My PC** | Full system spec on one page with a **Copy** button — handy for forums, sales listings or sending to a friend. |
 | **Startup** | See and toggle what launches with Windows, plus boot-time analysis. |
-| **Services** | Enable/disable Windows services safely, with descriptions and a gaming preset. |
+| **Services** | Enable/disable Windows services safely, with descriptions and a gaming preset. Includes a **Windows telemetry** switch-off panel (light/medium/aggressive presets, fully reversible). |
 | **Visual Effects** | Toggle Windows animations and effects for a snappier feel. |
 | **Clicker** | Configurable auto-clicker (mouse + keyboard, spam or hold) with hotkey, plus a **macro recorder**. |
 | **Screenshots** | Full-screen and region capture (with arrows/boxes/text annotations) via global hotkeys. |
@@ -59,7 +59,9 @@ DeepTools is a system tweaker, so it does things real malware also does: elevate
 - **Benchmark** — quick before/after CPU, RAM and disk test. Saves the result so you can see if your tweaks actually helped.
 - **Stress Test** — loads all CPU cores to 100% for 2 minutes and reports peak temperature.
 - **Temperature History** — 24-hour CPU/GPU graph with peak analysis.
-- **Game Time** — tracks your gaming sessions (playtime, average CPU, peak temps) and reports when you close a game. Works with fullscreen and borderless games.
+- **Game Time** — tracks your gaming sessions (playtime, average FPS, 1% low, average CPU, peak temps) and reports when you close a game. Works with fullscreen and borderless games. A **Share** button renders a PNG card with your PC spec and top games.
+- **Telemetry off** — disables Windows telemetry via official policies, services and scheduler tasks. Three presets (light/medium/aggressive), live status per tweak, one-click full revert.
+- **Restore point** — offered automatically before risky tweaks (debloat, service presets, telemetry) so you can always roll back.
 - **Crosshair** — customizable on-screen crosshair overlay (cross, dot, circle, T-shape); settings are remembered.
 - **Desktop Widget** — compact always-on-top CPU/RAM/temperature panel.
 
@@ -124,12 +126,12 @@ DeepTools — системный твикер, поэтому он делает 
 | Раздел | Что делает |
 |---|---|
 | **Главная** | Плитки быстрого перехода, живой мониторинг CPU/RAM/температур и опциональный виджет поверх окон. |
-| **Умная очистка** | Чистит временные файлы, кэши и кэши шейдеров по категориям, показывает размер до удаления. Включает **деинсталлятор программ** с чисткой хвостов и удаление **встроенного мусора Windows**. |
+| **Умная очистка** | Чистит временные файлы, кэши и кэши шейдеров по категориям, показывает размер до удаления. Включает **автоочистку по расписанию** (тихую, с отчётом из трея), **деинсталлятор программ** с чисткой хвостов и удаление **встроенного мусора Windows**. |
 | **Игровой буст** | В один клик включает план «Максимальная производительность», отключает парковку ядер, поднимает приоритет игры, авто-буст новых игр, **настраиваемый FPS-оверлей** с точным FPS игры (ETW-трейсинг в стиле PresentMon), 1% low и графиком фреймтайма, накладной **прицел** и блокировку клавиши Win. Игры определяются и в полноэкранном, и в borderless-режиме. |
 | **Проверка здоровья** | Нагрузка и температуры CPU/GPU/RAM, тревога перегрева с **настраиваемыми порогами CPU/GPU**, здоровье диска (SMART), стресс-тест, бенчмарк, разбор синих экранов и история температур за 24 часа. |
 | **Мой ПК** | Полная спека системы на одной странице с кнопкой **Копировать** — удобно для форумов, объявлений или отправки другу. |
 | **Автозагрузка** | Смотри и отключай то, что стартует с Windows, плюс анализ времени загрузки. |
-| **Службы** | Безопасно включай/отключай службы Windows, с описаниями и игровым пресетом. |
+| **Службы** | Безопасно включай/отключай службы Windows, с описаниями и игровым пресетом. Внутри — панель отключения **телеметрии Windows** (пресеты мягко/средне/жёстко, всё обратимо). |
 | **Визуальные эффекты** | Отключай анимации и эффекты Windows для отзывчивости. |
 | **Кликер** | Настраиваемый авто-кликер (мышь + клавиатура, спам или зажатие) с горячей клавишей и **запись макросов**. |
 | **Скриншоты** | Снимок всего экрана и области (со стрелками/рамками/текстом) по глобальным горячим клавишам. |
@@ -146,7 +148,9 @@ DeepTools — системный твикер, поэтому он делает 
 - **Бенчмарк** — быстрый тест CPU, RAM и диска «до/после». Сохраняет результат, чтобы увидеть реальный прирост.
 - **Стресс-тест** — грузит все ядра CPU на 100% в течение 2 минут и показывает пиковую температуру.
 - **История температур** — график CPU/GPU за 24 часа с разбором пиков.
-- **Время в играх** — считает игровые сессии (время, средний CPU, пиковые температуры) и шлёт отчёт при закрытии игры. Работает с полноэкранными и borderless-играми.
+- **Время в играх** — считает игровые сессии (время, средний FPS, 1% low, средний CPU, пиковые температуры) и шлёт отчёт при закрытии игры. Работает с полноэкранными и borderless-играми. Кнопка **Поделиться** рендерит PNG-карточку со спекой ПК и топом игр.
+- **Отключение телеметрии** — выключает телеметрию Windows через официальные политики, службы и задачи планировщика. Три пресета (мягко/средне/жёстко), живой статус каждого твика, полный откат одной кнопкой.
+- **Точка восстановления** — автоматически предлагается перед рискованными твиками (деблоат, пресеты служб, телеметрия), чтобы всегда можно было откатиться.
 - **Прицел** — настраиваемый накладной прицел (крест, точка, круг, T-образный); настройки запоминаются.
 - **Виджет на рабочий стол** — компактная плашка CPU/RAM/температуры, всегда поверх окон.
 
@@ -191,6 +195,6 @@ DeepTools доступен на **русском и английском**. Пр
 
 <div align="center">
 
-© 2026 dep1xar · DeepTools v1.5.0
+© 2026 dep1xar · DeepTools v1.6.0
 
 </div>

@@ -17,25 +17,14 @@ namespace DeepTools
         public bool Scanned;
     }
 
-    public class SmartCleanupPanel : Panel
+    // Движок очистки: список категорий и работа с папками.
+    // Общий для панели SmartCleanup и планировщика автоочистки
+    public static class CleanupEngine
     {
-        private List<CleanupCategory> categories = new List<CleanupCategory>();
-        private List<CheckBox> categoryChecks = new List<CheckBox>();
-        private List<Label> categorySizeLabels = new List<Label>();
-        private Label totalLabel;
-        private Label statusLabel;
-
-        public SmartCleanupPanel()
+        public static List<CleanupCategory> BuildCategories()
         {
-            Size = new Size(760, 616);
-            BackColor = Theme.BgColor;
+            var categories = new List<CleanupCategory>();
 
-            BuildCategoryList();
-            BuildUi();
-        }
-
-        private void BuildCategoryList()
-        {
             CleanupCategory temp = new CleanupCategory();
             temp.DisplayName = Lang.T("Temp пользователя", "User Temp");
             temp.Path = System.IO.Path.GetTempPath();
@@ -75,10 +64,12 @@ namespace DeepTools
             steamShader.Path = FindSteamShaderCache();
             steamShader.RequiresAdmin = false;
             categories.Add(steamShader);
+
+            return categories;
         }
 
         // Папка shadercache в установке Steam; ищем по стандартным путям и конфигу
-        private string FindSteamShaderCache()
+        private static string FindSteamShaderCache()
         {
             string custom = AppConfig.Get("steam_path", "");
             string[] roots = {
@@ -94,6 +85,223 @@ namespace DeepTools
             }
             // не нашли - вернём стандартный путь, категория честно покажет 0 байт
             return "C:\\Program Files (x86)\\Steam\\steamapps\\shadercache";
+        }
+
+        // Считает суммарный размер файлов внутри папки (рекурсивно), пропуская недоступные файлы
+        public static void GetDirectorySize(string path, out long size, out int count)
+        {
+            size = 0;
+            count = 0;
+            if (!Directory.Exists(path)) return;
+
+            string[] files;
+            try { files = Directory.GetFiles(path, "*", SearchOption.AllDirectories); }
+            catch { return; }
+
+            for (int i = 0; i < files.Length; i++)
+            {
+                try
+                {
+                    FileInfo info = new FileInfo(files[i]);
+                    size += info.Length;
+                    count++;
+                }
+                catch
+                {
+                    // файл мог исчезнуть или быть недоступен - пропускаем
+                }
+            }
+        }
+
+        // Удаляет содержимое папки, саму папку оставляет. Возвращает сколько байт реально освободили
+        public static long CleanFolderContents(string path)
+        {
+            long freed = 0;
+            if (!Directory.Exists(path)) return freed;
+
+            // Удаляем файлы во всех подпапках
+            string[] files;
+            try { files = Directory.GetFiles(path, "*", SearchOption.AllDirectories); }
+            catch { return freed; }
+
+            for (int i = 0; i < files.Length; i++)
+            {
+                try
+                {
+                    FileInfo info = new FileInfo(files[i]);
+                    long len = info.Length;
+                    File.Delete(files[i]);
+                    freed += len;
+                }
+                catch
+                {
+                    // файл занят или недоступен - пропускаем
+                }
+            }
+
+            // Пытаемся удалить пустые подпапки
+            try
+            {
+                string[] dirs = Directory.GetDirectories(path);
+                for (int i = 0; i < dirs.Length; i++)
+                {
+                    try
+                    {
+                        Directory.Delete(dirs[i], true);
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            return freed;
+        }
+
+        public static string FormatSize(long bytes)
+        {
+            double kb = bytes / 1024.0;
+            double mb = kb / 1024.0;
+            double gb = mb / 1024.0;
+
+            if (gb >= 1) return gb.ToString("0.##") + Lang.T(" ГБ", " GB");
+            if (mb >= 1) return mb.ToString("0.#") + Lang.T(" МБ", " MB");
+            if (kb >= 1) return kb.ToString("0.#") + Lang.T(" КБ", " KB");
+            return bytes + Lang.T(" Б", " B");
+        }
+    }
+
+
+    // Планировщик автоочистки: раз в N дней тихо чистит выбранные категории
+    // и сообщает результат из трея. Настройки в конфиге:
+    //   autoclean_enabled - вкл/выкл
+    //   autoclean_days    - интервал в днях (1..30)
+    //   autoclean_cats    - какие категории чистить (битовая маска по индексам)
+    //   autoclean_last    - когда чистили в прошлый раз
+    public static class AutoCleanup
+    {
+        private static System.Windows.Forms.Timer timer;
+        private static bool cleaning;
+
+        public static bool Enabled
+        {
+            get { return AppConfig.GetBool("autoclean_enabled", false); }
+            set { AppConfig.SetBool("autoclean_enabled", value); }
+        }
+
+        public static int IntervalDays
+        {
+            get
+            {
+                int d;
+                if (!int.TryParse(AppConfig.Get("autoclean_days", "7"), out d)) d = 7;
+                if (d < 1) d = 1;
+                if (d > 30) d = 30;
+                return d;
+            }
+            set { AppConfig.Set("autoclean_days", value.ToString()); }
+        }
+
+        // Битовая маска выбранных категорий; по умолчанию все
+        public static int CategoryMask
+        {
+            get
+            {
+                int m;
+                if (!int.TryParse(AppConfig.Get("autoclean_cats", "-1"), out m)) m = -1;
+                return m;
+            }
+            set { AppConfig.Set("autoclean_cats", value.ToString()); }
+        }
+
+        public static DateTime LastRun
+        {
+            get
+            {
+                DateTime t;
+                if (DateTime.TryParseExact(AppConfig.Get("autoclean_last", ""), "yyyy-MM-dd HH:mm:ss",
+                    System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out t))
+                    return t;
+                return DateTime.MinValue;
+            }
+            set { AppConfig.Set("autoclean_last", value.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)); }
+        }
+
+        // Зовётся один раз при старте программы
+        public static void Start()
+        {
+            if (timer != null) return;
+            timer = new System.Windows.Forms.Timer { Interval = 10 * 60 * 1000 }; // проверка каждые 10 минут
+            timer.Tick += (s, e) => CheckDue();
+            timer.Start();
+
+            // Первая проверка через минуту после старта, не сразу -
+            // пусть программа спокойно поднимется
+            var firstCheck = new System.Windows.Forms.Timer { Interval = 60 * 1000 };
+            firstCheck.Tick += (s, e) => { firstCheck.Stop(); firstCheck.Dispose(); CheckDue(); };
+            firstCheck.Start();
+        }
+
+        private static void CheckDue()
+        {
+            if (!Enabled || cleaning) return;
+
+            DateTime last = LastRun;
+            // Первое включение: точку отсчёта ставим сейчас, чтобы очистка
+            // не сработала внезапно в момент включения тумблера
+            if (last == DateTime.MinValue) { LastRun = DateTime.Now; return; }
+            if ((DateTime.Now - last).TotalDays < IntervalDays) return;
+
+            // Не чистим кэши шейдеров под запущенной игрой
+            if (GameSessionTracker.IsGameRunning) return;
+
+            RunSilent();
+        }
+
+        private static void RunSilent()
+        {
+            cleaning = true;
+            int mask = CategoryMask;
+            bool isAdmin = Program.IsRunningAsAdmin();
+
+            var worker = new System.ComponentModel.BackgroundWorker();
+            worker.DoWork += (s, e) => {
+                long freed = 0;
+                List<CleanupCategory> cats = CleanupEngine.BuildCategories();
+                for (int i = 0; i < cats.Count; i++)
+                {
+                    if ((mask & (1 << i)) == 0) continue;
+                    if (cats[i].RequiresAdmin && !isAdmin) continue;
+                    freed += CleanupEngine.CleanFolderContents(cats[i].Path);
+                }
+                e.Result = freed;
+            };
+            worker.RunWorkerCompleted += (s, e) => {
+                cleaning = false;
+                LastRun = DateTime.Now;
+                long freed = e.Result is long ? (long)e.Result : 0;
+                TrayNotify.Info(
+                    Lang.T("Автоочистка выполнена", "Auto cleanup finished"),
+                    Lang.T("Освобождено ", "Freed ") + CleanupEngine.FormatSize(freed));
+            };
+            worker.RunWorkerAsync();
+        }
+    }
+
+    public class SmartCleanupPanel : Panel
+    {
+        private List<CleanupCategory> categories;
+        private List<CheckBox> categoryChecks = new List<CheckBox>();
+        private List<Label> categorySizeLabels = new List<Label>();
+        private Label totalLabel;
+        private Label statusLabel;
+
+        public SmartCleanupPanel()
+        {
+            Size = new Size(760, 616);
+            BackColor = Theme.BgColor;
+
+            categories = CleanupEngine.BuildCategories();
+            BuildUi();
         }
 
         private void BuildUi()
@@ -174,6 +382,7 @@ namespace DeepTools
                 y += 62;
             }
 
+            // Ряд кнопок: суммарно должен влезать в 760px панели с отступом 24
             var scanBtn = new RoundedButton
             {
                 Text = Lang.T("Сканировать", "Scan"),
@@ -181,7 +390,7 @@ namespace DeepTools
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
                 Location = new Point(24, y + 10),
-                Size = new Size(140, 36)
+                Size = new Size(130, 36)
             };
             scanBtn.Click += (s, e) => ScanAll();
             Controls.Add(scanBtn);
@@ -192,8 +401,8 @@ namespace DeepTools
                 ButtonColor = Theme.Accent,
                 HoverColor = Theme.AccentHover,
                 TextColor = Theme.BgColor,
-                Location = new Point(174, y + 10),
-                Size = new Size(160, 36)
+                Location = new Point(164, y + 10),
+                Size = new Size(150, 36)
             };
             cleanBtn.Click += (s, e) => CleanSelected();
             Controls.Add(cleanBtn);
@@ -204,8 +413,8 @@ namespace DeepTools
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
-                Location = new Point(344, y + 10),
-                Size = new Size(210, 36)
+                Location = new Point(324, y + 10),
+                Size = new Size(200, 36)
             };
             debloatBtn.Click += (s, e) => {
                 using (var f = new DebloatForm())
@@ -221,8 +430,8 @@ namespace DeepTools
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
-                Location = new Point(564, y + 10),
-                Size = new Size(210, 36)
+                Location = new Point(534, y + 10),
+                Size = new Size(200, 36)
             };
             uninstallBtn.Click += (s, e) => {
                 using (var f = new UninstallerForm())
@@ -253,6 +462,139 @@ namespace DeepTools
                 AutoSize = true
             };
             Controls.Add(statusLabel);
+
+            BuildSchedulerUi(y + 102);
+        }
+
+        // Карточка планировщика автоочистки: тумблер, интервал в днях, дата последней очистки.
+        // Чистятся категории, отмеченные галочками выше (маска сохраняется в конфиг)
+        private void BuildSchedulerUi(int y)
+        {
+            var card = Theme.MakeCard(this, new Point(24, y), new Size(650, 58));
+
+            var toggle = new ToggleSwitch
+            {
+                Location = new Point(16, 17),
+                Checked = AutoCleanup.Enabled
+            };
+            card.Controls.Add(toggle);
+
+            var titleLbl = new Label
+            {
+                Text = Lang.T("Автоочистка по расписанию", "Scheduled auto cleanup"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(74, 8),
+                AutoSize = true
+            };
+            card.Controls.Add(titleLbl);
+
+            var infoLbl = new Label
+            {
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(75, 32),
+                AutoSize = true
+            };
+            card.Controls.Add(infoLbl);
+
+            Action updateInfo = () => {
+                DateTime last = AutoCleanup.LastRun;
+                string lastText = last == DateTime.MinValue
+                    ? Lang.T("ещё не выполнялась", "not run yet")
+                    : Lang.T("последняя: ", "last run: ") + last.ToString("dd.MM HH:mm");
+                infoLbl.Text = Lang.T("Тихо чистит отмеченные категории, отчёт из трея. ", "Silently cleans checked categories, tray report. ") + lastText;
+            };
+            updateInfo();
+
+            // Степпер интервала: «раз в N дн.»
+            int days = AutoCleanup.IntervalDays;
+
+            var daysLbl = new Label
+            {
+                Text = Lang.T("раз в ", "every "),
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(452, 20),
+                AutoSize = true
+            };
+            card.Controls.Add(daysLbl);
+
+            var valLbl = new Label
+            {
+                Text = days + Lang.T(" дн.", " d"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Location = new Point(520, 18),
+                Size = new Size(44, 18),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            var minusBtn = new RoundedButton
+            {
+                Text = "−",
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Location = new Point(496, 15),
+                Size = new Size(24, 24)
+            };
+            minusBtn.Click += (s, e) => {
+                if (days > 1) { days--; valLbl.Text = days + Lang.T(" дн.", " d"); AutoCleanup.IntervalDays = days; }
+            };
+            card.Controls.Add(minusBtn);
+            card.Controls.Add(valLbl);
+
+            var plusBtn = new RoundedButton
+            {
+                Text = "+",
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Location = new Point(564, 15),
+                Size = new Size(24, 24)
+            };
+            plusBtn.Click += (s, e) => {
+                if (days < 30) { days++; valLbl.Text = days + Lang.T(" дн.", " d"); AutoCleanup.IntervalDays = days; }
+            };
+            card.Controls.Add(plusBtn);
+
+            toggle.CheckedChanged += (s, e) => {
+                AutoCleanup.Enabled = toggle.Checked;
+                if (toggle.Checked)
+                {
+                    SaveCategoryMask();
+                    // Отсчёт с момента включения, а не с эпохи - иначе чистка
+                    // рванёт сразу же
+                    if (AutoCleanup.LastRun == DateTime.MinValue) AutoCleanup.LastRun = DateTime.Now;
+                }
+                updateInfo();
+            };
+
+            // Смена галочек при включённом планировщике сразу обновляет маску
+            for (int i = 0; i < categoryChecks.Count; i++)
+            {
+                categoryChecks[i].CheckedChanged += (s, e) => {
+                    if (AutoCleanup.Enabled) SaveCategoryMask();
+                };
+            }
+        }
+
+        // Маска категорий для автоочистки - из текущих галочек панели
+        private void SaveCategoryMask()
+        {
+            int mask = 0;
+            for (int i = 0; i < categoryChecks.Count; i++)
+            {
+                if (categoryChecks[i].Checked && categoryChecks[i].Enabled) mask |= 1 << i;
+            }
+            AutoCleanup.CategoryMask = mask;
         }
 
         private void ScanAll()
@@ -322,86 +664,19 @@ namespace DeepTools
             ScanAll();
         }
 
-        // Считает суммарный размер файлов внутри папки (рекурсивно), пропуская недоступные файлы
         private void GetDirectorySize(string path, out long size, out int count)
         {
-            size = 0;
-            count = 0;
-            if (!Directory.Exists(path)) return;
-
-            string[] files;
-            try { files = Directory.GetFiles(path, "*", SearchOption.AllDirectories); }
-            catch { return; }
-
-            for (int i = 0; i < files.Length; i++)
-            {
-                try
-                {
-                    FileInfo info = new FileInfo(files[i]);
-                    size += info.Length;
-                    count++;
-                }
-                catch
-                {
-                    // файл мог исчезнуть или быть недоступен - пропускаем
-                }
-            }
+            CleanupEngine.GetDirectorySize(path, out size, out count);
         }
 
-        // Удаляет содержимое папки, саму папку оставляет. Возвращает сколько байт реально освободили
         private long CleanFolderContents(string path)
         {
-            long freed = 0;
-            if (!Directory.Exists(path)) return freed;
-
-            // Удаляем файлы во всех подпапках
-            string[] files;
-            try { files = Directory.GetFiles(path, "*", SearchOption.AllDirectories); }
-            catch { return freed; }
-
-            for (int i = 0; i < files.Length; i++)
-            {
-                try
-                {
-                    FileInfo info = new FileInfo(files[i]);
-                    long len = info.Length;
-                    File.Delete(files[i]);
-                    freed += len;
-                }
-                catch
-                {
-                    // файл занят или недоступен - пропускаем
-                }
-            }
-
-            // Пытаемся удалить пустые подпапки
-            try
-            {
-                string[] dirs = Directory.GetDirectories(path);
-                for (int i = 0; i < dirs.Length; i++)
-                {
-                    try
-                    {
-                        Directory.Delete(dirs[i], true);
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-
-            return freed;
+            return CleanupEngine.CleanFolderContents(path);
         }
 
         private string FormatSize(long bytes)
         {
-            double kb = bytes / 1024.0;
-            double mb = kb / 1024.0;
-            double gb = mb / 1024.0;
-
-            if (gb >= 1) return gb.ToString("0.##") + Lang.T(" ГБ", " GB");
-            if (mb >= 1) return mb.ToString("0.#") + Lang.T(" МБ", " MB");
-            if (kb >= 1) return kb.ToString("0.#") + Lang.T(" КБ", " KB");
-            return bytes + Lang.T(" Б", " B");
+            return CleanupEngine.FormatSize(bytes);
         }
     }
 }
