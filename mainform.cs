@@ -72,6 +72,7 @@ namespace DeepTools
             StartupGuard.Start();
             MinerGuard.Start();
             TempHistory.Start();
+            AutoCleanup.Start();
             NotesManager.RestoreAll();
             UpdateChecker.CheckInBackground(true, null);
             WinKeyBlocker.Init();

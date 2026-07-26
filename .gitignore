@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+*.user
+.vs/
+
+# Собранные исполняемые файлы (кладутся в GitHub Releases, а не в репозиторий)
+DeepTools.exe
+DeepTools_build.exe
+
+# Установщики сторонних компонентов
+PawnIO_setup.exe
+
+# Личные скриншоты
+screenshots/
+
+# Локальный конфиг
+config.txt

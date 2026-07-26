@@ -7,8 +7,8 @@
 [assembly: AssemblyDescription("Умный твикер для Windows / Smart tweaker for Windows")]
 [assembly: AssemblyCompany("DeepTools")]
 [assembly: AssemblyCopyright("© 2026 dep1xar")]
-[assembly: AssemblyVersion("1.4.0.0")]
-[assembly: AssemblyFileVersion("1.4.0.0")]
+[assembly: AssemblyVersion("1.6.0.0")]
+[assembly: AssemblyFileVersion("1.6.0.0")]
 
 namespace DeepTools
 {

@@ -10,20 +10,35 @@ using System.Windows.Forms;
 namespace DeepTools
 {
     // Трекер игровых сессий. GameBoosterPanel сообщает о найденной игре (детект уже есть),
-    // трекер копит статистику (средний CPU, макс. температуры), а когда процесс игры
-    // завершается - шлёт отчёт в трей и дописывает сессию в журнал для статистики времени.
-    // Журнал: AppData\DeepTools\gametime.log, строка = имя|дата|секунды|срCPU|максCPU°|максGPU°
+    // трекер копит статистику (средний CPU, макс. температуры, FPS из PresentTracer),
+    // а когда процесс игры завершается - шлёт отчёт в трей и дописывает сессию в журнал.
+    // Журнал: AppData\DeepTools\gametime.log,
+    // строка = имя|дата|секунды|срCPU|максCPU°|максGPU°|срFPS|1%low
     public static class GameSessionTracker
     {
         private const int MinSessionSec = 180; // случайные развороты окон на пару минут не считаем
 
         private static Process proc;
+        private static int procId;
         private static string procName;
         private static DateTime start;
         private static double cpuSum;
         private static int cpuSamples;
         private static int maxCpuTemp = -1;
         private static int maxGpuTemp = -1;
+        private static double fpsSum;
+        private static int fpsSamples;
+        private static int worstLowFps = -1; // худший 1% low за сессию = самый жёсткий статтер
+
+        // Сейчас идёт игровая сессия? (автоочистка не трогает кэши шейдеров под игрой)
+        public static bool IsGameRunning
+        {
+            get
+            {
+                if (proc == null) return false;
+                try { return !proc.HasExited; } catch { return false; }
+            }
+        }
 
         public static string LogPath
         {
@@ -48,12 +63,16 @@ namespace DeepTools
             }
 
             proc = p;
+            try { procId = p.Id; } catch { procId = 0; }
             try { procName = p.ProcessName; } catch { procName = "game"; }
             start = DateTime.Now;
             cpuSum = 0;
             cpuSamples = 0;
             maxCpuTemp = -1;
             maxGpuTemp = -1;
+            fpsSum = 0;
+            fpsSamples = 0;
+            worstLowFps = -1;
         }
 
         // Зовётся каждый тик таймера детекта (~1.5 сек), даже когда игра свёрнута
@@ -76,6 +95,17 @@ namespace DeepTools
             }
             if (SystemStats.CpuTempNum > maxCpuTemp) maxCpuTemp = SystemStats.CpuTempNum;
             if (SystemStats.GpuTempNum > maxGpuTemp) maxGpuTemp = SystemStats.GpuTempNum;
+
+            // FPS игры из ETW-трейсера (GameBooster держит его включённым).
+            // Снапшот есть, только пока игра реально рисует - свёрнутая не портит среднее
+            PresentTracer.Snap snap = PresentTracer.SnapshotForPid(procId);
+            if (snap != null && snap.Fps > 0)
+            {
+                fpsSum += snap.Fps;
+                fpsSamples++;
+                if (snap.LowFps > 0 && (worstLowFps < 0 || snap.LowFps < worstLowFps))
+                    worstLowFps = snap.LowFps;
+            }
         }
 
         private static void Finish()
@@ -85,7 +115,10 @@ namespace DeepTools
             double avgCpu = cpuSamples > 0 ? cpuSum / cpuSamples : -1;
             int cpuT = maxCpuTemp;
             int gpuT = maxGpuTemp;
+            int avgFps = fpsSamples > 0 ? (int)Math.Round(fpsSum / fpsSamples) : -1;
+            int lowFps = worstLowFps;
             proc = null;
+            procId = 0;
 
             if (durationSec < MinSessionSec) return;
 
@@ -95,14 +128,16 @@ namespace DeepTools
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
                 string line = name.Replace("|", "_") + "|" + start.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
                     + "|" + (int)durationSec + "|" + (avgCpu < 0 ? "-1" : avgCpu.ToString("0", CultureInfo.InvariantCulture))
-                    + "|" + cpuT + "|" + gpuT;
+                    + "|" + cpuT + "|" + gpuT + "|" + avgFps + "|" + lowFps;
                 File.AppendAllText(LogPath, line + Environment.NewLine);
             }
             catch { }
 
-            // Отчёт после игры
+            // Отчёт после игры: сначала FPS (самое интересное), затем нагрев
             string stats = "";
-            if (avgCpu >= 0) stats += Lang.T("средний CPU ", "avg CPU ") + avgCpu.ToString("0") + "%";
+            if (avgFps > 0) stats += Lang.T("средний FPS ", "avg FPS ") + avgFps;
+            if (lowFps > 0) stats += (stats == "" ? "" : ", ") + "1% low " + lowFps;
+            if (avgCpu >= 0) stats += (stats == "" ? "" : ", ") + Lang.T("средний CPU ", "avg CPU ") + avgCpu.ToString("0") + "%";
             if (cpuT > 0) stats += (stats == "" ? "" : ", ") + Lang.T("макс. CPU ", "max CPU ") + cpuT + "°C";
             if (gpuT > 0) stats += (stats == "" ? "" : ", ") + Lang.T("макс. GPU ", "max GPU ") + gpuT + "°C";
 
@@ -131,6 +166,8 @@ namespace DeepTools
             public int WeekSec;
             public int Sessions;
             public DateTime LastPlayed;
+            public double FpsWeightedSum; // средний FPS сессии * её длительность
+            public int FpsSec;            // сумма длительностей сессий, где FPS был замерен
         }
 
         private Point dragStart;
@@ -206,6 +243,45 @@ namespace DeepTools
             int totalWeek = 0;
             foreach (GameStat g in stats) { totalAll += g.TotalSec; totalWeek += g.WeekSec; }
 
+            // PNG-карточка со спекой и топом игр - в буфер и в Изображения\DeepTools
+            var shareBtn = new RoundedButton
+            {
+                Text = Lang.T("📤 Поделиться", "📤 Share"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Location = new Point(Width - 178, 6),
+                Size = new Size(126, 28),
+                Enabled = stats.Count > 0
+            };
+            shareBtn.Click += (s, e) => {
+                shareBtn.Enabled = false;
+                shareBtn.Text = Lang.T("Создаём...", "Creating...");
+
+                var lines = new List<ShareCard.GameLine>();
+                foreach (GameStat g in stats)
+                {
+                    lines.Add(new ShareCard.GameLine
+                    {
+                        Name = g.Name,
+                        TotalSec = g.TotalSec,
+                        AvgFps = g.FpsSec > 0 ? (int)Math.Round(g.FpsWeightedSum / g.FpsSec) : -1
+                    });
+                }
+                ShareCard.CreateGameTimeCard(lines, totalAll, totalWeek, path => {
+                    shareBtn.Enabled = true;
+                    shareBtn.Text = Lang.T("📤 Поделиться", "📤 Share");
+                    if (path != null)
+                        TrayNotify.Info(
+                            Lang.T("Карточка готова", "Card is ready"),
+                            Lang.T("Скопирована в буфер и сохранена. Нажми, чтобы открыть папку", "Copied to clipboard and saved. Click to open the folder"),
+                            () => { try { System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + path + "\""); } catch { } });
+                    else
+                        TrayNotify.Info(Lang.T("Не получилось создать карточку", "Failed to create the card"), "");
+                });
+            };
+            titleBar.Controls.Add(shareBtn);
+
             var summaryLabel = new Label
             {
                 Text = stats.Count == 0
@@ -275,7 +351,8 @@ namespace DeepTools
                 var sessLbl = new Label
                 {
                     Text = Lang.T("сессий: ", "sessions: ") + g.Sessions
-                        + Lang.T(", последняя ", ", last ") + g.LastPlayed.ToString("dd.MM HH:mm"),
+                        + Lang.T(", последняя ", ", last ") + g.LastPlayed.ToString("dd.MM HH:mm")
+                        + (g.FpsSec > 0 ? Lang.T(", ср. FPS ", ", avg FPS ") + (int)Math.Round(g.FpsWeightedSum / g.FpsSec) : ""),
                     ForeColor = Theme.TextDim,
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 7.5F),
@@ -329,6 +406,14 @@ namespace DeepTools
                         if (when >= weekAgo) stat.WeekSec += sec;
                         stat.Sessions++;
                         if (when > stat.LastPlayed) stat.LastPlayed = when;
+
+                        // FPS появился в v1.6: старые строки короче, у новых может стоять -1
+                        int fps;
+                        if (parts.Length > 6 && int.TryParse(parts[6], out fps) && fps > 0)
+                        {
+                            stat.FpsWeightedSum += (double)fps * sec;
+                            stat.FpsSec += sec;
+                        }
                     }
                 }
             }

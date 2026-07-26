@@ -68,6 +68,23 @@ namespace DeepTools
             };
             Controls.Add(hintLabel);
 
+            var telemetryBtn = new RoundedButton
+            {
+                Text = Lang.T("🔇 Телеметрия", "🔇 Telemetry"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Location = new Point(444, 16),
+                Size = new Size(134, 34)
+            };
+            telemetryBtn.Click += (s, e) => {
+                using (var f = new TelemetryForm())
+                {
+                    f.ShowDialog(FindForm());
+                }
+            };
+            Controls.Add(telemetryBtn);
+
             var presetBtn = new RoundedButton
             {
                 Text = Lang.T("Пресет: Игровой ПК", "Preset: Gaming PC"),
@@ -244,21 +261,24 @@ namespace DeepTools
 
         private void ApplyGamingPreset()
         {
-            string[] toDisable = new string[]
-            {
-                "XblAuthManager", "XblGameSave", "XboxNetApiSvc", "XboxGipSvc",
-                "DiagTrack", "dmwappushservice", "MapsBroker", "RetailDemo", "Fax"
-            };
+            // Пресет трогает 9 служб разом - предлагаем точку восстановления
+            RestorePoint.OfferBefore(FindForm(), () => {
+                string[] toDisable = new string[]
+                {
+                    "XblAuthManager", "XblGameSave", "XboxNetApiSvc", "XboxGipSvc",
+                    "DiagTrack", "dmwappushservice", "MapsBroker", "RetailDemo", "Fax"
+                };
 
-            int success = 0;
-            for (int i = 0; i < toDisable.Length; i++)
-            {
-                if (SetServiceEnabled(toDisable[i], false)) success++;
-            }
+                int success = 0;
+                for (int i = 0; i < toDisable.Length; i++)
+                {
+                    if (SetServiceEnabled(toDisable[i], false)) success++;
+                }
 
-            statusLabel.Text = Lang.T("Пресет применён: отключено служб ", "Preset applied: services disabled ") + success + Lang.T(" из ", " of ") + toDisable.Length;
-            statusLabel.ForeColor = Theme.Accent;
-            RefreshList();
+                statusLabel.Text = Lang.T("Пресет применён: отключено служб ", "Preset applied: services disabled ") + success + Lang.T(" из ", " of ") + toDisable.Length;
+                statusLabel.ForeColor = Theme.Accent;
+                RefreshList();
+            });
         }
     }
 }
