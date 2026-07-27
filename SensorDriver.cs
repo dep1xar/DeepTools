@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using System.Windows.Forms;
 
@@ -53,14 +54,32 @@ namespace DeepTools
         {
             try
             {
+                // Ресурс лежит сжатым (.gz, см. build.ps1); несжатое имя - запасной
+                // вариант на случай сборки старым скриптом
                 Assembly self = Assembly.GetExecutingAssembly();
-                using (Stream s = self.GetManifestResourceStream(ResourceName))
+                bool gzipped = true;
+                Stream s = self.GetManifestResourceStream(ResourceName + ".gz");
+                if (s == null)
                 {
-                    if (s == null) return null;
+                    gzipped = false;
+                    s = self.GetManifestResourceStream(ResourceName);
+                }
+                if (s == null) return null;
+
+                using (s)
+                {
                     string path = Path.Combine(Path.GetTempPath(), "PawnIO_setup.exe");
                     using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write))
                     {
-                        s.CopyTo(fs);
+                        if (gzipped)
+                        {
+                            using (var gz = new GZipStream(s, CompressionMode.Decompress))
+                                gz.CopyTo(fs);
+                        }
+                        else
+                        {
+                            s.CopyTo(fs);
+                        }
                     }
                     return path;
                 }

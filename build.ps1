@@ -27,21 +27,39 @@ $embedDlls = @(
     "System.Runtime.CompilerServices.Unsafe.dll",
     "System.Threading.AccessControl.dll"
 )
+# Ресурсы встраиваются сжатыми (gzip), EmbeddedAssemblies/SensorDriver распаковывают
+# их в рантайме - exe худеет примерно вдвое. Сжатые копии складываются во временную папку
+$gzDir = Join-Path $env:TEMP "deeptools_build_gz"
+New-Item -ItemType Directory -Force -Path $gzDir | Out-Null
+Add-Type -AssemblyName System.IO.Compression | Out-Null
+
+function Compress-ToGz([string]$srcPath, [string]$gzPath) {
+    $data = [System.IO.File]::ReadAllBytes((Resolve-Path $srcPath))
+    $fs = [System.IO.File]::Create($gzPath)
+    $gz = New-Object System.IO.Compression.GZipStream($fs, [System.IO.Compression.CompressionLevel]::Optimal)
+    $gz.Write($data, 0, $data.Length)
+    $gz.Close(); $fs.Close()
+}
+
 $resourceArgs = @()
 foreach ($dll in $embedDlls) {
     if (-not (Test-Path $dll)) {
         Write-Host "Не найдена DLL для встраивания: $dll" -ForegroundColor Red
         exit 1
     }
-    # Имя ресурса = простое имя сборки (без -NDD и т.п. суффиксов файла) + .dll
+    # Имя ресурса = простое имя сборки (без -NDD и т.п. суффиксов файла) + .dll.gz
     $asmName = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $dll)).Name
-    $resourceArgs += "/resource:$dll,DeepTools.Embedded.$asmName.dll"
+    $gzPath = Join-Path $gzDir "$asmName.dll.gz"
+    Compress-ToGz $dll $gzPath
+    $resourceArgs += "/resource:$gzPath,DeepTools.Embedded.$asmName.dll.gz"
 }
 
 # Встраиваем установщик драйвера датчиков PawnIO, чтобы предлагать его прямо из программы,
 # когда LibreHardwareMonitor заблокирован (Целостность памяти в Windows 11)
 if (Test-Path "PawnIO_setup.exe") {
-    $resourceArgs += "/resource:PawnIO_setup.exe,DeepTools.PawnIO_setup.exe"
+    $gzPawn = Join-Path $gzDir "PawnIO_setup.exe.gz"
+    Compress-ToGz "PawnIO_setup.exe" $gzPawn
+    $resourceArgs += "/resource:$gzPawn,DeepTools.PawnIO_setup.exe.gz"
 }
 
 Write-Host "Компиляция $($sources.Count) файлов, встраивание $($embedDlls.Count) DLL..." -ForegroundColor Cyan

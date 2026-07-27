@@ -170,8 +170,9 @@ namespace DeepTools
 
             var hint = new Label
             {
-                Text = Lang.T("Изменения применяются сразу. Хоткей показа оверлея - F10.",
-                              "Changes apply immediately. Overlay hotkey is F10."),
+                Text = Lang.T("Изменения применяются сразу. Хоткей показа оверлея - ",
+                              "Changes apply immediately. Overlay hotkey is ")
+                       + Hotkeys.Get(NativeMethods.HOTKEY_ID_OVERLAY) + ".",
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),

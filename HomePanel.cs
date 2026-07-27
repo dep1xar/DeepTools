@@ -124,7 +124,9 @@ namespace DeepTools
 
             var heroHint = new Label
             {
-                Text = Lang.T("Программа живёт в трее: закрытие окна не выключает её. F8 - кликер, F9 - скриншот", "Lives in the tray: closing the window does not exit. F8 - clicker, F9 - screenshot"),
+                Text = Lang.T("Программа живёт в трее: закрытие окна не выключает её. ", "Lives in the tray: closing the window does not exit. ")
+                       + Hotkeys.Get(NativeMethods.HOTKEY_ID_CLICKER) + Lang.T(" - кликер, ", " - clicker, ")
+                       + Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT) + Lang.T(" - скриншот", " - screenshot"),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8F),
@@ -182,10 +184,10 @@ namespace DeepTools
                 Lang.T("Датчики, диски, бенчмарк", "Sensors, disks, benchmark"), "health");
             MakeQuickCard(new Point(24, 406), "⚡",
                 Lang.T("Автокликер", "Autoclicker"),
-                Lang.T("Мышь и клавиатура, F8", "Mouse and keyboard, F8"), "clicker");
+                Lang.T("Мышь и клавиатура, ", "Mouse and keyboard, ") + Hotkeys.Get(NativeMethods.HOTKEY_ID_CLICKER), "clicker");
             MakeQuickCard(new Point(265, 406), "◉",
                 Lang.T("Скриншоты", "Screenshots"),
-                Lang.T("Снимок экрана по F9", "Capture screen with F9"), "screenshots");
+                Lang.T("Снимок экрана по ", "Capture screen with ") + Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT), "screenshots");
             MakeQuickCard(new Point(506, 406), "⚙",
                 Lang.T("Настройки", "Settings"),
                 Lang.T("Тема, язык, права", "Theme, language, rights"), "settings");

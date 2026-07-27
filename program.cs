@@ -13,6 +13,12 @@ namespace DeepTools
             // Должно быть до первого обращения к встроенным сборкам (датчики температур)
             EmbeddedAssemblies.Install();
 
+            // Необработанные исключения пишем в %AppData%\DeepTools\crash.log -
+            // иначе при падении у пользователя нет ничего, что можно прислать
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += (s, e) => LogCrash(e.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (s, e) => LogCrash(e.ExceptionObject as Exception);
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
@@ -44,6 +50,31 @@ namespace DeepTools
             }
 
             Application.Run(new MainForm(isAdmin));
+        }
+
+        private static void LogCrash(Exception ex)
+        {
+            if (ex == null) return;
+            try
+            {
+                string dir = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DeepTools");
+                System.IO.Directory.CreateDirectory(dir);
+                System.IO.File.AppendAllText(System.IO.Path.Combine(dir, "crash.log"),
+                    "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] DeepTools " +
+                    Application.ProductVersion + Environment.NewLine + ex + Environment.NewLine + Environment.NewLine);
+            }
+            catch { }
+
+            try
+            {
+                MessageBox.Show(
+                    Lang.T("Произошла ошибка: ", "An error occurred: ") + ex.Message + Environment.NewLine +
+                    Lang.T("Подробности сохранены в crash.log (папка DeepTools в AppData).",
+                           "Details saved to crash.log (DeepTools folder in AppData)."),
+                    "DeepTools", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            catch { }
         }
 
         // Проверка, запущено ли приложение от имени администратора

@@ -368,9 +368,9 @@ namespace DeepTools
         }
 
         // ---- Хоткеи (собственные, на своём Handle) ----
-        // F6 глобально занят региональным скриншотом (главная форма). Пока открыто
-        // окно макросов, временно забираем F6 себе под запись, а при закрытии
-        // возвращаем главной форме - иначе RegisterHotKey на F6 просто не сработает
+        // Клавиша регионального скриншота глобально занята главной формой (по
+        // умолчанию F6). Пока открыто окно макросов, снимаем её и забираем F6/F7
+        // себе под запись/воспроизведение, а при закрытии возвращаем главной форме
         private void RegisterHotkeys()
         {
             if (Owner != null)
@@ -385,10 +385,11 @@ namespace DeepTools
         {
             NativeMethods.UnregisterHotKey(Handle, NativeMethods.HOTKEY_ID_MACRO_REC);
             NativeMethods.UnregisterHotKey(Handle, NativeMethods.HOTKEY_ID_MACRO_PLAY);
-            // Возвращаем F6 главной форме под региональный скриншот
+            // Возвращаем главной форме её клавишу регионального скриншота
+            // (могла быть переназначена в Настройках, поэтому берём из Hotkeys)
             if (Owner != null)
             {
-                try { NativeMethods.RegisterHotKey(Owner.Handle, NativeMethods.HOTKEY_ID_REGION, 0, (uint)Keys.F6); } catch { }
+                try { NativeMethods.RegisterHotKey(Owner.Handle, NativeMethods.HOTKEY_ID_REGION, 0, (uint)Hotkeys.Get(NativeMethods.HOTKEY_ID_REGION)); } catch { }
             }
         }
 

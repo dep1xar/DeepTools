@@ -225,7 +225,7 @@ namespace DeepTools
 
             var hintLabel = new Label
             {
-                Text = "F8",
+                Text = Hotkeys.Get(NativeMethods.HOTKEY_ID_CLICKER).ToString(),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),

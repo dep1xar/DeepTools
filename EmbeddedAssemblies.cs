@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 
 namespace DeepTools
@@ -34,28 +35,41 @@ namespace DeepTools
                 Assembly cached;
                 if (cache.TryGetValue(resourceName, out cached)) return cached;
 
-                Assembly self = Assembly.GetExecutingAssembly();
-                using (Stream stream = self.GetManifestResourceStream(resourceName))
+                // Ресурсы лежат сжатыми (<имя>.dll.gz, см. build.ps1); несжатый вариант
+                // поддерживаем как запасной - на случай сборки старым скриптом
+                byte[] data = ReadResource(resourceName + ".gz", true);
+                if (data == null) data = ReadResource(resourceName, false);
+                if (data == null)
                 {
-                    if (stream == null)
-                    {
-                        // Сборки с таким именем среди ресурсов нет - пусть CLR ищет дальше сам
-                        cache[resourceName] = null;
-                        return null;
-                    }
+                    // Сборки с таким именем среди ресурсов нет - пусть CLR ищет дальше сам
+                    cache[resourceName] = null;
+                    return null;
+                }
 
-                    byte[] data = new byte[stream.Length];
-                    int offset = 0;
-                    while (offset < data.Length)
-                    {
-                        int read = stream.Read(data, offset, data.Length - offset);
-                        if (read <= 0) break;
-                        offset += read;
-                    }
+                Assembly loaded = Assembly.Load(data);
+                cache[resourceName] = loaded;
+                return loaded;
+            }
+        }
 
-                    Assembly loaded = Assembly.Load(data);
-                    cache[resourceName] = loaded;
-                    return loaded;
+        private static byte[] ReadResource(string name, bool gzipped)
+        {
+            Assembly self = Assembly.GetExecutingAssembly();
+            using (Stream stream = self.GetManifestResourceStream(name))
+            {
+                if (stream == null) return null;
+                using (var ms = new MemoryStream())
+                {
+                    if (gzipped)
+                    {
+                        using (var gz = new GZipStream(stream, CompressionMode.Decompress))
+                            gz.CopyTo(ms);
+                    }
+                    else
+                    {
+                        stream.CopyTo(ms);
+                    }
+                    return ms.ToArray();
                 }
             }
         }

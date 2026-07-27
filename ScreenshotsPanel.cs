@@ -13,6 +13,7 @@ namespace DeepTools
         public event EventHandler RequestHotkeyCapture;
 
         private Label hotkeyValueLabel;
+        private RoundedButton regionBtn;
         private Label captureHint;
         private FlowLayoutPanel gallery;
 
@@ -63,7 +64,7 @@ namespace DeepTools
 
             hotkeyValueLabel = new Label
             {
-                Text = "F9",
+                Text = Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT).ToString(),
                 ForeColor = Theme.Accent,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
@@ -87,9 +88,9 @@ namespace DeepTools
             };
             topCard.Controls.Add(changeBtn);
 
-            var regionBtn = new RoundedButton
+            regionBtn = new RoundedButton
             {
-                Text = Lang.T("Область (F6)", "Region (F6)"),
+                Text = Lang.T("Область (", "Region (") + Hotkeys.Get(NativeMethods.HOTKEY_ID_REGION) + ")",
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
@@ -137,6 +138,12 @@ namespace DeepTools
         public void SetHotkeyDisplay(string text)
         {
             hotkeyValueLabel.Text = text;
+        }
+
+        // Обновить подпись кнопки области после переназначения клавиши в Настройках
+        public void RefreshRegionHotkey()
+        {
+            regionBtn.Text = Lang.T("Область (", "Region (") + Hotkeys.Get(NativeMethods.HOTKEY_ID_REGION) + ")";
         }
 
         // Скриншот выделенной области с разметкой (стрелки, рамки, текст)

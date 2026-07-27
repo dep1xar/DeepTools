@@ -48,8 +48,10 @@ namespace DeepTools
 
         private NotifyIcon trayIcon;
 
-        private Keys screenshotHotkey = Keys.F9;
-        private bool awaitingHotkeyCapture = false;
+        // Захват новой клавиши для хоткея: id действия, которое ждёт нажатия (-1 = никто)
+        private int awaitingCaptureId = -1;
+        private System.Collections.Generic.Dictionary<int, RoundedButton> hotkeyButtons =
+            new System.Collections.Generic.Dictionary<int, RoundedButton>();
 
         public MainForm(bool isAdminFlag)
         {
@@ -64,7 +66,7 @@ namespace DeepTools
 
             try { Icon = AppIcon(); } catch { }
 
-            LoadScreenshotHotkey();
+            Hotkeys.Load();
             SetupTrayIcon();
             StartTrayMonitor();
             BuildShell();
@@ -73,6 +75,7 @@ namespace DeepTools
             MinerGuard.Start();
             TempHistory.Start();
             AutoCleanup.Start();
+            KeepAwake.Restore();
             NotesManager.RestoreAll();
             UpdateChecker.CheckInBackground(true, null);
             WinKeyBlocker.Init();
@@ -80,6 +83,7 @@ namespace DeepTools
 
             Load += (s, e) => ApplyRoundedRegion();
             Load += (s, e) => RegisterHotkeys();
+            Shown += (s, e) => WhatsNew.ShowIfUpdated(this);
             FormClosing += (s, e) => OnFormClosing(s, e);
             FormClosed += (s, e) => UnregisterHotkeys();
         }
@@ -197,6 +201,8 @@ namespace DeepTools
             {
                 new TrayMenuItem("▢", Lang.T("Показать", "Show"), () => ShowWindow()),
                 new TrayMenuItem("📝", Lang.T("Новая заметка", "New note"), () => NotesManager.CreateNew()),
+                new TrayMenuItem("☕", Lang.T("Не спать: ", "Keep awake: ") + (KeepAwake.Enabled ? Lang.T("вкл", "on") : Lang.T("выкл", "off")),
+                    () => KeepAwake.Enabled = !KeepAwake.Enabled),
                 new TrayMenuItem("–", Lang.T("Скрыть", "Hide"), () => HideWindow()),
                 new TrayMenuItem("✕", Lang.T("Выход", "Exit"), () => ExitApplication()) { Danger = true }
             };
@@ -241,27 +247,14 @@ namespace DeepTools
             Application.Exit();
         }
 
-        private void LoadScreenshotHotkey()
-        {
-            string saved = AppConfig.Get("screenshot_hotkey", "F9");
-            try { screenshotHotkey = (Keys)Enum.Parse(typeof(Keys), saved); }
-            catch { screenshotHotkey = Keys.F9; }
-        }
-
         private void RegisterHotkeys()
         {
-            NativeMethods.RegisterHotKey(this.Handle, NativeMethods.HOTKEY_ID_CLICKER, 0, (uint)Keys.F8);
-            NativeMethods.RegisterHotKey(this.Handle, NativeMethods.HOTKEY_ID_SCREENSHOT, 0, (uint)screenshotHotkey);
-            NativeMethods.RegisterHotKey(this.Handle, NativeMethods.HOTKEY_ID_OVERLAY, 0, (uint)Keys.F10);
-            NativeMethods.RegisterHotKey(this.Handle, NativeMethods.HOTKEY_ID_REGION, 0, (uint)Keys.F6);
+            Hotkeys.RegisterAll(this.Handle);
         }
 
         private void UnregisterHotkeys()
         {
-            NativeMethods.UnregisterHotKey(this.Handle, NativeMethods.HOTKEY_ID_CLICKER);
-            NativeMethods.UnregisterHotKey(this.Handle, NativeMethods.HOTKEY_ID_SCREENSHOT);
-            NativeMethods.UnregisterHotKey(this.Handle, NativeMethods.HOTKEY_ID_OVERLAY);
-            NativeMethods.UnregisterHotKey(this.Handle, NativeMethods.HOTKEY_ID_REGION);
+            Hotkeys.UnregisterAll(this.Handle);
         }
 
         protected override void WndProc(ref Message m)
@@ -291,20 +284,50 @@ namespace DeepTools
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            if (awaitingHotkeyCapture)
+            if (awaitingCaptureId >= 0)
             {
-                awaitingHotkeyCapture = false;
+                Keys key = keyData & Keys.KeyCode;
 
-                NativeMethods.UnregisterHotKey(this.Handle, NativeMethods.HOTKEY_ID_SCREENSHOT);
-                screenshotHotkey = keyData;
-                NativeMethods.RegisterHotKey(this.Handle, NativeMethods.HOTKEY_ID_SCREENSHOT, 0, (uint)screenshotHotkey);
+                // Голые модификаторы не считаем - ждём настоящую клавишу
+                if (key == Keys.ControlKey || key == Keys.ShiftKey || key == Keys.Menu) return true;
 
-                AppConfig.Set("screenshot_hotkey", screenshotHotkey.ToString());
-                panelScreenshots.SetHotkeyDisplay(screenshotHotkey.ToString());
+                int id = awaitingCaptureId;
+                awaitingCaptureId = -1;
 
+                if (key != Keys.Escape) // Esc = отмена, оставить как было
+                {
+                    HotkeyDef busy = Hotkeys.UsedBy(key, id);
+                    if (busy != null)
+                    {
+                        MessageBox.Show(
+                            Lang.T("Клавиша уже занята действием «", "This key is already used by \"") + busy.Name + Lang.T("»", "\""),
+                            "DeepTools", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                    {
+                        Hotkeys.Set(this.Handle, id, key);
+                    }
+                }
+
+                RefreshHotkeyUi();
                 return true;
             }
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        // Обновляет кнопки в карточке «Горячие клавиши» и подпись в панели скриншотов
+        private void RefreshHotkeyUi()
+        {
+            foreach (var pair in hotkeyButtons)
+            {
+                pair.Value.Text = Hotkeys.Get(pair.Key).ToString();
+                pair.Value.Invalidate();
+            }
+            if (panelScreenshots != null)
+            {
+                panelScreenshots.SetHotkeyDisplay(Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT).ToString());
+                panelScreenshots.RefreshRegionHotkey();
+            }
         }
 
         private void ApplyRoundedRegion()
@@ -502,10 +525,10 @@ namespace DeepTools
             panelClicker.Visible = false;
 
             panelScreenshots = new ScreenshotsPanel();
-            panelScreenshots.SetHotkeyDisplay(screenshotHotkey.ToString());
+            panelScreenshots.SetHotkeyDisplay(Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT).ToString());
             panelScreenshots.RequestHotkeyCapture += (s, e) => {
-                awaitingHotkeyCapture = true;
-                panelScreenshots.SetHotkeyDisplay("Нажми любую клавишу...");
+                awaitingCaptureId = NativeMethods.HOTKEY_ID_SCREENSHOT;
+                panelScreenshots.SetHotkeyDisplay(Lang.T("Нажми любую клавишу...", "Press any key..."));
             };
             contentArea.Controls.Add(panelScreenshots);
             panelScreenshots.Visible = false;
@@ -856,7 +879,177 @@ namespace DeepTools
             restartExplorerBtn.Click += (s, e) => PowerTools.RestartExplorer();
             sysCard.Controls.Add(restartExplorerBtn);
 
+            // Карточка: экран и сон. Карточка ниже видимой области - панель скроллится
+            panel.AutoScroll = true;
+            var pwCard = Theme.MakeCard(panel, new Point(24, 546), new Size(640, 172));
+
+            var pwTitle = new Label
+            {
+                Text = Lang.T("Экран и сон", "Screen & sleep"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(20, 14),
+                AutoSize = true
+            };
+            pwCard.Controls.Add(pwTitle);
+
+            var awakeLabel = new Label
+            {
+                Text = Lang.T("☕ Не спать: не гасить экран и не уходить в сон", "☕ Keep awake: don't turn off the screen or sleep"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 9F),
+                Location = new Point(20, 48),
+                AutoSize = true
+            };
+            pwCard.Controls.Add(awakeLabel);
+
+            var awakeToggle = new ToggleSwitch { Location = new Point(580, 44), Checked = KeepAwake.Enabled };
+            awakeToggle.CheckedChanged += (s, e) => { KeepAwake.Enabled = awakeToggle.Checked; };
+            pwCard.Controls.Add(awakeToggle);
+
+            var monLabel = new Label
+            {
+                Text = Lang.T("Отключать экран через", "Turn off the screen after"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 9F),
+                Location = new Point(20, 92),
+                AutoSize = true
+            };
+            pwCard.Controls.Add(monLabel);
+            var monBox = MakeTimeoutBox(pwCard, new Point(456, 88));
+
+            var sleepLabel = new Label
+            {
+                Text = Lang.T("Переводить в спящий режим через", "Put the PC to sleep after"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 9F),
+                Location = new Point(20, 130),
+                AutoSize = true
+            };
+            pwCard.Controls.Add(sleepLabel);
+            var sleepBox = MakeTimeoutBox(pwCard, new Point(456, 126));
+
+            // Текущие значения читаются powercfg'ом - в фоне, чтобы не тормозить открытие
+            var pwWorker = new System.ComponentModel.BackgroundWorker();
+            pwWorker.DoWork += (s, e) => { e.Result = new[] { PowerTimeouts.GetMonitorMinutes(), PowerTimeouts.GetSleepMinutes() }; };
+            pwWorker.RunWorkerCompleted += (s, e) =>
+            {
+                if (pwCard.IsDisposed) return;
+                var cur = (int[])e.Result;
+                FillTimeoutBox(monBox, cur[0], v => PowerTimeouts.SetMonitorMinutes(v));
+                FillTimeoutBox(sleepBox, cur[1], v => PowerTimeouts.SetSleepMinutes(v));
+            };
+            pwWorker.RunWorkerAsync();
+
+            // Карточка: горячие клавиши. Клик по клавише -> захват нового нажатия
+            var hkCard = Theme.MakeCard(panel, new Point(24, 734), new Size(640, 216));
+
+            var hkTitle = new Label
+            {
+                Text = Lang.T("Горячие клавиши", "Hotkeys"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(20, 14),
+                AutoSize = true
+            };
+            hkCard.Controls.Add(hkTitle);
+
+            var hkHint = new Label
+            {
+                Text = Lang.T("Клик по клавише — затем нажми новую. Esc — отмена", "Click a key, then press a new one. Esc cancels"),
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8.25F),
+                Location = new Point(20, 36),
+                AutoSize = true
+            };
+            hkCard.Controls.Add(hkHint);
+
+            int hkY = 64;
+            foreach (HotkeyDef def in Hotkeys.All)
+            {
+                var actLabel = new Label
+                {
+                    Text = def.Name,
+                    ForeColor = Theme.TextMain,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9F),
+                    Location = new Point(20, hkY + 5),
+                    AutoSize = true
+                };
+                hkCard.Controls.Add(actLabel);
+
+                var keyBtn = new RoundedButton
+                {
+                    Text = def.Current.ToString(),
+                    ButtonColor = Theme.InputColor,
+                    HoverColor = Theme.KeyHover,
+                    TextColor = Theme.Accent,
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    Location = new Point(508, hkY),
+                    Size = new Size(112, 28)
+                };
+                int defId = def.Id; // копия для замыкания
+                keyBtn.Click += (s, e) =>
+                {
+                    awaitingCaptureId = defId;
+                    RefreshHotkeyUi(); // сбрасываем возможный прошлый «Нажми...» на других кнопках
+                    keyBtn.Text = Lang.T("Нажми...", "Press...");
+                    keyBtn.Invalidate();
+                };
+                hkCard.Controls.Add(keyBtn);
+                hotkeyButtons[def.Id] = keyBtn;
+
+                hkY += 36;
+            }
+
             return panel;
+        }
+
+        private ComboBox MakeTimeoutBox(Panel parent, Point loc)
+        {
+            var box = new ComboBox
+            {
+                Location = loc,
+                Size = new Size(160, 28),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Theme.InputColor,
+                ForeColor = Theme.TextMain,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5F),
+                Enabled = false
+            };
+            box.Items.Add("…");
+            box.SelectedIndex = 0;
+            parent.Controls.Add(box);
+            return box;
+        }
+
+        // Заполняет выпадашку вариантами, выбирает текущий и вешает применение.
+        // Если текущее значение нестандартное (например 7 мин) - добавляем его в список
+        private void FillTimeoutBox(ComboBox box, int current, Action<int> apply)
+        {
+            var values = new System.Collections.Generic.List<int>(PowerTimeouts.Choices);
+            if (current >= 0 && !values.Contains(current))
+            {
+                values.Add(current);
+                values.Sort();
+            }
+
+            box.Items.Clear();
+            foreach (int v in values) box.Items.Add(PowerTimeouts.Format(v));
+            box.SelectedIndex = current >= 0 ? values.IndexOf(current) : 0;
+            box.Enabled = true;
+            box.SelectedIndexChanged += (s, e) =>
+            {
+                if (box.SelectedIndex >= 0 && box.SelectedIndex < values.Count)
+                    apply(values[box.SelectedIndex]);
+            };
         }
 
         private RoundedButton MakeChoiceButton(Panel parent, string text, Point loc, bool selected)
