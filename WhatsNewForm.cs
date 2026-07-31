@@ -39,14 +39,14 @@ namespace DeepTools
             {
                 return new string[][]
                 {
-                    new[] { "⚡", Lang.T("Программа похудела: файл стал меньше примерно на треть",
-                                         "The app slimmed down: the file is about a third smaller") },
-                    new[] { "⌨", Lang.T("Горячие клавиши теперь настраиваются - карточка в Настройках",
-                                         "Hotkeys are now customizable - see the card in Settings") },
-                    new[] { "🖥", Lang.T("Карточка «Экран и сон»: таймауты экрана и режим «Не спать»",
-                                         "\"Screen & sleep\" card: display timeouts and Keep awake mode") },
-                    new[] { "✨", Lang.T("Это окно: после каждого обновления покажет, что нового",
-                                         "This window: after every update it shows what's new") },
+                    new[] { "🎮", Lang.T("Дискретная GPU для игр: обнаруженная игра сама закрепляется за мощной видеокартой (ноутбуки)",
+                                         "Discrete GPU for games: the detected game is auto-pinned to the powerful GPU (laptops)") },
+                    new[] { "⚡", Lang.T("Отключение Game DVR: фоновая запись Game Bar больше не ест FPS",
+                                         "Game DVR switch-off: Game Bar background recording no longer eats FPS") },
+                    new[] { "❄", Lang.T("Заморозка тяжёлого фона: Discord и браузер можно заморозить на время игры, а не закрывать",
+                                         "Freeze heavy background: pause Discord and the browser while you play instead of killing them") },
+                    new[] { "⏱", Lang.T("Автоочистка RAM по расписанию на главной: каждые 5/10/30/60 минут",
+                                         "Scheduled RAM auto-clean on Home: every 5/10/30/60 minutes") },
                 };
             }
         }

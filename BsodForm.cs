@@ -112,6 +112,7 @@ namespace DeepTools
                 AutoScroll = true
             };
             card.Controls.Add(list);
+            NativeMethods.ApplyDarkScrollbar(list);
         }
 
         // Что означает код и куда копать. Топ реально встречающихся кодов

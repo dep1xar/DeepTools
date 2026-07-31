@@ -133,6 +133,7 @@ namespace DeepTools
                 AutoScroll = true
             };
             Controls.Add(gallery);
+            NativeMethods.ApplyDarkScrollbar(gallery);
         }
 
         public void SetHotkeyDisplay(string text)

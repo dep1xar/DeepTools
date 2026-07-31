@@ -99,10 +99,33 @@ namespace DeepTools
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
         public static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string pszSubIdList);
 
+        // Тёмный системный скроллбар (Win10 1809+). Без этого AutoScroll-панели и
+        // списки рисуют ослепительно-белую полосу прокрутки на тёмной теме.
+        // Применяем при создании handle: контролы часто настраиваются до показа
         public static void ApplyDarkScrollbar(System.Windows.Forms.Control control)
         {
-            try { SetWindowTheme(control.Handle, "DarkMode_Explorer", null); }
-            catch { }
+            ApplyWindowTheme(control, "DarkMode_Explorer");
+        }
+
+        // Тёмный ComboBox: DarkMode_CFD красит рамку, стрелку и выпадающий список
+        public static void ApplyDarkCombo(System.Windows.Forms.Control control)
+        {
+            ApplyWindowTheme(control, "DarkMode_CFD");
+        }
+
+        private static void ApplyWindowTheme(System.Windows.Forms.Control control, string theme)
+        {
+            if (Theme.IsLight) return; // светлой теме системные цвета подходят как есть
+            if (control.IsHandleCreated)
+            {
+                try { SetWindowTheme(control.Handle, theme, null); } catch { }
+            }
+            else
+            {
+                control.HandleCreated += (s, e) => {
+                    try { SetWindowTheme(control.Handle, theme, null); } catch { }
+                };
+            }
         }
     }
 }

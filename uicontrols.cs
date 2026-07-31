@@ -269,8 +269,12 @@ namespace DeepTools
         public static Color AccentHover = Color.FromArgb(70, 240, 160);
         public static Color DangerHover = Color.FromArgb(220, 50, 50);
 
+        // Текущая тема: нужно контролам, которые красятся системно (скроллбары, комбобоксы)
+        public static bool IsLight = false;
+
         public static void Apply(bool light)
         {
+            IsLight = light;
             if (light)
             {
                 BgColor = Color.FromArgb(243, 245, 249);

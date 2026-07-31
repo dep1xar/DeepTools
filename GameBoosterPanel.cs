@@ -57,6 +57,54 @@ namespace DeepTools
             ultimateBusy = false;
         }
 
+        private ToggleSwitch dvrToggle;
+        private ToggleSwitch gpuPinToggle;
+        private RoundedButton freezeBtn;
+        // Путь к exe игры, для которой уже проверяли/ставили GpuPreference -
+        // чтобы не дёргать реестр на каждый тик детектора (1.5 сек)
+        private string lastGpuPinnedPath;
+
+        // Отключение фоновой записи Game DVR / Game Bar - применяется сразу и глобально
+        private void OnDvrToggle()
+        {
+            bool disable = dvrToggle.Checked;
+            if (GameOptimizer.SetDvrDisabled(disable))
+            {
+                statusLabel.Text = disable
+                    ? Lang.T("Game DVR отключён - фоновая запись Game Bar больше не ест FPS", "Game DVR disabled - Game Bar background recording no longer eats FPS")
+                    : Lang.T("Game DVR снова включён", "Game DVR re-enabled");
+                statusLabel.ForeColor = Theme.Accent;
+            }
+            else
+            {
+                statusLabel.Text = Lang.T("Не удалось изменить настройки Game DVR", "Failed to change Game DVR settings");
+                statusLabel.ForeColor = Theme.Warning;
+                dvrToggle.Checked = !disable;
+                dvrToggle.Invalidate();
+            }
+        }
+
+        // Закрепление обнаруженной игры за дискретной GPU (профиль «Высокая
+        // производительность» в настройках графики Windows). Игра должна быть
+        // перезапущена, чтобы выбор GPU вступил в силу
+        private void TryPinGpu(Process proc)
+        {
+            string path;
+            try { path = proc.MainModule.FileName; }
+            catch { return; } // 32/64-битное несоответствие или процесс уже вышел
+
+            if (string.IsNullOrEmpty(path) || path == lastGpuPinnedPath) return;
+            lastGpuPinnedPath = path;
+
+            if (GameOptimizer.HasGpuPreference(path)) return;
+            if (GameOptimizer.SetGpuPreference(path))
+            {
+                statusLabel.Text = proc.ProcessName + ".exe " +
+                    Lang.T("закреплена за дискретной GPU (нужен перезапуск игры)", "pinned to the discrete GPU (restart the game to apply)");
+                statusLabel.ForeColor = Theme.Accent;
+            }
+        }
+
         private ToggleSwitch crosshairToggle;
         private CrosshairForm crosshairForm;
         private string crossShape = "cross";
@@ -403,38 +451,34 @@ namespace DeepTools
                 sx += 36;
             }
 
-            // Карточка электропитания: Ultimate Performance + отключение парковки ядер
-            var powerCard = Theme.MakeCard(this, new Point(24, 278), new Size(712, 64));
+            // Карточка оптимизаций: план питания, Game DVR, дискретная GPU
+            var powerCard = Theme.MakeCard(this, new Point(24, 278), new Size(712, 134));
 
-            var powerTitle = new Label
-            {
-                Text = "Ultimate Performance",
-                ForeColor = Theme.TextMain,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                Location = new Point(18, 20),
-                AutoSize = true
-            };
-            powerCard.Controls.Add(powerTitle);
-
-            var powerDesc = new Label
-            {
-                Text = Lang.T(
-                    "Скрытый план питания Windows для максимальной производительности + отключение парковки ядер CPU",
-                    "Hidden Windows power plan for maximum performance + CPU core parking disabled"),
-                ForeColor = Theme.TextDim,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 8F),
-                Location = new Point(200, 14),
-                Size = new Size(430, 36)
-            };
-            powerCard.Controls.Add(powerDesc);
-
-            ultimateToggle = new ToggleSwitch { Location = new Point(646, 18), Checked = PowerPlan.IsUltimateActive() };
+            MakeOptRow(powerCard, 12, "Ultimate Performance",
+                Lang.T("Скрытый план питания Windows для максимальной производительности + отключение парковки ядер CPU",
+                       "Hidden Windows power plan for maximum performance + CPU core parking disabled"));
+            ultimateToggle = new ToggleSwitch { Location = new Point(646, 16), Checked = PowerPlan.IsUltimateActive() };
             ultimateToggle.CheckedChanged += (s, e) => OnUltimateToggle();
             powerCard.Controls.Add(ultimateToggle);
 
-            var heavyCard = Theme.MakeCard(this, new Point(24, 354), new Size(712, 222));
+            MakeOptRow(powerCard, 52, Lang.T("Отключить Game DVR", "Disable Game DVR"),
+                Lang.T("Фоновая запись Xbox Game Bar захватывает кадры даже без записи - реальный минус к FPS",
+                       "Xbox Game Bar background capture grabs frames even when idle - a real FPS cost"));
+            dvrToggle = new ToggleSwitch { Location = new Point(646, 56), Checked = GameOptimizer.IsDvrDisabled() };
+            dvrToggle.CheckedChanged += (s, e) => OnDvrToggle();
+            powerCard.Controls.Add(dvrToggle);
+
+            MakeOptRow(powerCard, 92, Lang.T("Дискретная GPU для игр", "Discrete GPU for games"),
+                Lang.T("Обнаруженная игра автоматически закрепляется за мощной видеокартой (для ноутбуков с двумя GPU)",
+                       "The detected game is auto-pinned to the powerful GPU (for laptops with dual GPUs)"));
+            gpuPinToggle = new ToggleSwitch { Location = new Point(646, 96), Checked = AppConfig.GetBool("gpu_auto_pin", false) };
+            gpuPinToggle.CheckedChanged += (s, e) => {
+                AppConfig.SetBool("gpu_auto_pin", gpuPinToggle.Checked);
+                lastGpuPinnedPath = null; // чтобы применилось к уже запущенной игре
+            };
+            powerCard.Controls.Add(gpuPinToggle);
+
+            var heavyCard = Theme.MakeCard(this, new Point(24, 424), new Size(712, 152));
 
             var heavyTitle = new Label
             {
@@ -449,11 +493,11 @@ namespace DeepTools
 
             var heavyDesc = new Label
             {
-                Text = Lang.T("Программы, которые обычно можно закрыть без вреда системе. Несколько окон одной программы считаются одной строкой.", "Apps that can usually be closed safely. Multiple windows of one app are grouped into one row."),
+                Text = Lang.T("«Заморозить» = пауза без потерь (❄), та же кнопка размораживает. «Завершить» закрывает программу.", "Freeze pauses checked apps with no data loss (❄), same button unfreezes. Kill closes them."),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(18, 42),
+                Location = new Point(18, 46),
                 Size = new Size(676, 18),
                 AutoEllipsis = true
             };
@@ -465,11 +509,23 @@ namespace DeepTools
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
-                Location = new Point(452, 14),
-                Size = new Size(110, 32)
+                Location = new Point(360, 10),
+                Size = new Size(100, 32)
             };
             refreshBtn.Click += (s, e) => RefreshHeavyList();
             heavyCard.Controls.Add(refreshBtn);
+
+            freezeBtn = new RoundedButton
+            {
+                Text = Lang.T("Заморозить", "Freeze"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Location = new Point(468, 10),
+                Size = new Size(116, 32)
+            };
+            freezeBtn.Click += (s, e) => FreezeOrResume();
+            heavyCard.Controls.Add(freezeBtn);
 
             var killBtn = new RoundedButton
             {
@@ -477,8 +533,8 @@ namespace DeepTools
                 ButtonColor = Theme.Danger,
                 HoverColor = Theme.DangerHover,
                 TextColor = Theme.BgColor,
-                Location = new Point(570, 14),
-                Size = new Size(120, 32)
+                Location = new Point(592, 10),
+                Size = new Size(102, 32)
             };
             killBtn.Click += (s, e) => TerminateSelected();
             heavyCard.Controls.Add(killBtn);
@@ -486,13 +542,14 @@ namespace DeepTools
             heavyList = new FlowLayoutPanel
             {
                 Location = new Point(18, 66),
-                Size = new Size(676, 142),
+                Size = new Size(676, 76),
                 BackColor = Theme.SidebarColor,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
                 AutoScroll = true
             };
             heavyCard.Controls.Add(heavyList);
+            NativeMethods.ApplyDarkScrollbar(heavyList);
 
             statusLabel = new Label
             {
@@ -504,6 +561,78 @@ namespace DeepTools
                 AutoSize = true
             };
             Controls.Add(statusLabel);
+        }
+
+        // Строка карточки оптимизаций: жирный заголовок слева + серое описание
+        private void MakeOptRow(Panel card, int y, string title, string desc)
+        {
+            var titleLbl = new Label
+            {
+                Text = title,
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Location = new Point(18, y + 6),
+                AutoSize = true
+            };
+            card.Controls.Add(titleLbl);
+
+            var descLbl = new Label
+            {
+                Text = desc,
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(215, y + 2),
+                Size = new Size(420, 32)
+            };
+            card.Controls.Add(descLbl);
+        }
+
+        // Одна кнопка на два действия: если что-то заморожено - размораживаем всё,
+        // иначе замораживаем отмеченные группы
+        private void FreezeOrResume()
+        {
+            if (BackgroundFreezer.FrozenCount > 0)
+            {
+                int woken = BackgroundFreezer.ResumeAll();
+                statusLabel.Text = Lang.T("Разморожено процессов: ", "Processes unfrozen: ") + woken;
+                statusLabel.ForeColor = Theme.Accent;
+            }
+            else
+            {
+                int frozenGroups = 0;
+                int frozenProcs = 0;
+                for (int i = 0; i < heavyChecks.Count; i++)
+                {
+                    if (!heavyChecks[i].Checked) continue;
+                    int done = BackgroundFreezer.Freeze(heavyGroups[i]);
+                    if (done > 0) frozenGroups++;
+                    frozenProcs += done;
+                }
+
+                if (frozenProcs > 0)
+                {
+                    statusLabel.Text = Lang.T("Заморожено программ: ", "Apps frozen: ") + frozenGroups +
+                        " (" + frozenProcs + Lang.T(" процессов). Окна не отвечают, пока заморожены - это нормально", " processes). Windows stay unresponsive while frozen - that's expected");
+                    statusLabel.ForeColor = Theme.Accent;
+                }
+                else
+                {
+                    statusLabel.Text = Lang.T("Ничего не выбрано или не удалось заморозить", "Nothing selected or failed to freeze");
+                    statusLabel.ForeColor = Theme.Warning;
+                }
+            }
+            UpdateFreezeButton();
+            RefreshHeavyList();
+        }
+
+        private void UpdateFreezeButton()
+        {
+            freezeBtn.Text = BackgroundFreezer.FrozenCount > 0
+                ? Lang.T("Разморозить", "Unfreeze")
+                : Lang.T("Заморозить", "Freeze");
+            freezeBtn.Invalidate();
         }
 
         private void DetectFullscreenGame()
@@ -562,6 +691,8 @@ namespace DeepTools
                     BoostProcess(proc);
                     lastBoostedProcess = proc;
                 }
+
+                if (gpuPinToggle.Checked) TryPinGpu(proc);
             }
             catch
             {
@@ -634,6 +765,13 @@ namespace DeepTools
 
                 string displayName = KnownHeavyApps[i] + ".exe";
                 if (group.Count > 1) displayName += " (" + group.Count + Lang.T(" процессов)", " processes)");
+
+                bool groupFrozen = false;
+                for (int j = 0; j < group.Count; j++)
+                {
+                    if (BackgroundFreezer.IsFrozen(group[j].Id)) { groupFrozen = true; break; }
+                }
+                if (groupFrozen) displayName += " ❄";
 
                 // 636 и не шире: иначе с вертикальным скроллбаром (около 17px) появляется
                 // горизонтальная прокрутка, а колонка с мегабайтами уезжает за край

@@ -80,6 +80,8 @@ namespace DeepTools
             UpdateChecker.CheckInBackground(true, null);
             WinKeyBlocker.Init();
             FormClosed += (s, e) => WinKeyBlocker.Shutdown();
+            // Замороженные фоновые процессы обязаны проснуться при выходе из программы
+            FormClosed += (s, e) => BackgroundFreezer.ResumeAll();
 
             Load += (s, e) => ApplyRoundedRegion();
             Load += (s, e) => RegisterHotkeys();
@@ -881,6 +883,7 @@ namespace DeepTools
 
             // Карточка: экран и сон. Карточка ниже видимой области - панель скроллится
             panel.AutoScroll = true;
+            NativeMethods.ApplyDarkScrollbar(panel);
             var pwCard = Theme.MakeCard(panel, new Point(24, 546), new Size(640, 172));
 
             var pwTitle = new Label
@@ -1027,6 +1030,7 @@ namespace DeepTools
             box.Items.Add("…");
             box.SelectedIndex = 0;
             parent.Controls.Add(box);
+            NativeMethods.ApplyDarkCombo(box);
             return box;
         }
 

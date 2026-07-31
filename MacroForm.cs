@@ -353,6 +353,7 @@ namespace DeepTools
                 AutoScroll = true
             };
             savedCard.Controls.Add(savedList);
+            NativeMethods.ApplyDarkScrollbar(savedList);
 
             var hint = new Label
             {

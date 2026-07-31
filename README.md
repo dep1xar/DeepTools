@@ -5,7 +5,7 @@
 **Smart tweaker, cleaner and monitoring tool for Windows — in one app.**
 **Умный твикер, чистильщик и монитор для Windows — всё в одном.**
 
-[![Version](https://img.shields.io/badge/version-1.6.0-blue)](https://github.com/dep1xar/DeepTools/releases)
+[![Version](https://img.shields.io/badge/version-1.7.0-blue)](https://github.com/dep1xar/DeepTools/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D6)](#)
 [![.NET](https://img.shields.io/badge/.NET%20Framework-4.x-512BD4)](#)
 
@@ -36,9 +36,9 @@ DeepTools is a system tweaker, so it does things real malware also does: elevate
 
 | Section | What it does |
 |---|---|
-| **Home** | Quick tiles to jump to the most-used tools, live CPU/RAM/temperature monitoring, and an optional always-on-top desktop widget. |
+| **Home** | Quick tiles to jump to the most-used tools, live CPU/RAM/temperature monitoring, one-click RAM cleaner with **scheduled auto-clean** (every 5/10/30/60 min, pauses while a game is running), and an optional always-on-top desktop widget. |
 | **Smart Cleanup** | Clears temp files, caches and shader caches by category, with a size preview before you delete. Includes **scheduled auto cleanup** (silent, with a tray report), a **program uninstaller** with leftover cleanup and a **Windows bloatware** remover. |
-| **Game Booster** | One-click "Ultimate Performance" power plan, disables core parking, boosts the running game's priority, optional auto-boost for new games, **customizable FPS overlay** with accurate per-game FPS (PresentMon-style ETW tracing), 1% low and a frametime graph, on-screen **crosshair**, and Win-key blocking. Games are detected in both fullscreen and borderless mode. |
+| **Game Booster** | One-click "Ultimate Performance" power plan, disables core parking, boosts the running game's priority, optional auto-boost for new games, **Game DVR switch-off** (Game Bar background recording no longer eats FPS), **auto-pinning the game to the discrete GPU** on dual-GPU laptops, **freezing heavy background apps** (Discord/browser pause instead of being killed), **customizable FPS overlay** with accurate per-game FPS (PresentMon-style ETW tracing), 1% low and a frametime graph, on-screen **crosshair**, and Win-key blocking. Games are detected in both fullscreen and borderless mode. |
 | **Health Check** | Live CPU/GPU/RAM load and temperatures, overheat alerts with **user-adjustable CPU/GPU thresholds**, disk health (SMART), stress test, benchmark, BSOD analyzer and 24h temperature history. |
 | **My PC** | Full system spec on one page with a **Copy** button — handy for forums, sales listings or sending to a friend. |
 | **Startup** | See and toggle what launches with Windows, plus boot-time analysis. |
@@ -125,9 +125,9 @@ DeepTools — системный твикер, поэтому он делает 
 
 | Раздел | Что делает |
 |---|---|
-| **Главная** | Плитки быстрого перехода, живой мониторинг CPU/RAM/температур и опциональный виджет поверх окон. |
+| **Главная** | Плитки быстрого перехода, живой мониторинг CPU/RAM/температур, очистка RAM в один клик с **автоочисткой по расписанию** (каждые 5/10/30/60 минут, во время игры не запускается) и опциональный виджет поверх окон. |
 | **Умная очистка** | Чистит временные файлы, кэши и кэши шейдеров по категориям, показывает размер до удаления. Включает **автоочистку по расписанию** (тихую, с отчётом из трея), **деинсталлятор программ** с чисткой хвостов и удаление **встроенного мусора Windows**. |
-| **Игровой буст** | В один клик включает план «Максимальная производительность», отключает парковку ядер, поднимает приоритет игры, авто-буст новых игр, **настраиваемый FPS-оверлей** с точным FPS игры (ETW-трейсинг в стиле PresentMon), 1% low и графиком фреймтайма, накладной **прицел** и блокировку клавиши Win. Игры определяются и в полноэкранном, и в borderless-режиме. |
+| **Игровой буст** | В один клик включает план «Максимальная производительность», отключает парковку ядер, поднимает приоритет игры, авто-буст новых игр, **отключение Game DVR** (фоновая запись Game Bar больше не ест FPS), **авто-закрепление игры за дискретной GPU** на ноутбуках с двумя видеокартами, **заморозка тяжёлого фона** (Discord/браузер ставятся на паузу вместо закрытия), **настраиваемый FPS-оверлей** с точным FPS игры (ETW-трейсинг в стиле PresentMon), 1% low и графиком фреймтайма, накладной **прицел** и блокировку клавиши Win. Игры определяются и в полноэкранном, и в borderless-режиме. |
 | **Проверка здоровья** | Нагрузка и температуры CPU/GPU/RAM, тревога перегрева с **настраиваемыми порогами CPU/GPU**, здоровье диска (SMART), стресс-тест, бенчмарк, разбор синих экранов и история температур за 24 часа. |
 | **Мой ПК** | Полная спека системы на одной странице с кнопкой **Копировать** — удобно для форумов, объявлений или отправки другу. |
 | **Автозагрузка** | Смотри и отключай то, что стартует с Windows, плюс анализ времени загрузки. |
@@ -195,6 +195,6 @@ DeepTools доступен на **русском и английском**. Пр
 
 <div align="center">
 
-© 2026 dep1xar · DeepTools v1.6.0
+© 2026 dep1xar · DeepTools v1.7.0
 
 </div>

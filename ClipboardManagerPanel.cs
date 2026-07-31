@@ -83,6 +83,7 @@ namespace DeepTools
             historyListBox.DoubleClick += (s, e) => RestoreSelected();
             historyListBox.SelectedIndexChanged += (s, e) => UpdatePreview();
             card.Controls.Add(historyListBox);
+            NativeMethods.ApplyDarkScrollbar(historyListBox);
 
             preview = new PictureBox
             {
