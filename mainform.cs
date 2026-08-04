@@ -74,12 +74,15 @@ namespace DeepTools
             StartupGuard.Start();
             MinerGuard.Start();
             TempHistory.Start();
+            CoolerAdvisor.Start();
             AutoCleanup.Start();
             KeepAwake.Restore();
             NotesManager.RestoreAll();
             UpdateChecker.CheckInBackground(true, null);
             WinKeyBlocker.Init();
             FormClosed += (s, e) => WinKeyBlocker.Shutdown();
+            // Замороженные фоновые процессы обязаны проснуться при выходе из программы
+            FormClosed += (s, e) => BackgroundFreezer.ResumeAll();
 
             Load += (s, e) => ApplyRoundedRegion();
             Load += (s, e) => RegisterHotkeys();
@@ -202,10 +205,22 @@ namespace DeepTools
                 new TrayMenuItem("▢", Lang.T("Показать", "Show"), () => ShowWindow()),
                 new TrayMenuItem("📝", Lang.T("Новая заметка", "New note"), () => NotesManager.CreateNew()),
                 new TrayMenuItem("☕", Lang.T("Не спать: ", "Keep awake: ") + (KeepAwake.Enabled ? Lang.T("вкл", "on") : Lang.T("выкл", "off")),
-                    () => KeepAwake.Enabled = !KeepAwake.Enabled),
-                new TrayMenuItem("–", Lang.T("Скрыть", "Hide"), () => HideWindow()),
-                new TrayMenuItem("✕", Lang.T("Выход", "Exit"), () => ExitApplication()) { Danger = true }
+                    () => KeepAwake.Enabled = !KeepAwake.Enabled)
             };
+
+            // Переключатель звука показываем, только если устройств вывода больше одного
+            string audioName = AudioSwitcher.CurrentShortName();
+            if (audioName != null && AudioSwitcher.GetPlaybackDevices().Count > 1)
+            {
+                menuItems.Add(new TrayMenuItem("🔊", Lang.T("Звук: ", "Audio: ") + audioName, () => {
+                    string next = AudioSwitcher.CycleNext();
+                    if (next != null)
+                        TrayNotify.Info("🔊 " + Lang.T("Звук переключён", "Audio switched"), next);
+                }));
+            }
+
+            menuItems.Add(new TrayMenuItem("–", Lang.T("Скрыть", "Hide"), () => HideWindow()));
+            menuItems.Add(new TrayMenuItem("✕", Lang.T("Выход", "Exit"), () => ExitApplication()) { Danger = true });
             TrayMenuForm.Popup(menuItems);
         }
 
@@ -426,6 +441,19 @@ namespace DeepTools
                 Location = new Point(18, 44),
                 AutoSize = true
             };
+            int brandClicks = 0;
+            DateTime lastBrandClick = DateTime.MinValue;
+            brandTitle.Click += (s, e) => {
+                if ((DateTime.Now - lastBrandClick).TotalSeconds > 1.5) brandClicks = 0;
+                lastBrandClick = DateTime.Now;
+                brandClicks++;
+                if (brandClicks >= 3)
+                {
+                    brandClicks = 0;
+                    using (var egg = new WwEasterEggForm()) egg.ShowDialog(this);
+                }
+            };
+
             brandPanel.Controls.Add(brandTitle);
             brandPanel.Controls.Add(brandSubtitle);
             sidebar.Controls.Add(brandPanel);
@@ -881,6 +909,7 @@ namespace DeepTools
 
             // Карточка: экран и сон. Карточка ниже видимой области - панель скроллится
             panel.AutoScroll = true;
+            NativeMethods.ApplyDarkScrollbar(panel);
             var pwCard = Theme.MakeCard(panel, new Point(24, 546), new Size(640, 172));
 
             var pwTitle = new Label
@@ -1027,6 +1056,7 @@ namespace DeepTools
             box.Items.Add("…");
             box.SelectedIndex = 0;
             parent.Controls.Add(box);
+            NativeMethods.ApplyDarkCombo(box);
             return box;
         }
 

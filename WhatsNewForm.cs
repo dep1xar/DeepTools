@@ -11,6 +11,10 @@ namespace DeepTools
     // Список изменений редактируется тут же (Notes) при каждом релизе
     public static class WhatsNew
     {
+        // Ревизия списка изменений: позволяет показать окно ещё раз,
+        // когда фичи доехали без смены номера версии
+        private const string NotesRev = "1.7.0-b";
+
         public static void ShowIfUpdated(Form owner)
         {
             try
@@ -18,8 +22,10 @@ namespace DeepTools
                 Version v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
                 string current = v.Major + "." + v.Minor + "." + v.Build;
                 string seen = AppConfig.Get("last_seen_version", "");
-                if (seen == current) return;
+                string seenRev = AppConfig.Get("last_seen_notes_rev", "");
+                if (seen == current && seenRev == NotesRev) return;
                 AppConfig.Set("last_seen_version", current);
+                AppConfig.Set("last_seen_notes_rev", NotesRev);
 
                 // seen == "" - либо чистая установка, либо обновление со старой
                 // версии, где этого ключа ещё не было: показываем как приветствие
@@ -39,14 +45,18 @@ namespace DeepTools
             {
                 return new string[][]
                 {
-                    new[] { "⚡", Lang.T("Программа похудела: файл стал меньше примерно на треть",
-                                         "The app slimmed down: the file is about a third smaller") },
-                    new[] { "⌨", Lang.T("Горячие клавиши теперь настраиваются - карточка в Настройках",
-                                         "Hotkeys are now customizable - see the card in Settings") },
-                    new[] { "🖥", Lang.T("Карточка «Экран и сон»: таймауты экрана и режим «Не спать»",
-                                         "\"Screen & sleep\" card: display timeouts and Keep awake mode") },
-                    new[] { "✨", Lang.T("Это окно: после каждого обновления покажет, что нового",
-                                         "This window: after every update it shows what's new") },
+                    new[] { "📈", Lang.T("История FPS по играм: график по сессиям в Game Time (📈 у игры) — видно, деградирует ли система",
+                                         "Per-game FPS history: session chart in Game Time (📈 next to a game) — see if your system degrades") },
+                    new[] { "🌡", Lang.T("«Пора чистить кулер»: DeepTools заметит, если средняя температура CPU растёт неделю, и предупредит",
+                                         "\"Clean the cooler\" alert: DeepTools notices when average CPU temp keeps rising over a week") },
+                    new[] { "⏰", Lang.T("Напоминания в заметках: ⏰ на стикере — и в нужное время придёт уведомление",
+                                         "Note reminders: hit ⏰ on a sticky note and get notified at the right time") },
+                    new[] { "🔊", Lang.T("Переключение звука из трея: наушники ↔ колонки одним кликом",
+                                         "Audio switcher in tray: headphones ↔ speakers in one click") },
+                    new[] { "🛡", Lang.T("Рейтинг подозрительности в Автозагрузке: без подписи + из Temp + случайное имя = красный флаг",
+                                         "Startup suspicion rating: unsigned + from Temp + random name = red flag") },
+                    new[] { "🥚", Lang.T("Где-то спряталась пасхалка. Найдёшь?",
+                                         "There is an easter egg hidden somewhere. Can you find it?") },
                 };
             }
         }

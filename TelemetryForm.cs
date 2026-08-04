@@ -379,6 +379,7 @@ namespace DeepTools
                 AutoScroll = true
             };
             card.Controls.Add(list);
+            NativeMethods.ApplyDarkScrollbar(list);
 
             string[] levelTag = { "", Lang.T("мягко", "light"), Lang.T("средне", "medium"), Lang.T("жёстко", "aggressive") };
             for (int i = 0; i < tweaks.Count; i++)

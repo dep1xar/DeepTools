@@ -201,8 +201,60 @@ namespace DeepTools
                 Location = new Point(24, 516),
                 Size = new Size(190, 34)
             };
-            ramBtn.Click += (s, e) => FreeRam();
+            ramBtn.Click += (s, e) => FreeRam(false);
             Controls.Add(ramBtn);
+
+            // Автоочистка RAM по расписанию: тумблер + выбор интервала.
+            // Таймер живёт в HomePanel, а панель создаётся при старте и не умирает -
+            // так что расписание работает, даже когда окно свёрнуто в трей
+            ramAutoToggle = new ToggleSwitch { Location = new Point(230, 520), Checked = AppConfig.GetBool("ram_auto_on", false) };
+            ramAutoToggle.CheckedChanged += (s, e) => {
+                AppConfig.SetBool("ram_auto_on", ramAutoToggle.Checked);
+                ApplyAutoCleanTimer();
+            };
+            Controls.Add(ramAutoToggle);
+
+            var ramAutoLabel = new Label
+            {
+                Text = Lang.T("Автоочистка каждые:", "Auto-clean every:"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 9F),
+                Location = new Point(284, 524),
+                AutoSize = true
+            };
+            Controls.Add(ramAutoLabel);
+
+            int[] intervals = { 5, 10, 30, 60 };
+            int ix = 420;
+            for (int i = 0; i < intervals.Length; i++)
+            {
+                int minutesVal = intervals[i];
+                var b = new RoundedButton
+                {
+                    Text = minutesVal + Lang.T("м", "m"),
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                    Location = new Point(ix, 518),
+                    Size = new Size(42, 28),
+                    Tag = minutesVal
+                };
+                b.Click += (s, e) => {
+                    AppConfig.Set("ram_auto_min", minutesVal.ToString());
+                    // Выбор интервала сразу включает автоочистку, если она была выключена
+                    if (!ramAutoToggle.Checked)
+                    {
+                        ramAutoToggle.Checked = true;
+                        ramAutoToggle.Invalidate();
+                        AppConfig.SetBool("ram_auto_on", true);
+                    }
+                    HighlightIntervalButtons();
+                    ApplyAutoCleanTimer();
+                };
+                Controls.Add(b);
+                intervalButtons.Add(b);
+                ix += 46;
+            }
+            HighlightIntervalButtons();
 
             ramResultLabel = new Label
             {
@@ -210,27 +262,84 @@ namespace DeepTools
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 9F),
-                Location = new Point(226, 524),
-                Size = new Size(500, 18),
+                Location = new Point(24, 560),
+                Size = new Size(690, 18),
                 AutoEllipsis = true
             };
             Controls.Add(ramResultLabel);
+
+            autoCleanTimer = new System.Windows.Forms.Timer();
+            autoCleanTimer.Tick += (s, e) => AutoCleanTick();
+            ApplyAutoCleanTimer();
         }
 
         private Label ramResultLabel;
+        private ToggleSwitch ramAutoToggle;
+        private System.Windows.Forms.Timer autoCleanTimer;
+        private readonly System.Collections.Generic.List<RoundedButton> intervalButtons =
+            new System.Collections.Generic.List<RoundedButton>();
+        private bool ramCleaning = false;
 
-        private void FreeRam()
+        private int AutoCleanMinutes()
         {
-            ramResultLabel.ForeColor = Theme.TextDim;
-            ramResultLabel.Text = Lang.T("Освобождаю память...", "Freeing memory...");
+            int min;
+            if (!int.TryParse(AppConfig.Get("ram_auto_min", "10"), out min)) min = 10;
+            return Math.Max(1, min);
+        }
+
+        private void HighlightIntervalButtons()
+        {
+            int current = AutoCleanMinutes();
+            foreach (RoundedButton b in intervalButtons)
+            {
+                bool selected = (int)b.Tag == current;
+                b.ButtonColor = selected ? Theme.Accent : Theme.InputColor;
+                b.HoverColor = selected ? Theme.AccentHover : Theme.KeyHover;
+                b.TextColor = selected ? Theme.BgColor : Theme.TextDim;
+                b.Invalidate();
+            }
+        }
+
+        private void ApplyAutoCleanTimer()
+        {
+            autoCleanTimer.Stop();
+            if (ramAutoToggle.Checked)
+            {
+                autoCleanTimer.Interval = AutoCleanMinutes() * 60000;
+                autoCleanTimer.Start();
+            }
+        }
+
+        private void AutoCleanTick()
+        {
+            // Во время игры не трогаем память: EmptyWorkingSet выдернет страницы
+            // из-под игры, и она заикнётся - подождём следующего тика
+            if (WinKeyBlocker.GameActive) return;
+            if (ramCleaning) return;
+            FreeRam(true);
+        }
+
+        private void FreeRam(bool auto)
+        {
+            if (ramCleaning) return;
+            ramCleaning = true;
+            if (!auto)
+            {
+                ramResultLabel.ForeColor = Theme.TextDim;
+                ramResultLabel.Text = Lang.T("Освобождаю память...", "Freeing memory...");
+            }
             var worker = new System.ComponentModel.BackgroundWorker();
             worker.DoWork += (s, e) => e.Result = RamCleaner.Clean();
             worker.RunWorkerCompleted += (s, e) => {
+                ramCleaning = false;
                 long freed = e.Error == null && e.Result != null ? (long)e.Result : 0;
                 ramResultLabel.ForeColor = Theme.Accent;
-                ramResultLabel.Text = freed > 0
+                string result = freed > 0
                     ? Lang.T("Освобождено ~", "Freed ~") + freed + Lang.T(" МБ", " MB")
                     : Lang.T("Память уже оптимальна", "Memory already optimal");
+                if (auto)
+                    result = Lang.T("Автоочистка в ", "Auto-clean at ") + DateTime.Now.ToString("HH:mm") + ": " + result;
+                ramResultLabel.Text = result;
             };
             worker.RunWorkerAsync();
         }

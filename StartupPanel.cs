@@ -138,6 +138,7 @@ namespace DeepTools
                 AutoScroll = true
             };
             card.Controls.Add(list);
+            NativeMethods.ApplyDarkScrollbar(list);
 
             statusLabel = new Label
             {
@@ -434,6 +435,95 @@ namespace DeepTools
             }
         }
 
+        // ---------- Рейтинг подозрительности ----------
+        // Эвристика как у MinerGuard: не приговор, а повод присмотреться.
+        // Красный - несколько красных флагов сразу, жёлтый - один
+
+        private static string ExtractExePath(string command)
+        {
+            if (string.IsNullOrEmpty(command)) return null;
+            string c = command.Trim();
+            try
+            {
+                if (c.StartsWith("\""))
+                {
+                    int end = c.IndexOf('"', 1);
+                    if (end > 1) return Environment.ExpandEnvironmentVariables(c.Substring(1, end - 1));
+                }
+                int exe = c.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+                if (exe > 0) return Environment.ExpandEnvironmentVariables(c.Substring(0, exe + 4));
+                int sp = c.IndexOf(' ');
+                return Environment.ExpandEnvironmentVariables(sp > 0 ? c.Substring(0, sp) : c);
+            }
+            catch { return null; }
+        }
+
+        // Имя вида "xk9f2mqa" или "svc83729" - типичный автогенерат малвари
+        private static bool LooksRandomName(string name)
+        {
+            if (string.IsNullOrEmpty(name) || name.Length < 8) return false;
+            int letters = 0, vowels = 0, digits = 0;
+            string v = "aeiouyаеёиоуыэюя";
+            foreach (char ch in name.ToLowerInvariant())
+            {
+                if (char.IsDigit(ch)) digits++;
+                else if (char.IsLetter(ch))
+                {
+                    letters++;
+                    if (v.IndexOf(ch) >= 0) vowels++;
+                }
+            }
+            if (digits >= 4 && letters >= 4) return true;      // мешанина букв и цифр
+            if (letters >= 8 && vowels * 5 < letters) return true; // слово почти без гласных
+            return false;
+        }
+
+        private int SuspicionScore(StartupItem item, List<string> reasons)
+        {
+            int score = 0;
+            string path = ExtractExePath(item.Command);
+
+            bool exists = false;
+            try { exists = path != null && File.Exists(path); } catch { }
+
+            if (path != null)
+            {
+                string low = path.ToLowerInvariant();
+                if (low.Contains("\\temp\\") || low.Contains("\\tmp\\"))
+                {
+                    score += 2;
+                    reasons.Add(Lang.T("запускается из Temp", "runs from Temp"));
+                }
+
+                if (!exists)
+                {
+                    score += 1;
+                    reasons.Add(Lang.T("файл не найден", "file not found"));
+                }
+                else
+                {
+                    try
+                    {
+                        System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(path);
+                    }
+                    catch
+                    {
+                        score += 1;
+                        reasons.Add(Lang.T("нет цифровой подписи", "no digital signature"));
+                    }
+                }
+            }
+
+            if (LooksRandomName(item.Name) ||
+                (exists && LooksRandomName(Path.GetFileNameWithoutExtension(path))))
+            {
+                score += 2;
+                reasons.Add(Lang.T("случайное имя", "random-looking name"));
+            }
+
+            return score;
+        }
+
         private Panel MakeRow(StartupItem item)
         {
             var row = new Panel { Size = new Size(660, 48), BackColor = Color.Transparent, Margin = new Padding(0, 2, 0, 2) };
@@ -445,10 +535,30 @@ namespace DeepTools
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Location = new Point(8, 4),
-                Size = new Size(420, 18),
+                Size = new Size(330, 18),
                 AutoEllipsis = true
             };
             row.Controls.Add(nameLbl);
+
+            var reasons = new List<string>();
+            int score = SuspicionScore(item, reasons);
+            if (score > 0)
+            {
+                var badge = new Label
+                {
+                    Text = (score >= 3 ? "●  " + Lang.T("подозрительно", "suspicious")
+                                       : "●  " + Lang.T("стоит проверить", "worth checking")),
+                    ForeColor = score >= 3 ? Theme.Danger : Theme.Warning,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                    Location = new Point(400, 14),
+                    Size = new Size(190, 18),
+                    TextAlign = ContentAlignment.MiddleRight
+                };
+                var tip = new ToolTip();
+                tip.SetToolTip(badge, string.Join(", ", reasons.ToArray()));
+                row.Controls.Add(badge);
+            }
 
             var sourceLbl = new Label
             {

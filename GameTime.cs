@@ -331,6 +331,7 @@ namespace DeepTools
                 AutoScroll = true
             };
             card.Controls.Add(list);
+            NativeMethods.ApplyDarkScrollbar(list);
 
             foreach (GameStat g in stats)
             {
@@ -371,6 +372,31 @@ namespace DeepTools
                     AutoSize = true
                 };
                 row.Controls.Add(timeLbl);
+
+                // История FPS: есть смысл показывать только там, где FPS замерялся
+                if (g.FpsSec > 0)
+                {
+                    string gameName = g.Name;
+                    var histBtn = new Label
+                    {
+                        Text = "📈",
+                        ForeColor = Theme.TextDim,
+                        BackColor = Color.Transparent,
+                        Font = new Font("Segoe UI", 11F),
+                        Size = new Size(28, 28),
+                        Location = new Point(430, 6),
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        Cursor = Cursors.Hand
+                    };
+                    var tip = new ToolTip();
+                    tip.SetToolTip(histBtn, Lang.T("История FPS", "FPS history"));
+                    histBtn.MouseEnter += (s, e) => histBtn.ForeColor = Theme.Accent;
+                    histBtn.MouseLeave += (s, e) => histBtn.ForeColor = Theme.TextDim;
+                    histBtn.Click += (s, e) => {
+                        using (var f = new FpsHistoryForm(gameName)) f.ShowDialog(this);
+                    };
+                    row.Controls.Add(histBtn);
+                }
 
                 list.Controls.Add(row);
             }
