@@ -262,7 +262,7 @@ namespace DeepTools
 
         private void ApplyGamingPreset()
         {
-            // Пресет трогает 9 служб разом - предлагаем точку восстановления
+            // трогает 9 служб разом - предлагаем точку восстановления
             RestorePoint.OfferBefore(FindForm(), () => {
                 string[] toDisable = new string[]
                 {
