@@ -186,34 +186,41 @@ namespace DeepTools
             {
                 if (!Directory.Exists(ScreenshotsFolder)) Directory.CreateDirectory(ScreenshotsFolder);
 
+                // Захватываем пиксели синхронно (нужен UI-поток),
+                // но сохранение PNG делаем в фоне — это и есть zero-latency:
+                // экран захвачен мгновенно, диск не блокирует игру
                 Rectangle bounds = SystemInformation.VirtualScreen;
-                Bitmap bmp = new Bitmap(bounds.Width, bounds.Height);
+                Bitmap bmp = new Bitmap(bounds.Width, bounds.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
                 using (Graphics g = Graphics.FromImage(bmp))
                 {
-                    g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
+                    g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size,
+                        CopyPixelOperation.SourceCopy);
                 }
 
                 string fileName = "screenshot_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png";
                 string fullPath = Path.Combine(ScreenshotsFolder, fileName);
-                bmp.Save(fullPath, ImageFormat.Png);
 
-                // Копируем в буфер обмена, чтобы сразу вставлять через Ctrl+V.
-                // Clipboard.SetImage сам делает копию, поэтому bmp можно освобождать
+                captureHint.Text = Lang.T("Захват выполнен, сохраняем...", "Captured, saving...");
+                captureHint.ForeColor = Theme.TextDim;
+
+                // Копируем в буфер прямо сейчас (до фонового потока — Clipboard не thread-safe)
                 bool copied = false;
-                try
-                {
-                    Clipboard.SetImage(bmp);
-                    copied = true;
-                }
-                catch
-                {
-                    // буфер может быть занят другим приложением - скриншот всё равно сохранён
-                }
-                bmp.Dispose();
+                try { Clipboard.SetImage(bmp); copied = true; } catch { }
 
-                captureHint.Text = Lang.T("Сохранено: ", "Saved: ") + fileName
-                    + (copied ? Lang.T(" (скопировано в буфер - вставляй Ctrl+V)", " (copied to clipboard - paste with Ctrl+V)") : "");
-                RefreshGallery();
+                // Сохранение PNG в фоне — игра не ощущает паузы
+                var bw = new System.ComponentModel.BackgroundWorker();
+                bw.DoWork += delegate(object s2, System.ComponentModel.DoWorkEventArgs e2) {
+                    bmp.Save(fullPath, ImageFormat.Png);
+                    bmp.Dispose();
+                };
+                bw.RunWorkerCompleted += delegate(object s2, System.ComponentModel.RunWorkerCompletedEventArgs e2) {
+                    if (IsDisposed) return;
+                    captureHint.Text = Lang.T("Сохранено: ", "Saved: ") + fileName
+                        + (copied ? Lang.T(" (скопировано в буфер - вставляй Ctrl+V)", " (copied to clipboard - paste with Ctrl+V)") : "");
+                    captureHint.ForeColor = Theme.Accent;
+                    RefreshGallery();
+                };
+                bw.RunWorkerAsync();
             }
             catch (Exception ex)
             {

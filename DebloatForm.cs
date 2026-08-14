@@ -155,6 +155,7 @@ namespace DeepTools
                 AutoScroll = true
             };
             card.Controls.Add(list);
+            NativeMethods.ApplyDarkScrollbar(list);
 
             removeBtn = new RoundedButton
             {
@@ -273,7 +274,7 @@ namespace DeepTools
                 return;
             }
 
-            DialogResult confirm = MessageBox.Show(
+            DialogResult confirm = DTDialog.Show(
                 Lang.T("Удалить приложений: ", "Apps to remove: ") + toRemove.Count +
                 Lang.T("?\n\nИх можно будет вернуть через Microsoft Store.", "?\n\nThey can be reinstalled from Microsoft Store."),
                 "DeepTools",

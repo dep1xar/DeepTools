@@ -136,7 +136,7 @@ namespace DeepTools
 
         private Panel MakeRow(ServiceEntry entry)
         {
-            var row = new Panel { Size = new Size(660, 52), BackColor = Color.Transparent, Margin = new Padding(0, 2, 0, 2) };
+            var row = new HoverRow { Size = new Size(660, 52), Margin = new Padding(0, 2, 0, 2) };
 
             var nameLbl = new Label
             {
@@ -262,7 +262,7 @@ namespace DeepTools
 
         private void ApplyGamingPreset()
         {
-            // трогает 9 служб разом - предлагаем точку восстановления
+            // Пресет трогает 9 служб разом - предлагаем точку восстановления
             RestorePoint.OfferBefore(FindForm(), () => {
                 string[] toDisable = new string[]
                 {

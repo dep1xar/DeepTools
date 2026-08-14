@@ -240,14 +240,31 @@ namespace DeepTools
             };
             Controls.Add(titleLbl);
 
+            var diskSpeedBtn = new RoundedButton
+            {
+                Text = Lang.T("💾 Диск", "💾 Disk"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Location = new Point(492, 20),
+                Size = new Size(78, 32)
+            };
+            diskSpeedBtn.Click += (s, e) => {
+                using (var f = new DiskSpeedForm())
+                {
+                    f.ShowDialog(FindForm());
+                }
+            };
+            Controls.Add(diskSpeedBtn);
+
             var stressBtn = new RoundedButton
             {
                 Text = Lang.T("Стресс", "Stress"),
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
-                Location = new Point(404, 20),
-                Size = new Size(88, 32)
+                Location = new Point(342, 20),
+                Size = new Size(78, 32)
             };
             stressBtn.Click += (s, e) => {
                 using (var f = new StressTestForm())
@@ -263,8 +280,8 @@ namespace DeepTools
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
-                Location = new Point(320, 20),
-                Size = new Size(76, 32)
+                Location = new Point(270, 20),
+                Size = new Size(66, 32)
             };
             tempHistBtn.Click += (s, e) => {
                 using (var f = new TempHistoryForm())
@@ -280,8 +297,8 @@ namespace DeepTools
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
-                Location = new Point(500, 20),
-                Size = new Size(88, 32)
+                Location = new Point(426, 20),
+                Size = new Size(60, 32)
             };
             bsodBtn.Click += (s, e) => {
                 using (var f = new BsodForm())
@@ -297,8 +314,8 @@ namespace DeepTools
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
-                Location = new Point(596, 20),
-                Size = new Size(140, 32)
+                Location = new Point(576, 20),
+                Size = new Size(160, 32)
             };
             benchBtn.Click += (s, e) => {
                 using (var f = new BenchmarkForm())

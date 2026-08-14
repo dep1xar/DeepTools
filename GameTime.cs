@@ -335,7 +335,7 @@ namespace DeepTools
 
             foreach (GameStat g in stats)
             {
-                var row = new Panel { Size = new Size(464, 40), BackColor = Color.Transparent, Margin = new Padding(2, 1, 0, 1) };
+                var row = new HoverRow { Size = new Size(464, 40), Margin = new Padding(2, 1, 0, 1) };
 
                 var nameLbl = new Label
                 {
@@ -388,8 +388,7 @@ namespace DeepTools
                         TextAlign = ContentAlignment.MiddleCenter,
                         Cursor = Cursors.Hand
                     };
-                    var tip = new ToolTip();
-                    tip.SetToolTip(histBtn, Lang.T("История FPS", "FPS history"));
+                    DarkTip.Set(histBtn, Lang.T("История FPS", "FPS history"));
                     histBtn.MouseEnter += (s, e) => histBtn.ForeColor = Theme.Accent;
                     histBtn.MouseLeave += (s, e) => histBtn.ForeColor = Theme.TextDim;
                     histBtn.Click += (s, e) => {

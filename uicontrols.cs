@@ -439,4 +439,83 @@ namespace DeepTools
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
         }
     }
+
+    // Тултип в стиле приложения: системный ToolTip рисует белую плашку,
+    // которая выбивается из тёмной темы. Один хелпер - единый вид везде
+    public static class DarkTip
+    {
+        public static void Set(Control control, string text)
+        {
+            var tip = new ToolTip { OwnerDraw = true };
+            var font = new Font("Segoe UI", 8.5F);
+
+            tip.Popup += (s, e) => {
+                Size sz = TextRenderer.MeasureText(tip.GetToolTip(e.AssociatedControl), font);
+                e.ToolTipSize = new Size(sz.Width + 16, sz.Height + 10);
+            };
+            tip.Draw += (s, e) => {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                var rect = new Rectangle(0, 0, e.Bounds.Width - 1, e.Bounds.Height - 1);
+                using (var bg = new SolidBrush(Theme.InputColor))
+                    e.Graphics.FillRectangle(bg, e.Bounds);
+                using (var border = new Pen(Theme.BorderColor))
+                    e.Graphics.DrawRectangle(border, rect);
+                TextRenderer.DrawText(e.Graphics, e.ToolTipText, font, e.Bounds, Theme.TextMain,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+
+            tip.SetToolTip(control, text);
+        }
+    }
+
+    // Строка списка с подсветкой при наведении - как пункты меню трея.
+    // Дочерние Label перехватывают мышь, поэтому наведение слушаем и у детей
+    public class HoverRow : Panel
+    {
+        private bool hovered = false;
+
+        public HoverRow()
+        {
+            DoubleBuffered = true;
+            BackColor = Color.Transparent;
+        }
+
+        protected override void OnControlAdded(ControlEventArgs e)
+        {
+            base.OnControlAdded(e);
+            e.Control.MouseEnter += (s, ev) => SetHover(true);
+            e.Control.MouseLeave += (s, ev) => ReCheckHover();
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { SetHover(true); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { ReCheckHover(); base.OnMouseLeave(e); }
+
+        // Уход с дочернего контрола на саму строку - не считается уходом со строки
+        private void ReCheckHover()
+        {
+            SetHover(ClientRectangle.Contains(PointToClient(Cursor.Position)));
+        }
+
+        private void SetHover(bool value)
+        {
+            if (hovered == value) return;
+            hovered = value;
+            Invalidate(true);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (hovered)
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                var rect = new Rectangle(0, 0, Width - 1, Height - 1);
+                using (var path = Theme.RoundedRect(rect, 8))
+                using (var bg = new SolidBrush(Theme.NavHoverBg))
+                {
+                    e.Graphics.FillPath(bg, path);
+                }
+            }
+            base.OnPaint(e);
+        }
+    }
 }   

@@ -71,7 +71,23 @@ namespace DeepTools
         private Label cpuTempValue;
         private Label gpuTempValue;
         private System.Windows.Forms.Timer statsTimer;
+        private System.Windows.Forms.Timer statsAnimTimer;
         private WidgetForm widget;
+
+        // Плавная анимация цифр мониторинга: значение не прыгает 37 -> 62,
+        // а быстро «докручивается», как спидометр
+        private class StatAnim
+        {
+            public Label Label;
+            public float Shown = -1;  // -1 = число ещё не показывали, первый раз без анимации
+            public float Target = -1;
+            public string Suffix = "";
+            public bool Numeric = false;
+            public bool IsTemp = false;
+        }
+
+        private readonly System.Collections.Generic.List<StatAnim> statAnims =
+            new System.Collections.Generic.List<StatAnim>();
 
         public HomePanel()
         {
@@ -80,9 +96,17 @@ namespace DeepTools
 
             BuildUi();
 
+            statAnims.Add(new StatAnim { Label = cpuValue });
+            statAnims.Add(new StatAnim { Label = ramValue });
+            statAnims.Add(new StatAnim { Label = cpuTempValue, IsTemp = true });
+            statAnims.Add(new StatAnim { Label = gpuTempValue, IsTemp = true });
+
             statsTimer = new System.Windows.Forms.Timer { Interval = 2000 };
             statsTimer.Tick += (s, e) => RefreshStats();
             statsTimer.Start();
+
+            statsAnimTimer = new System.Windows.Forms.Timer { Interval = 30 };
+            statsAnimTimer.Tick += (s, e) => AnimateStats();
         }
 
         private void BuildUi()
@@ -401,10 +425,83 @@ namespace DeepTools
         private void RefreshStats()
         {
             if (!Visible) return;
-            cpuValue.Text = SystemStats.CpuLoad;
-            ramValue.Text = SystemStats.RamLoad;
-            cpuTempValue.Text = SystemStats.CpuTemp;
-            gpuTempValue.Text = SystemStats.GpuTemp;
+
+            SetStatTarget(statAnims[0], SystemStats.CpuLoad);
+            SetStatTarget(statAnims[1], SystemStats.RamLoad);
+            SetStatTarget(statAnims[2], SystemStats.CpuTemp);
+            SetStatTarget(statAnims[3], SystemStats.GpuTemp);
+
+            if (!statsAnimTimer.Enabled) statsAnimTimer.Start();
+        }
+
+        // Разбирает "62°C" / "37%" на число и суффикс. Не число ("—") - показываем как есть
+        private static void ParseStat(string raw, out float value, out string suffix, out bool ok)
+        {
+            value = 0; suffix = ""; ok = false;
+            if (string.IsNullOrEmpty(raw)) return;
+            int i = 0;
+            while (i < raw.Length && char.IsDigit(raw[i])) i++;
+            if (i == 0) return;
+            float v;
+            if (!float.TryParse(raw.Substring(0, i), out v)) return;
+            value = v;
+            suffix = raw.Substring(i);
+            ok = true;
+        }
+
+        private void SetStatTarget(StatAnim stat, string raw)
+        {
+            float value; string suffix; bool ok;
+            ParseStat(raw, out value, out suffix, out ok);
+
+            if (!ok)
+            {
+                stat.Numeric = false;
+                stat.Shown = -1;
+                stat.Label.Text = raw;
+                stat.Label.ForeColor = Theme.TextMain;
+                return;
+            }
+
+            stat.Numeric = true;
+            stat.Suffix = suffix;
+            stat.Target = value;
+            if (stat.Shown < 0) // первое значение - сразу, без «раскрутки» с нуля
+            {
+                stat.Shown = value;
+                ApplyStat(stat);
+            }
+        }
+
+        private void AnimateStats()
+        {
+            bool anyMoving = false;
+            foreach (StatAnim stat in statAnims)
+            {
+                if (!stat.Numeric || stat.Shown < 0) continue;
+                float d = stat.Target - stat.Shown;
+                if (Math.Abs(d) < 0.5f)
+                {
+                    if (stat.Shown != stat.Target) { stat.Shown = stat.Target; ApplyStat(stat); }
+                    continue;
+                }
+                anyMoving = true;
+                stat.Shown += d * 0.25f;
+                ApplyStat(stat);
+            }
+            if (!anyMoving) statsAnimTimer.Stop();
+        }
+
+        private void ApplyStat(StatAnim stat)
+        {
+            int shown = (int)Math.Round(stat.Shown);
+            stat.Label.Text = shown + stat.Suffix;
+
+            // Подсветка по серьёзности: температуры и загрузка краснеют по-разному
+            if (stat.IsTemp)
+                stat.Label.ForeColor = shown >= 80 ? Theme.Danger : (shown >= 65 ? Theme.Warning : Theme.TextMain);
+            else
+                stat.Label.ForeColor = shown >= 90 ? Theme.Danger : (shown >= 75 ? Theme.Warning : Theme.TextMain);
         }
     }
 }

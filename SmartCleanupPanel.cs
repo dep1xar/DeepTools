@@ -631,7 +631,7 @@ namespace DeepTools
                 {
                     if (!categories[i].Scanned)
                     {
-                        MessageBox.Show(Lang.T("Сначала нажми \"Сканировать\", чтобы увидеть, что будет удалено.", "Press Scan first to see what will be deleted."), "DeepTools",
+                        DTDialog.Show(Lang.T("Сначала нажми \"Сканировать\", чтобы увидеть, что будет удалено.", "Press Scan first to see what will be deleted."), "DeepTools",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return;
                     }
@@ -646,7 +646,7 @@ namespace DeepTools
                 return;
             }
 
-            DialogResult result = MessageBox.Show(
+            DialogResult result = DTDialog.Show(
                 Lang.T("Будет очищено примерно ", "Approximately ") + FormatSize(total) + Lang.T(".\n\nПродолжить?", " will be cleaned.\n\nContinue?"),
                 Lang.T("Подтверждение очистки", "Cleanup confirmation"),
                 MessageBoxButtons.YesNo,

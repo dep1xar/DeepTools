@@ -83,6 +83,7 @@ namespace DeepTools
             historyListBox.DoubleClick += (s, e) => RestoreSelected();
             historyListBox.SelectedIndexChanged += (s, e) => UpdatePreview();
             card.Controls.Add(historyListBox);
+            NativeMethods.ApplyDarkScrollbar(historyListBox);
 
             preview = new PictureBox
             {
@@ -217,7 +218,7 @@ namespace DeepTools
             int idx = historyListBox.SelectedIndex;
             if (idx < 0 || idx >= displayed.Count)
             {
-                MessageBox.Show(Lang.T("Выбери элемент из истории", "Select an item from history"), Lang.T("Буфер обмена", "Clipboard"));
+                DTDialog.Show(Lang.T("Выбери элемент из истории", "Select an item from history"), Lang.T("Буфер обмена", "Clipboard"));
                 return;
             }
 
@@ -270,7 +271,7 @@ namespace DeepTools
 
         private void ClearAll()
         {
-            var result = MessageBox.Show(Lang.T("Очистить всю историю буфера обмена?", "Clear entire clipboard history?"), Lang.T("Подтверждение", "Confirmation"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            var result = DTDialog.Show(Lang.T("Очистить всю историю буфера обмена?", "Clear entire clipboard history?"), Lang.T("Подтверждение", "Confirmation"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
             if (result == DialogResult.Yes)
             {
                 clipboardManager.ClearHistory();

@@ -11,8 +11,7 @@ if (-not (Test-Path $csc)) {
     exit 1
 }
 
-# clicker.cs - старый одиночный кликер, не входит в сборку DeepTools
-$sources = Get-ChildItem *.cs | Where-Object { $_.Name -ne "clicker.cs" } | ForEach-Object { $_.Name }
+$sources = Get-ChildItem *.cs | ForEach-Object { $_.Name }
 
 # Managed-зависимости встраиваем в exe как ресурсы вида DeepTools.Embedded.<Имя>.dll.
 # EmbeddedAssemblies.cs достаёт их оттуда в рантайме - релиз становится одним файлом.

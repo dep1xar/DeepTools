@@ -280,7 +280,7 @@ namespace DeepTools
             string path = SelectedPath();
             if (path == null) return;
 
-            if (MessageBox.Show(
+            if (DTDialog.Show(
                 Lang.T("Удалить файл безвозвратно?\n\n", "Delete this file permanently?\n\n") + path,
                 "DeepTools", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
 

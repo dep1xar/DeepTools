@@ -526,7 +526,7 @@ namespace DeepTools
 
         private Panel MakeRow(StartupItem item)
         {
-            var row = new Panel { Size = new Size(660, 48), BackColor = Color.Transparent, Margin = new Padding(0, 2, 0, 2) };
+            var row = new HoverRow { Size = new Size(660, 48), Margin = new Padding(0, 2, 0, 2) };
 
             var nameLbl = new Label
             {
@@ -555,8 +555,7 @@ namespace DeepTools
                     Size = new Size(190, 18),
                     TextAlign = ContentAlignment.MiddleRight
                 };
-                var tip = new ToolTip();
-                tip.SetToolTip(badge, string.Join(", ", reasons.ToArray()));
+                DarkTip.Set(badge, string.Join(", ", reasons.ToArray()));
                 row.Controls.Add(badge);
             }
 

@@ -285,8 +285,7 @@ namespace DeepTools
 
         private void UpdateBellTip()
         {
-            var tip = new ToolTip();
-            tip.SetToolTip(bellBtn, reminder != DateTime.MinValue
+            DarkTip.Set(bellBtn, reminder != DateTime.MinValue
                 ? Lang.T("Напомнит ", "Reminder at ") + reminder.ToString("dd.MM HH:mm") + Lang.T(" (клик - убрать)", " (click to remove)")
                 : Lang.T("Напомнить в заданное время", "Remind me at a set time"));
         }

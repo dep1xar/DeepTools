@@ -23,19 +23,28 @@ namespace DeepTools
             Application.SetCompatibleTextRenderingDefault(false);
 
             AppConfig.Load();
+            Theme.Apply(AppConfig.Get("theme", "dark") == "light");
 
-            // При первом запуске выбираем язык по языку Windows:
-            // русская система - русский, любая другая - английский
+            // Самый первый запуск: спрашиваем язык явно, а не угадываем по локали -
+            // иначе человек с "чужим" языком системы даже не поймёт, где его сменить.
+            // Заодно помечаем, что надо показать мастер первого запуска
             string savedLang = AppConfig.Get("language", "");
             if (savedLang == "")
             {
-                bool systemIsRussian = System.Globalization.CultureInfo
-                    .CurrentUICulture.TwoLetterISOLanguageName == "ru";
-                savedLang = systemIsRussian ? "ru" : "en";
-                AppConfig.Set("language", savedLang);
+                using (var picker = new LanguagePickerForm())
+                    picker.ShowDialog();
+
+                savedLang = AppConfig.Get("language", "");
+                if (savedLang == "") // закрыл окно, не выбрав - fallback на локаль Windows
+                {
+                    bool systemIsRussian = System.Globalization.CultureInfo
+                        .CurrentUICulture.TwoLetterISOLanguageName == "ru";
+                    savedLang = systemIsRussian ? "ru" : "en";
+                    AppConfig.Set("language", savedLang);
+                }
+                AppConfig.SetBool("wizard_pending", true);
             }
             Lang.IsEn = savedLang == "en";
-            Theme.Apply(AppConfig.Get("theme", "dark") == "light");
 
             bool isAdmin = IsRunningAsAdmin();
 

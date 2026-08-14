@@ -231,7 +231,7 @@ namespace DeepTools
             AppEntry a = Selected();
             if (a == null) { statusLabel.Text = Lang.T("Выбери программу", "Select a program"); return; }
 
-            if (MessageBox.Show(
+            if (DTDialog.Show(
                 Lang.T("Запустить удаление «", "Start uninstalling \"") + a.Name + Lang.T("»?\n\nОткроется штатный деинсталлятор. После него можно нажать «Почистить хвосты».",
                     "\"?\n\nThe program's own uninstaller will open. After it finishes, use \"Clean leftovers\"."),
                 "DeepTools", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
@@ -256,7 +256,7 @@ namespace DeepTools
             List<string> found = FindLeftovers(a);
             if (found.Count == 0)
             {
-                MessageBox.Show(Lang.T("Остаточных папок не найдено", "No leftover folders found"), "DeepTools");
+                DTDialog.Show(Lang.T("Остаточных папок не найдено", "No leftover folders found"), "DeepTools");
                 return;
             }
 
@@ -428,7 +428,7 @@ namespace DeepTools
                 catch { }
             }
             for (int i = toRemove.Count - 1; i >= 0; i--) clb.Items.RemoveAt(toRemove[i]);
-            MessageBox.Show(Lang.T("Удалено папок: ", "Folders deleted: ") + deleted, "DeepTools");
+            DTDialog.Show(Lang.T("Удалено папок: ", "Folders deleted: ") + deleted, "DeepTools");
         }
     }
 }

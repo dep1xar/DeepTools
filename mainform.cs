@@ -83,10 +83,29 @@ namespace DeepTools
             FormClosed += (s, e) => WinKeyBlocker.Shutdown();
             // Замороженные фоновые процессы обязаны проснуться при выходе из программы
             FormClosed += (s, e) => BackgroundFreezer.ResumeAll();
+            // Выключаем новые фоновые сервисы при закрытии
+            FormClosed += (s, e) => LatencySurgeon.Disable();
+            FormClosed += (s, e) => RgbReactive.Enabled = false;
+            FormClosed += (s, e) => AdaptivePowerProfile.Enabled = false;
+            // Восстанавливаем сохранённые состояния
+            if (AppConfig.GetBool("adaptive_power", false))  AdaptivePowerProfile.Enabled = true;
+            if (AppConfig.GetBool("rgb_reactive", false))    RgbReactive.Enabled = true;
 
             Load += (s, e) => ApplyRoundedRegion();
             Load += (s, e) => RegisterHotkeys();
-            Shown += (s, e) => WhatsNew.ShowIfUpdated(this);
+            Shown += (s, e) => {
+                // Первый запуск: мастер вместо окна "Что нового" (и то и то сразу - перебор)
+                if (AppConfig.GetBool("wizard_pending", false))
+                {
+                    AppConfig.SetBool("wizard_pending", false);
+                    using (var wizard = new FirstRunWizardForm(key => NavigateByKey(key)))
+                        wizard.ShowDialog(this);
+                }
+                else
+                {
+                    WhatsNew.ShowIfUpdated(this);
+                }
+            };
             FormClosing += (s, e) => OnFormClosing(s, e);
             FormClosed += (s, e) => UnregisterHotkeys();
         }
@@ -314,7 +333,7 @@ namespace DeepTools
                     HotkeyDef busy = Hotkeys.UsedBy(key, id);
                     if (busy != null)
                     {
-                        MessageBox.Show(
+                        DTDialog.Show(
                             Lang.T("Клавиша уже занята действием «", "This key is already used by \"") + busy.Name + Lang.T("»", "\""),
                             "DeepTools", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
@@ -441,19 +460,6 @@ namespace DeepTools
                 Location = new Point(18, 44),
                 AutoSize = true
             };
-            int brandClicks = 0;
-            DateTime lastBrandClick = DateTime.MinValue;
-            brandTitle.Click += (s, e) => {
-                if ((DateTime.Now - lastBrandClick).TotalSeconds > 1.5) brandClicks = 0;
-                lastBrandClick = DateTime.Now;
-                brandClicks++;
-                if (brandClicks >= 3)
-                {
-                    brandClicks = 0;
-                    using (var egg = new WwEasterEggForm()) egg.ShowDialog(this);
-                }
-            };
-
             brandPanel.Controls.Add(brandTitle);
             brandPanel.Controls.Add(brandSubtitle);
             sidebar.Controls.Add(brandPanel);
@@ -596,6 +602,20 @@ namespace DeepTools
                 AutoSize = true
             };
             sidebar.Controls.Add(lbl);
+        }
+
+        // Переход в раздел по строковому ключу: используют быстрые карточки главной
+        // и мастер первого запуска
+        private void NavigateByKey(string key)
+        {
+            if (key == "cleanup") ShowPanel(panelCleanup, navCleanup);
+            else if (key == "booster") ShowPanel(panelBooster, navBooster);
+            else if (key == "health") ShowPanel(panelHealth, navHealth);
+            else if (key == "clicker") ShowPanel(panelClicker, navClicker);
+            else if (key == "screenshots") ShowPanel(panelScreenshots, navScreenshots);
+            else if (key == "settings") ShowPanel(panelSettings, navSettings);
+            else if (key == "services") ShowPanel(panelServices, navServices);
+            else if (key == "startup") ShowPanel(panelStartup, navStartup);
         }
 
         private void ShowPanel(Panel panel, SidebarNavButton navItem)
@@ -887,7 +907,7 @@ namespace DeepTools
                 Size = new Size(220, 34)
             };
             biosBtn.Click += (s, e) => {
-                if (MessageBox.Show(
+                if (DTDialog.Show(
                     Lang.T("Перезагрузить компьютер сейчас и войти в BIOS/UEFI?", "Restart the PC now and enter BIOS/UEFI?"),
                     "DeepTools", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
                     PowerTools.RestartToFirmware();
@@ -1106,7 +1126,7 @@ namespace DeepTools
 
         private void OfferRestart()
         {
-            DialogResult r = MessageBox.Show(
+            DialogResult r = DTDialog.Show(
                 Lang.T("Перезапустить DeepTools сейчас, чтобы применить изменения?", "Restart DeepTools now to apply changes?"),
                 "DeepTools",
                 MessageBoxButtons.YesNo,

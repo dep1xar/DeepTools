@@ -5,24 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DeepTools — умный твикер, чистильщик и монитор для Windows</title>
 <meta name="description" content="DeepTools: чистка, оптимизация под игры и мониторинг Windows в одном exe. Без установщика. Открытый код.">
-<link rel="canonical" href="https://dep1xar.github.io/DeepTools/">
-
-<!-- Favicon: собран из акцентной точки-статуса приложения, а не generic-иконки инструмента -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0c10'/%3E%3Ccircle cx='16' cy='16' r='6.5' fill='%232ecc71'/%3E%3C/svg%3E">
+<link rel="canonical" href="https://github.com/dep1xar/DeepTools">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🔧%3C/text%3E%3C/svg%3E">
 
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="DeepTools — умный твикер, чистильщик и монитор для Windows">
 <meta property="og:description" content="Чистка, оптимизация под игры и мониторинг Windows в одном exe. Без установщика. Открытый код.">
-<meta property="og:url" content="https://dep1xar.github.io/DeepTools/">
-<meta property="og:image" content="https://dep1xar.github.io/DeepTools/og-image.png">
+<meta property="og:url" content="https://github.com/dep1xar/DeepTools">
 <meta property="og:site_name" content="DeepTools">
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="DeepTools — умный твикер, чистильщик и монитор для Windows">
 <meta name="twitter:description" content="Чистка, оптимизация под игры и мониторинг Windows в одном exe. Без установщика. Открытый код.">
-<meta name="twitter:image" content="https://dep1xar.github.io/DeepTools/og-image.png">
 
 <!-- Schema.org -->
 <script type="application/ld+json">
@@ -32,9 +28,7 @@
   "name": "DeepTools",
   "applicationCategory": "UtilitiesApplication",
   "operatingSystem": "Windows 10, Windows 11",
-  "softwareVersion": "1.7.0",
-  "url": "https://dep1xar.github.io/DeepTools/",
-  "downloadUrl": "https://github.com/dep1xar/DeepTools/releases/latest/download/DeepTools.exe",
+  "softwareVersion": "1.8.0",
   "license": "https://github.com/dep1xar/DeepTools/blob/main/LICENSE",
   "offers": {
     "@type": "Offer",
@@ -78,9 +72,26 @@
     --nav-height:64px;
   }
 
-  /* Тёмная тема — это часть идентичности продукта (совпадает с самим приложением),
-     поэтому фиксируем её вместо авто-переключения по системным настройкам:
-     первое впечатление от сайта должно совпадать с тем, что видит пользователь в самой программе. */
+  /* Light theme support */
+  @media (prefers-color-scheme: light){
+    :root{
+      color-scheme: light;
+      --bg:#f6f7f9;
+      --bg-soft:#eef0f4;
+      --card:#ffffff;
+      --card-hover:#f8f9fb;
+      --border:#dde1e8;
+      --border-soft:#e8eaef;
+      --text:#0f1115;
+      --text-dim:#4a5060;
+      --text-faint:#8a93a3;
+      --accent:#27ae60;
+      --accent-hover:#219150;
+      --accent-soft:rgba(39,174,96,.08);
+    }
+    .mockup{box-shadow:0 30px 80px -30px rgba(0,0,0,.15), 0 0 0 1px rgba(0,0,0,.04);}
+    .final-cta{background:linear-gradient(135deg, rgba(39,174,96,.06), var(--card));}
+  }
 
   *{margin:0;padding:0;box-sizing:border-box;}
   html{scroll-behavior:smooth;scroll-padding-top:calc(var(--nav-height) + 16px);}
@@ -116,6 +127,10 @@
     background:rgba(10,12,16,.85);
     backdrop-filter:blur(12px);
     border-bottom:1px solid var(--border-soft);
+    transition:background .2s,border-color .2s;
+  }
+  @media (prefers-color-scheme: light){
+    nav{background:rgba(246,247,249,.9);}
   }
   .nav-inner{
     max-width:1180px;margin:0 auto;padding:0 24px;
@@ -182,13 +197,6 @@
     background:var(--accent-soft);border:1px solid rgba(46,204,113,.25);
     padding:5px 12px;border-radius:100px;margin-bottom:22px;
   }
-  /* Мигающий курсор — намёк на "живой" системный монитор, а не декоративная деталь */
-  .eyebrow::after{
-    content:'';width:6px;height:12px;background:var(--accent);
-    animation:blink 1s step-end infinite;
-  }
-  @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
-  @media (prefers-reduced-motion: reduce){.eyebrow::after{animation:none;}}
   h1.hero-title{
     font-family:var(--font-display);font-size:52px;line-height:1.06;font-weight:700;
     letter-spacing:-0.02em;margin-bottom:20px;
@@ -281,20 +289,12 @@
   .compare-note b{color:var(--text-dim);}
 
   /* ---------- versions ---------- */
-  /* Узлы таймлайна оформлены как git-теги (моноширинный "v"), а не абстрактные точки —
-     версии программы буквально и есть git-теги, это не декоративная деталь. */
-  .timeline{position:relative;padding-left:44px;}
-  .timeline::before{content:'';position:absolute;left:11px;top:6px;bottom:6px;width:1px;background:var(--border);}
+  .timeline{position:relative;padding-left:32px;}
+  .timeline::before{content:'';position:absolute;left:6px;top:6px;bottom:6px;width:1px;background:var(--border);}
   .tl-item{position:relative;padding-bottom:40px;}
   .tl-item:last-child{padding-bottom:0;}
-  .tl-dot{
-    position:absolute;left:-44px;top:0;width:23px;height:23px;border-radius:6px;
-    background:var(--bg-soft);border:1px solid var(--border);
-    display:flex;align-items:center;justify-content:center;
-    font-family:var(--font-mono);font-size:11px;color:var(--text-faint);
-  }
-  .tl-dot::before{content:'v';}
-  .tl-item.latest .tl-dot{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);}
+  .tl-dot{position:absolute;left:-32px;top:4px;width:13px;height:13px;border-radius:50%;background:var(--bg);border:2px solid var(--border);}
+  .tl-item.latest .tl-dot{border-color:var(--accent);background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);}
   .tl-header{display:flex;align-items:baseline;gap:12px;margin-bottom:8px;flex-wrap:wrap;}
   .tl-version{font-family:var(--font-mono);font-weight:600;font-size:16px;}
   .tl-item.latest .tl-version{color:var(--accent);}
@@ -322,7 +322,6 @@
   .trust-block:last-child{margin-bottom:0;}
   .trust-title{font-family:var(--font-display);font-weight:600;font-size:15px;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
   .trust-desc{font-size:13.5px;color:var(--text-dim);line-height:1.6;}
-  .trust-desc code{font-family:var(--font-mono);font-size:12px;background:var(--bg-soft);padding:1px 5px;border-radius:4px;color:var(--text-dim);}
   .code-block{
     background:var(--bg-soft);border:1px solid var(--border-soft);border-radius:var(--radius-sm);
     padding:16px 18px;font-family:var(--font-mono);font-size:12.5px;color:var(--text-dim);
@@ -336,12 +335,12 @@
     padding:12px 16px;margin-top:10px;
   }
   .hash-val{font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);word-break:break-all;}
-  .hash-link-btn{
+  .copy-btn{
     font-family:var(--font-mono);font-size:11px;background:var(--card-hover);border:1px solid var(--border);
-    color:var(--text-dim);padding:5px 10px;border-radius:6px;flex-shrink:0;white-space:nowrap;
+    color:var(--text-dim);padding:5px 10px;border-radius:6px;cursor:pointer;flex-shrink:0;white-space:nowrap;
     transition:all .15s;
   }
-  @media (hover: hover){.hash-link-btn:hover{color:var(--text);border-color:var(--text-faint);}}
+  @media (hover: hover){.copy-btn:hover{color:var(--text);border-color:var(--text-faint);}}
 
   /* ---------- final cta ---------- */
   .final-cta{
@@ -398,12 +397,12 @@
 <nav id="navbar" aria-label="Основная навигация">
   <div class="nav-inner">
     <a href="#" class="brand"><span class="brand-dot" aria-hidden="true"></span>DeepTools</a>
-    <div class="nav-links">
-      <a href="#features">Возможности</a>
-      <a href="#compare">Сравнение</a>
-      <a href="#versions">История версий</a>
-      <a href="#blog">Блог</a>
-      <a href="#faq">FAQ</a>
+    <div class="nav-links" role="menubar">
+      <a href="#features" role="menuitem">Возможности</a>
+      <a href="#compare" role="menuitem">Сравнение</a>
+      <a href="#versions" role="menuitem">История версий</a>
+      <a href="#blog" role="menuitem">Блог</a>
+      <a href="#faq" role="menuitem">FAQ</a>
     </div>
     <div class="nav-cta">
       <a href="https://github.com/dep1xar/DeepTools" class="navbar-github" aria-label="GitHub" target="_blank" rel="noopener noreferrer">
@@ -415,19 +414,19 @@
   </div>
 </nav>
 
-<div id="mobile-menu" class="mobile-menu">
-  <a href="#features" onclick="closeMobileMenu()">Возможности</a>
-  <a href="#compare" onclick="closeMobileMenu()">Сравнение</a>
-  <a href="#versions" onclick="closeMobileMenu()">История версий</a>
-  <a href="#blog" onclick="closeMobileMenu()">Блог</a>
-  <a href="#faq" onclick="closeMobileMenu()">FAQ</a>
+<div id="mobile-menu" class="mobile-menu" role="menu" aria-label="Мобильное меню">
+  <a href="#features" role="menuitem" onclick="closeMobileMenu()">Возможности</a>
+  <a href="#compare" role="menuitem" onclick="closeMobileMenu()">Сравнение</a>
+  <a href="#versions" role="menuitem" onclick="closeMobileMenu()">История версий</a>
+  <a href="#blog" role="menuitem" onclick="closeMobileMenu()">Блог</a>
+  <a href="#faq" role="menuitem" onclick="closeMobileMenu()">FAQ</a>
 </div>
 
 <main id="main-content">
 <header class="hero">
   <div class="wrap hero-grid">
     <div>
-      <div class="eyebrow">v1.7.0 · открытый код · без установщика</div>
+      <div class="eyebrow">● v1.8.0 · открытый код · без установщика</div>
       <h1 class="hero-title">Один <span class="accent">.exe</span> вместо пяти программ для твоего Windows</h1>
       <p class="hero-sub">Чистка мусора, буст под игры и мониторинг железа — в одном лёгком приложении. Никаких установщиков, никаких фоновых служб. Скачал, запустил, пользуешься.</p>
       <div class="hero-actions">
@@ -445,7 +444,7 @@
 
     <div class="mockup" aria-hidden="true">
       <div class="mockup-titlebar">
-        <div class="mockup-titlebar-left"><span class="mockup-titlebar-dot"></span>DeepTools v1.7</div>
+        <div class="mockup-titlebar-left"><span class="mockup-titlebar-dot"></span>DeepTools v1.8</div>
         <div class="mockup-titlebar-right"><span>—</span><span>✕</span></div>
       </div>
       <div class="mockup-body">
@@ -463,7 +462,7 @@
         </div>
         <div class="mockup-content">
           <div class="mockup-hero-card">
-            <div class="mockup-hero-title">DeepTools v1.7.0</div>
+            <div class="mockup-hero-title">DeepTools v1.8.0</div>
             <div class="mockup-hero-sub">Чистка, ускорение и мониторинг компьютера в одном месте</div>
           </div>
           <div class="mockup-stats">
@@ -621,8 +620,20 @@
       <div class="tl-item latest">
         <div class="tl-dot" aria-hidden="true"></div>
         <div class="tl-header">
-          <span class="tl-version">v1.7.0</span>
+          <span class="tl-version">v1.8.0</span>
           <span class="tl-badge">текущая</span>
+          <span class="tl-date">август 2026</span>
+        </div>
+        <ul class="tl-list">
+          <li>Хирург латентности: режет фоновый трафик в игре и приоритизирует пакеты через QoS</li>
+          <li>DNS-переключатель и адаптивный профиль питания по контексту</li>
+          <li>Дефрагментация VRAM, RGB-реакция по датчикам и самообновление в один клик</li>
+        </ul>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot" aria-hidden="true"></div>
+        <div class="tl-header">
+          <span class="tl-version">v1.7.0</span>
           <span class="tl-date">август 2026</span>
         </div>
         <ul class="tl-list">
@@ -665,7 +676,7 @@
   <div class="wrap">
     <div class="section-label">Блог</div>
     <h2 class="section-title">Заметки о разработке</h2>
-    <p class="section-sub">Почему программа сделана именно так — и что будет дальше.</p>
+    <p class="section-sub">Почему программа сделана именно так.</p>
 
     <div class="blog-grid">
       <article class="blog-card">
@@ -678,12 +689,6 @@
         <div class="blog-tag">Внутрянка</div>
         <h3 class="blog-title">Как MinerGuard ловит скрытые майнеры по паттерну простоя</h3>
         <div class="blog-desc">Почему детект «CPU грузится, пока тебя нет за компом» работает надёжнее, чем поиск процесса по имени.</div>
-        <div class="blog-meta">Скоро</div>
-      </article>
-      <article class="blog-card">
-        <div class="blog-tag">Roadmap</div>
-        <h3 class="blog-title">Что дальше: Scheduled Tasks в автозагрузке и профили твиков</h3>
-        <div class="blog-desc">Куда движется проект — расширение анализа автозапуска и пресеты «Игровой / Рабочий / Батарея».</div>
         <div class="blog-meta">Скоро</div>
       </article>
     </div>
@@ -718,10 +723,10 @@
         </div>
         <div class="trust-block">
           <div class="trust-title">✓ Проверка релиза</div>
-          <div class="trust-desc">Сверьте SHA256 скачанного файла перед запуском — хэш публикуется в каждом релизе на GitHub, рядом с файлом:</div>
+          <div class="trust-desc">Сверьте SHA256 скачанного файла перед запуском. Хэш публикуется в каждом релизе на GitHub:</div>
           <div class="hash-row">
-            <span class="hash-val">SHA256 → страница релиза, раздел Assets</span>
-            <a class="hash-link-btn" href="https://github.com/dep1xar/DeepTools/releases/latest" target="_blank" rel="noopener noreferrer">Открыть релиз ↗</a>
+            <code class="hash-val" id="release-hash">SHA256 указан в релизе на GitHub → Releases → Assets</code>
+            <button class="copy-btn" aria-label="Скопировать подсказку" onclick="copyHash()">Copy</button>
           </div>
         </div>
       </div>
@@ -756,7 +761,6 @@
           <li><a href="#features">Возможности</a></li>
           <li><a href="#compare">Сравнение</a></li>
           <li><a href="#versions">История версий</a></li>
-          <li><a href="#blog">Блог</a></li>
         </ul>
       </div>
       <div>
@@ -834,6 +838,22 @@
   jitter(document.getElementById('stat-ram'), 60, 4, '%', 0);
   jitter(document.getElementById('stat-cputemp'), 52, 3, '°C', 0);
   jitter(document.getElementById('stat-gputemp'), 44, 3, '°C', 0);
+
+  // ===== Copy hash =====
+  async function copyHash(){
+    const hashEl = document.getElementById('release-hash');
+    const btn = document.querySelector('.copy-btn');
+    if(!hashEl || !btn) return;
+    try{
+      await navigator.clipboard.writeText(hashEl.textContent.trim());
+      const orig = btn.textContent;
+      btn.textContent = 'Скопировано';
+      setTimeout(() => btn.textContent = orig, 1400);
+    }catch(err){
+      btn.textContent = 'Ошибка';
+      setTimeout(() => btn.textContent = 'Copy', 1400);
+    }
+  }
 
   // Cleanup on page hide (good practice)
   document.addEventListener('visibilitychange', () => {

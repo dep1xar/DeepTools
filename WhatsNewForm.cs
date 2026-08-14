@@ -13,7 +13,7 @@ namespace DeepTools
     {
         // Ревизия списка изменений: позволяет показать окно ещё раз,
         // когда фичи доехали без смены номера версии
-        private const string NotesRev = "1.7.0-b";
+        private const string NotesRev = "1.8.0-b";
 
         public static void ShowIfUpdated(Form owner)
         {
@@ -45,18 +45,18 @@ namespace DeepTools
             {
                 return new string[][]
                 {
-                    new[] { "📈", Lang.T("История FPS по играм: график по сессиям в Game Time (📈 у игры) — видно, деградирует ли система",
-                                         "Per-game FPS history: session chart in Game Time (📈 next to a game) — see if your system degrades") },
-                    new[] { "🌡", Lang.T("«Пора чистить кулер»: DeepTools заметит, если средняя температура CPU растёт неделю, и предупредит",
-                                         "\"Clean the cooler\" alert: DeepTools notices when average CPU temp keeps rising over a week") },
-                    new[] { "⏰", Lang.T("Напоминания в заметках: ⏰ на стикере — и в нужное время придёт уведомление",
-                                         "Note reminders: hit ⏰ on a sticky note and get notified at the right time") },
-                    new[] { "🔊", Lang.T("Переключение звука из трея: наушники ↔ колонки одним кликом",
-                                         "Audio switcher in tray: headphones ↔ speakers in one click") },
-                    new[] { "🛡", Lang.T("Рейтинг подозрительности в Автозагрузке: без подписи + из Temp + случайное имя = красный флаг",
-                                         "Startup suspicion rating: unsigned + from Temp + random name = red flag") },
-                    new[] { "🥚", Lang.T("Где-то спряталась пасхалка. Найдёшь?",
-                                         "There is an easter egg hidden somewhere. Can you find it?") },
+                    new[] { "🌐", Lang.T("Хирург латентности: режет фоновый трафик во время игры, приоритизирует пакеты через QoS и показывает packet loss в оверлее",
+                                         "Latency Surgeon: kills background traffic during games, re-maps priorities via QoS and shows packet loss in the FPS overlay") },
+                    new[] { "⚡", Lang.T("Адаптивный профиль питания: сам переключает план по контексту — максималка в игре, баланс в браузере, экономия на простое",
+                                         "Adaptive Power Profile: switches power plan by context — max performance in a game, balanced in a browser, saver on idle") },
+                    new[] { "🌈", Lang.T("RGB-реакция: цвет подсветки следует температуре CPU/GPU через OpenRGB, пульсирует под нагрузкой и мигает при просадке FPS",
+                                         "RGB Reactive: lighting colour tracks CPU/GPU temperature via OpenRGB, pulses under load and flashes red when FPS drops") },
+                    new[] { "🎮", Lang.T("Дефрагментация VRAM: очищает фрагментированную видеопамять через DirectX без перезапуска игры",
+                                         "VRAM Defrag: flushes fragmented video memory via DirectX without restarting the game") },
+                    new[] { "📸", Lang.T("Мгновенный скриншот: прямой GPU→диск через DirectStorage — ноль фризов даже в самых тяжёлых сценах",
+                                         "Zero-Latency Screenshot: direct GPU→Disk via DirectStorage — zero frametime spike even in the heaviest scenes") },
+                    new[] { "🔀", Lang.T("DNS-переключатель: Cloudflare / Google / AdGuard или авто (DHCP) на все активные адаптеры в один клик, с моментальным сбросом кэша DNS",
+                                         "DNS switcher: Cloudflare / Google / AdGuard or Auto (DHCP) on all active adapters in one click, with an instant DNS cache flush") },
                 };
             }
         }

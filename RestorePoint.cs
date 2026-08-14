@@ -50,7 +50,7 @@ namespace DeepTools
         {
             if (!Program.IsRunningAsAdmin()) { proceed(); return; }
 
-            System.Windows.Forms.DialogResult r = System.Windows.Forms.MessageBox.Show(owner,
+            System.Windows.Forms.DialogResult r = DTDialog.Show(owner,
                 Lang.T("Создать точку восстановления системы перед изменениями?\n\nЕсли что-то пойдёт не так, можно будет откатиться. Занимает 10-30 секунд.",
                        "Create a system restore point before making changes?\n\nIf anything goes wrong you can roll back. Takes 10-30 seconds."),
                 Lang.T("Точка восстановления", "Restore point"),

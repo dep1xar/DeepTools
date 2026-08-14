@@ -312,7 +312,12 @@ namespace DeepTools
         private Label[] procConnLabels;
         private Label[] procRateLabels;
         private Label trafficHintLabel;
+        private Label surgeonStatusLabel;
         private const int ProcRows = 5;
+
+        private RoundedButton[] dnsButtons;
+        private Label dnsStatusLabel;
+        private bool dnsBusy = false;
 
         // Пинг-тест по этим серверам + свой адрес из поля ввода.
         // Xbox DNS (xbox-dns.ru) - Smart DNS для Xbox Live/ChatGPT/Supercell, адреса 111.88.96.50/51
@@ -322,7 +327,9 @@ namespace DeepTools
         public NetworkPanel()
         {
             Size = new Size(760, 616);
+            AutoScroll = true;
             BackColor = Theme.BgColor;
+            NativeMethods.ApplyDarkScrollbar(this);
 
             BuildUi();
 
@@ -528,6 +535,123 @@ namespace DeepTools
                 AutoEllipsis = true
             };
             trafficCard.Controls.Add(trafficHintLabel);
+
+            // ---- Карточка: Хирург латентности ----
+            var surgeonCard = Theme.MakeCard(this, new Point(24, 608), new Size(712, 88));
+
+            var surgeonTitle = new Label
+            {
+                Text = Lang.T("🌐 Хирург латентности", "🌐 Latency Surgeon"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(16, 14),
+                AutoSize = true
+            };
+            surgeonCard.Controls.Add(surgeonTitle);
+
+            var surgeonDesc = new Label
+            {
+                Text = Lang.T("Режет фоновый трафик (Steam, обновления, браузеры) в игре, QoS-приоритет для игровых пакетов",
+                              "Kills background traffic (Steam, updates, browsers) during game, QoS priority for game packets"),
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(16, 36),
+                Size = new Size(560, 32)
+            };
+            surgeonCard.Controls.Add(surgeonDesc);
+
+            var surgeonToggle = new ToggleSwitch
+            {
+                Location = new Point(646, 22),
+                Checked = AppConfig.GetBool("latency_surgeon", false)
+            };
+            surgeonToggle.CheckedChanged += (s, e) => {
+                if (surgeonToggle.Checked) LatencySurgeon.Enable();
+                else LatencySurgeon.Disable();
+                AppConfig.SetBool("latency_surgeon", surgeonToggle.Checked);
+            };
+            surgeonCard.Controls.Add(surgeonToggle);
+
+            surgeonStatusLabel = new Label
+            {
+                Text = "",
+                ForeColor = Theme.Accent,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(16, 62),
+                AutoSize = true
+            };
+            surgeonCard.Controls.Add(surgeonStatusLabel);
+
+            // Восстанавливаем состояние после перезапуска
+            if (AppConfig.GetBool("latency_surgeon", false))
+                LatencySurgeon.Enable();
+
+            // ---- Карточка: DNS-переключатель ----
+            var dnsCard = Theme.MakeCard(this, new Point(24, surgeonCard.Bottom + 12), new Size(712, 118));
+
+            var dnsTitle = new Label
+            {
+                Text = Lang.T("DNS-переключатель", "DNS switcher"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(16, 12),
+                AutoSize = true
+            };
+            dnsCard.Controls.Add(dnsTitle);
+
+            var dnsDesc = new Label
+            {
+                Text = Lang.T("Меняет DNS на всех активных адаптерах. Быстрее отклик сайтов, обход тормозов DNS провайдера.",
+                              "Sets DNS on all active adapters. Faster site response, bypasses a slow ISP DNS."),
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(16, 34),
+                Size = new Size(680, 16),
+                AutoEllipsis = true
+            };
+            dnsCard.Controls.Add(dnsDesc);
+
+            dnsButtons = new RoundedButton[DnsSwitcher.Presets.Length];
+            int dnsX = 16;
+            for (int i = 0; i < DnsSwitcher.Presets.Length; i++)
+            {
+                DnsSwitcher.Preset preset = DnsSwitcher.Presets[i];
+                bool isAuto = preset.Primary == null;
+                int w = isAuto ? 140 : 120;
+                var b = new RoundedButton
+                {
+                    Text = isAuto ? Lang.T("Авто (DHCP)", "Auto (DHCP)") : preset.Name,
+                    ButtonColor = Theme.KeyColor,
+                    HoverColor = Theme.KeyHover,
+                    TextColor = Theme.TextMain,
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    Location = new Point(dnsX, 56),
+                    Size = new Size(w, 30)
+                };
+                b.Click += (s, e) => ApplyDnsPreset(preset);
+                dnsCard.Controls.Add(b);
+                dnsButtons[i] = b;
+                dnsX += w + 12;
+            }
+
+            dnsStatusLabel = new Label
+            {
+                Text = "",
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(16, 92),
+                Size = new Size(680, 18),
+                AutoEllipsis = true
+            };
+            dnsCard.Controls.Add(dnsStatusLabel);
+
+            ShowCurrentDns();
         }
 
         private Label MakeDimLabel(Panel parent, string text, int x, int y)
@@ -571,6 +695,17 @@ namespace DeepTools
             RefreshSpeed();
             tickCount++;
             if (Visible && tickCount % 3 == 0) RefreshTraffic();
+            // Обновляем статус Хирурга латентности раз в 5 тиков
+            if (Visible && LatencySurgeon.IsActive && tickCount % 5 == 0)
+            {
+                surgeonStatusLabel.Text = string.Format(
+                    "loss {0}%  jitter {1} ms",
+                    LatencySurgeon.PacketLoss, LatencySurgeon.Jitter);
+            }
+            else if (!LatencySurgeon.IsActive && surgeonStatusLabel != null)
+            {
+                surgeonStatusLabel.Text = "";
+            }
         }
 
         private void RefreshSpeed()
@@ -748,6 +883,71 @@ namespace DeepTools
                 }
             };
             worker.RunWorkerAsync();
+        }
+
+        // ---- DNS-переключатель ----
+
+        private void ApplyDnsPreset(DnsSwitcher.Preset preset)
+        {
+            if (dnsBusy) return;
+            dnsBusy = true;
+            for (int i = 0; i < dnsButtons.Length; i++) dnsButtons[i].Enabled = false;
+            dnsStatusLabel.ForeColor = Theme.TextDim;
+            dnsStatusLabel.Text = Lang.T("Применяем DNS...", "Applying DNS...");
+
+            var worker = new System.ComponentModel.BackgroundWorker();
+            worker.DoWork += delegate(object s, System.ComponentModel.DoWorkEventArgs e2) {
+                e2.Result = DnsSwitcher.Apply(preset);
+            };
+            worker.RunWorkerCompleted += delegate(object s, System.ComponentModel.RunWorkerCompletedEventArgs e2) {
+                dnsBusy = false;
+                if (IsDisposed) return;
+                for (int i = 0; i < dnsButtons.Length; i++) dnsButtons[i].Enabled = true;
+
+                int n = (e2.Error == null && e2.Result != null) ? (int)e2.Result : 0;
+                if (n > 0)
+                {
+                    string what = preset.Primary == null
+                        ? Lang.T("Авто (DHCP)", "Auto (DHCP)")
+                        : preset.Name + " (" + preset.Primary + ")";
+                    dnsStatusLabel.Text = what + Lang.T(" — применён на ", " — applied to ") + n +
+                        Lang.T(" адаптер(ах), кэш DNS сброшен", " adapter(s), DNS cache flushed");
+                    dnsStatusLabel.ForeColor = Theme.Accent;
+                }
+                else
+                {
+                    dnsStatusLabel.Text = Lang.T("Не удалось изменить DNS (нет активных адаптеров или ошибка)",
+                                                 "Failed to change DNS (no active adapters or an error occurred)");
+                    dnsStatusLabel.ForeColor = Theme.Warning;
+                }
+                HighlightActiveDns();
+            };
+            worker.RunWorkerAsync();
+        }
+
+        private void ShowCurrentDns()
+        {
+            string cur = DnsSwitcher.CurrentDns();
+            dnsStatusLabel.Text = Lang.T("Текущий DNS: ", "Current DNS: ") +
+                (cur ?? Lang.T("не определён", "unknown"));
+            dnsStatusLabel.ForeColor = Theme.TextDim;
+            HighlightActiveDns();
+        }
+
+        // Подсветить кнопку пресета, чей первичный адрес совпадает с текущим DNS
+        private void HighlightActiveDns()
+        {
+            if (dnsButtons == null) return;
+            string cur = DnsSwitcher.CurrentDns();
+            for (int i = 0; i < dnsButtons.Length; i++)
+            {
+                DnsSwitcher.Preset preset = DnsSwitcher.Presets[i];
+                bool active = preset.Primary != null && cur != null && cur.StartsWith(preset.Primary);
+                dnsButtons[i].ButtonColor = active ? Theme.Accent : Theme.KeyColor;
+                dnsButtons[i].HoverColor = active ? Theme.AccentHover : Theme.KeyHover;
+                dnsButtons[i].TextColor = active ? Theme.BgColor : Theme.TextMain;
+                dnsButtons[i].Invalidate();
+            }
         }
 
         // ---- Форматирование ----
