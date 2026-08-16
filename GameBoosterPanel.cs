@@ -201,8 +201,9 @@ namespace DeepTools
             detectTimer.Tick += (s, e) => DetectFullscreenGame();
 
             // ETW-трейсер Present-кадров: нужен детекту, чтобы отличать
-            // borderless-игру от просто развёрнутого окна (браузер и т.п.)
-            PresentTracer.Start();
+            // borderless-игру от просто развёрнутого окна (браузер и т.п.).
+            // Старт ETW-сессии небыстрый - уводим в фон, чтобы не тормозить показ окна
+            System.Threading.ThreadPool.QueueUserWorkItem(_ => { try { PresentTracer.Start(); } catch { } });
 
             BuildUi();
             LoadPersistedState();

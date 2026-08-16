@@ -161,7 +161,10 @@ namespace DeepTools
         private static extern bool GlobalMemoryStatusEx([In, Out] MEMORYSTATUSEX lpBuffer);
 
         private readonly Timer refreshTimer;
-        private readonly PerformanceCounter cpuCounter;
+        private PerformanceCounter cpuCounter;
+
+        private Label fanLabel;
+        private bool fanReading = false;
 
         private Label cpuValueLabel;
         private Label ramValueLabel;
@@ -199,19 +202,28 @@ namespace DeepTools
         {
             Size = new Size(760, 616);
             BackColor = Theme.BgColor;
+            AutoScroll = true;
+            NativeMethods.ApplyDarkScrollbar(this);
 
             alertEnabled = AppConfig.GetBool("alert_enabled", true);
             alertCpuTemp = ParseTemp(AppConfig.Get("alert_cpu_temp", "90"), 90);
             alertGpuTemp = ParseTemp(AppConfig.Get("alert_gpu_temp", "85"), 85);
 
-            cpuCounter = CreateCpuCounter();
+            // Счётчик CPU: первая инициализация PDH медленная (до 1-3 сек),
+            // поэтому создаём и «прогреваем» его в фоне - окно показывается сразу
+            System.Threading.ThreadPool.QueueUserWorkItem(_ => {
+                var c = CreateCpuCounter();
+                try { if (c != null) c.NextValue(); } catch { }
+                cpuCounter = c;
+            });
             CpuSensor.InitAsync();
+            FanSensor.InitAsync();
             Application.ApplicationExit += (s, e) => CpuSensor.Shutdown();
+            Application.ApplicationExit += (s, e) => FanSensor.Shutdown();
             refreshTimer = new Timer { Interval = 2000 };
             refreshTimer.Tick += (s, e) => RefreshMetrics();
 
             BuildUi();
-            RefreshMetrics();
             refreshTimer.Start();
         }
 
@@ -333,6 +345,19 @@ namespace DeepTools
             AddMetricCard(summaryCard, "GPU", 364, 20, out gpuValueLabel);
             AddMetricCard(summaryCard, Lang.T("Темп. CPU", "CPU temp"), 480, 20, out cpuTempValueLabel);
             AddMetricCard(summaryCard, Lang.T("Темп. GPU", "GPU temp"), 596, 20, out tempValueLabel);
+
+            // Обороты вентиляторов - одной строкой под метриками
+            fanLabel = new Label
+            {
+                Text = Lang.T("Вентиляторы: —", "Fans: —"),
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(16, 82),
+                Size = new Size(680, 16),
+                AutoEllipsis = true
+            };
+            summaryCard.Controls.Add(fanLabel);
 
             var graphsRow = new Panel { Location = new Point(24, 172), Size = new Size(712, 210), BackColor = Color.Transparent };
             Controls.Add(graphsRow);
@@ -798,6 +823,8 @@ namespace DeepTools
                         Lang.T("Проверь охлаждение и запылённость.", "Check cooling and dust buildup."));
                 }
 
+                UpdateFans();
+
                 statusLabel.Text = Lang.T("Данные обновлены", "Data updated");
                 statusLabel.ForeColor = Theme.Accent;
             }
@@ -806,6 +833,32 @@ namespace DeepTools
                 statusLabel.Text = Lang.T("Не удалось получить все данные", "Failed to get all data");
                 statusLabel.ForeColor = Theme.Warning;
             }
+        }
+
+        // Обороты вентиляторов читаем в фоне (hw.Update() может подтормаживать),
+        // результат кладём в подпись под метриками
+        private void UpdateFans()
+        {
+            if (fanReading) return;
+            fanReading = true;
+            var w = new System.ComponentModel.BackgroundWorker();
+            w.DoWork += (s, e) => e.Result = FanSensor.Read();
+            w.RunWorkerCompleted += (s, e) => {
+                fanReading = false;
+                if (IsDisposed || fanLabel == null || e.Error != null || e.Result == null) return;
+                var fans = (System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, int>>)e.Result;
+                if (fans.Count == 0)
+                {
+                    fanLabel.Text = Lang.T("Вентиляторы: датчики недоступны (нужен драйвер PawnIO)",
+                                           "Fans: sensors unavailable (needs the PawnIO driver)");
+                    return;
+                }
+                var parts = new System.Collections.Generic.List<string>();
+                foreach (var f in fans) parts.Add(f.Key + " " + f.Value);
+                fanLabel.Text = Lang.T("Вентиляторы: ", "Fans: ") +
+                    string.Join("  ·  ", parts.ToArray()) + " RPM";
+            };
+            w.RunWorkerAsync();
         }
 
         private float GetCpuPercent()

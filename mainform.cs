@@ -87,9 +87,15 @@ namespace DeepTools
             FormClosed += (s, e) => LatencySurgeon.Disable();
             FormClosed += (s, e) => RgbReactive.Enabled = false;
             FormClosed += (s, e) => AdaptivePowerProfile.Enabled = false;
+            FormClosed += (s, e) => StandbyCleaner.Enabled = false;
             // Восстанавливаем сохранённые состояния
             if (AppConfig.GetBool("adaptive_power", false))  AdaptivePowerProfile.Enabled = true;
             if (AppConfig.GetBool("rgb_reactive", false))    RgbReactive.Enabled = true;
+            if (AppConfig.GetBool("standby_auto", false))    StandbyCleaner.Enabled = true;
+            // Кэш шейдеров: если версия драйвера GPU сменилась - чистим на старте
+            // (в фоне, чтобы не тормозить показ окна)
+            if (AppConfig.GetBool("shader_auto", false))
+                System.Threading.ThreadPool.QueueUserWorkItem(_ => { try { ShaderCacheGuard.CheckAndClean(); } catch { } });
 
             Load += (s, e) => ApplyRoundedRegion();
             Load += (s, e) => RegisterHotkeys();
@@ -293,6 +299,14 @@ namespace DeepTools
 
         protected override void WndProc(ref Message m)
         {
+            // Второй запуск DeepTools попросил показать это (уже запущенное) окно
+            if (m.Msg == NativeMethods.WM_SHOW_DEEPTOOLS)
+            {
+                ShowWindow();
+                BringToFront();
+                base.WndProc(ref m);
+                return;
+            }
             if (m.Msg == NativeMethods.WM_HOTKEY)
             {
                 int id = m.WParam.ToInt32();
@@ -497,13 +511,13 @@ namespace DeepTools
             navIndicator.BringToFront();
 
             navHome.Click += (s, e) => ShowPanel(panelHome, navHome);
-            navSysInfo.Click += (s, e) => ShowPanel(panelSysInfo, navSysInfo);
-            navCleanup.Click += (s, e) => ShowPanel(panelCleanup, navCleanup);
+            navSysInfo.Click += (s, e) => ShowPanel(GetSysInfo(), navSysInfo);
+            navCleanup.Click += (s, e) => ShowPanel(GetCleanup(), navCleanup);
             navBooster.Click += (s, e) => ShowPanel(panelBooster, navBooster);
             navHealth.Click += (s, e) => ShowPanel(panelHealth, navHealth);
-            navStartup.Click += (s, e) => ShowPanel(panelStartup, navStartup);
-            navServices.Click += (s, e) => ShowPanel(panelServices, navServices);
-            navVisual.Click += (s, e) => ShowPanel(panelVisual, navVisual);
+            navStartup.Click += (s, e) => ShowPanel(GetStartup(), navStartup);
+            navServices.Click += (s, e) => ShowPanel(GetServices(), navServices);
+            navVisual.Click += (s, e) => ShowPanel(GetVisual(), navVisual);
             navClicker.Click += (s, e) => ShowPanel(panelClicker, navClicker);
             navScreenshots.Click += (s, e) => ShowPanel(panelScreenshots, navScreenshots);
             navClipboard.Click += (s, e) => ShowPanel(panelClipboard, navClipboard);
@@ -516,7 +530,7 @@ namespace DeepTools
 
             panelHome = new HomePanel();
             panelHome.RequestNavigate += key => {
-                if (key == "cleanup") ShowPanel(panelCleanup, navCleanup);
+                if (key == "cleanup") ShowPanel(GetCleanup(), navCleanup);
                 else if (key == "booster") ShowPanel(panelBooster, navBooster);
                 else if (key == "health") ShowPanel(panelHealth, navHealth);
                 else if (key == "clicker") ShowPanel(panelClicker, navClicker);
@@ -526,10 +540,6 @@ namespace DeepTools
             contentArea.Controls.Add(panelHome);
             panelHome.Visible = false;
 
-            panelCleanup = new SmartCleanupPanel();
-            contentArea.Controls.Add(panelCleanup);
-            panelCleanup.Visible = false;
-
             panelBooster = new GameBoosterPanel();
             contentArea.Controls.Add(panelBooster);
             panelBooster.Visible = false;
@@ -537,22 +547,6 @@ namespace DeepTools
             panelHealth = new HealthCheckPanel();
             contentArea.Controls.Add(panelHealth);
             panelHealth.Visible = false;
-
-            panelSysInfo = new SystemInfoPanel();
-            contentArea.Controls.Add(panelSysInfo);
-            panelSysInfo.Visible = false;
-
-            panelStartup = new StartupPanel();
-            contentArea.Controls.Add(panelStartup);
-            panelStartup.Visible = false;
-
-            panelServices = new ServicesPanel();
-            contentArea.Controls.Add(panelServices);
-            panelServices.Visible = false;
-
-            panelVisual = new VisualEffectsPanel();
-            contentArea.Controls.Add(panelVisual);
-            panelVisual.Visible = false;
 
             panelClicker = new ClickerPanel();
             contentArea.Controls.Add(panelClicker);
@@ -604,30 +598,58 @@ namespace DeepTools
             sidebar.Controls.Add(lbl);
         }
 
+        // Ленивое создание тяжёлых панелей: строим при первом открытии, а не на
+        // старте - так окно показывается заметно быстрее (важно на слабых ПК)
+        private Panel GetCleanup()
+        {
+            if (panelCleanup == null) { panelCleanup = new SmartCleanupPanel(); contentArea.Controls.Add(panelCleanup); panelCleanup.Visible = false; }
+            return panelCleanup;
+        }
+        private SystemInfoPanel GetSysInfo()
+        {
+            if (panelSysInfo == null) { panelSysInfo = new SystemInfoPanel(); contentArea.Controls.Add(panelSysInfo); panelSysInfo.Visible = false; }
+            return panelSysInfo;
+        }
+        private StartupPanel GetStartup()
+        {
+            if (panelStartup == null) { panelStartup = new StartupPanel(); contentArea.Controls.Add(panelStartup); panelStartup.Visible = false; }
+            return panelStartup;
+        }
+        private ServicesPanel GetServices()
+        {
+            if (panelServices == null) { panelServices = new ServicesPanel(); contentArea.Controls.Add(panelServices); panelServices.Visible = false; }
+            return panelServices;
+        }
+        private VisualEffectsPanel GetVisual()
+        {
+            if (panelVisual == null) { panelVisual = new VisualEffectsPanel(); contentArea.Controls.Add(panelVisual); panelVisual.Visible = false; }
+            return panelVisual;
+        }
+
         // Переход в раздел по строковому ключу: используют быстрые карточки главной
         // и мастер первого запуска
         private void NavigateByKey(string key)
         {
-            if (key == "cleanup") ShowPanel(panelCleanup, navCleanup);
+            if (key == "cleanup") ShowPanel(GetCleanup(), navCleanup);
             else if (key == "booster") ShowPanel(panelBooster, navBooster);
             else if (key == "health") ShowPanel(panelHealth, navHealth);
             else if (key == "clicker") ShowPanel(panelClicker, navClicker);
             else if (key == "screenshots") ShowPanel(panelScreenshots, navScreenshots);
             else if (key == "settings") ShowPanel(panelSettings, navSettings);
-            else if (key == "services") ShowPanel(panelServices, navServices);
-            else if (key == "startup") ShowPanel(panelStartup, navStartup);
+            else if (key == "services") ShowPanel(GetServices(), navServices);
+            else if (key == "startup") ShowPanel(GetStartup(), navStartup);
         }
 
         private void ShowPanel(Panel panel, SidebarNavButton navItem)
         {
             panelHome.Visible = false;
-            panelCleanup.Visible = false;
+            if (panelCleanup != null) panelCleanup.Visible = false;
             panelBooster.Visible = false;
             panelHealth.Visible = false;
-            panelSysInfo.Visible = false;
-            panelStartup.Visible = false;
-            panelServices.Visible = false;
-            panelVisual.Visible = false;
+            if (panelSysInfo != null) panelSysInfo.Visible = false;
+            if (panelStartup != null) panelStartup.Visible = false;
+            if (panelServices != null) panelServices.Visible = false;
+            if (panelVisual != null) panelVisual.Visible = false;
             panelClicker.Visible = false;
             panelScreenshots.Visible = false;
             panelClipboard.Visible = false;

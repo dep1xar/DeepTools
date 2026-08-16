@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Security.Principal;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace DeepTools
 {
     public class Program
     {
+        // Держим мьютекс живым всё время работы программы (иначе GC освободит
+        // его и одно-экземплярность сломается)
+        private static Mutex _singleInstance;
+
         [STAThread]
         static void Main()
         {
@@ -56,6 +61,19 @@ namespace DeepTools
                 {
                     return; // текущий процесс завершится, новый запустится с правами
                 }
+            }
+
+            // Один экземпляр DeepTools. Проверяем здесь, уже ПОСЛЕ возможного
+            // перезапуска с правами админа - иначе временный процесс без прав
+            // занял бы мьютекс и админский экземпляр решил бы, что он второй.
+            bool createdNew;
+            _singleInstance = new Mutex(true, "DeepTools_SingleInstance_dep1xar", out createdNew);
+            if (!createdNew)
+            {
+                // Уже запущено - будим то окно (выйдет из трея) и выходим
+                NativeMethods.PostMessage((IntPtr)NativeMethods.HWND_BROADCAST,
+                    NativeMethods.WM_SHOW_DEEPTOOLS, IntPtr.Zero, IntPtr.Zero);
+                return;
             }
 
             Application.Run(new MainForm(isAdmin));

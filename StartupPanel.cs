@@ -18,6 +18,8 @@ namespace DeepTools
         public bool IsLocalMachine;
         public string Key;
         public bool Enabled;
+        public bool IsTask;      // запись из Планировщика задач
+        public string TaskPath;  // полный путь задачи для вкл/выкл
     }
 
     public class StartupPanel : Panel
@@ -284,6 +286,22 @@ namespace DeepTools
             {
                 list.Controls.Add(MakeRow(items[i]));
             }
+
+            // Задачи Планировщика грузим в фоне (COM-перечисление небыстрое) и дописываем
+            LoadScheduledTasks();
+        }
+
+        private void LoadScheduledTasks()
+        {
+            var worker = new System.ComponentModel.BackgroundWorker();
+            worker.DoWork += (s, e) => e.Result = StartupTasks.GetLogonTasks();
+            worker.RunWorkerCompleted += (s, e) => {
+                if (IsDisposed || e.Error != null || e.Result == null) return;
+                var tasks = (List<StartupItem>)e.Result;
+                tasks.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+                foreach (StartupItem t in tasks) list.Controls.Add(MakeRow(t));
+            };
+            worker.RunWorkerAsync();
         }
 
         private void AddRunKeyItems(List<StartupItem> items, RegistryKey root, bool isLocalMachine, string sourceLabel)
@@ -572,7 +590,20 @@ namespace DeepTools
 
             var toggle = new ToggleSwitch { Location = new Point(600, 12), Checked = item.Enabled };
             toggle.CheckedChanged += (s, e) => {
-                if (item.IsRegistry)
+                if (item.IsTask)
+                {
+                    if (StartupTasks.SetEnabled(item.TaskPath, toggle.Checked))
+                    {
+                        statusLabel.Text = Lang.T("Изменено: ", "Changed: ") + item.Name;
+                        statusLabel.ForeColor = Theme.Accent;
+                    }
+                    else
+                    {
+                        statusLabel.Text = Lang.T("Не удалось изменить задачу: ", "Failed to change task: ") + item.Name;
+                        statusLabel.ForeColor = Theme.Warning;
+                    }
+                }
+                else if (item.IsRegistry)
                 {
                     RegistryKey root = item.IsLocalMachine ? Registry.LocalMachine : Registry.CurrentUser;
                     SetRunEnabled(root, item.Key, toggle.Checked);

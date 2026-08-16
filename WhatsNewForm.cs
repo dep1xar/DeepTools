@@ -13,7 +13,7 @@ namespace DeepTools
     {
         // Ревизия списка изменений: позволяет показать окно ещё раз,
         // когда фичи доехали без смены номера версии
-        private const string NotesRev = "1.8.0-b";
+        private const string NotesRev = "1.9.0-a";
 
         public static void ShowIfUpdated(Form owner)
         {
@@ -45,18 +45,18 @@ namespace DeepTools
             {
                 return new string[][]
                 {
-                    new[] { "🌐", Lang.T("Хирург латентности: режет фоновый трафик во время игры, приоритизирует пакеты через QoS и показывает packet loss в оверлее",
-                                         "Latency Surgeon: kills background traffic during games, re-maps priorities via QoS and shows packet loss in the FPS overlay") },
-                    new[] { "⚡", Lang.T("Адаптивный профиль питания: сам переключает план по контексту — максималка в игре, баланс в браузере, экономия на простое",
-                                         "Adaptive Power Profile: switches power plan by context — max performance in a game, balanced in a browser, saver on idle") },
-                    new[] { "🌈", Lang.T("RGB-реакция: цвет подсветки следует температуре CPU/GPU через OpenRGB, пульсирует под нагрузкой и мигает при просадке FPS",
-                                         "RGB Reactive: lighting colour tracks CPU/GPU temperature via OpenRGB, pulses under load and flashes red when FPS drops") },
-                    new[] { "🎮", Lang.T("Дефрагментация VRAM: очищает фрагментированную видеопамять через DirectX без перезапуска игры",
-                                         "VRAM Defrag: flushes fragmented video memory via DirectX without restarting the game") },
-                    new[] { "📸", Lang.T("Мгновенный скриншот: прямой GPU→диск через DirectStorage — ноль фризов даже в самых тяжёлых сценах",
-                                         "Zero-Latency Screenshot: direct GPU→Disk via DirectStorage — zero frametime spike even in the heaviest scenes") },
-                    new[] { "🔀", Lang.T("DNS-переключатель: Cloudflare / Google / AdGuard или авто (DHCP) на все активные адаптеры в один клик, с моментальным сбросом кэша DNS",
-                                         "DNS switcher: Cloudflare / Google / AdGuard or Auto (DHCP) on all active adapters in one click, with an instant DNS cache flush") },
+                    new[] { "🚀", Lang.T("Автозагрузка теперь видит Планировщик задач: logon/boot-задачи с рейтингом подозрительности и переключателем вкл/выкл",
+                                         "Startup now sees Task Scheduler: logon/boot tasks with a suspicion rating and an on/off toggle") },
+                    new[] { "🧠", Lang.T("Авто-очистка standby-памяти (в духе ISLC): сбрасывает резервный кэш при нехватке RAM — убирает микрофризы в тяжёлых играх",
+                                         "Auto standby-memory cleanup (ISLC-style): purges the standby cache when RAM runs low — removes micro-stutter in heavy games") },
+                    new[] { "🎮", Lang.T("Авто-очистка кэша шейдеров при смене драйвера GPU — после обновления драйвера старый кэш больше не вызывает фризы",
+                                         "Auto shader-cache cleanup on GPU driver change — a stale cache no longer causes stutter after a driver update") },
+                    new[] { "🌀", Lang.T("Обороты вентиляторов CPU/GPU/корпуса прямо в Health Check",
+                                         "CPU/GPU/case fan RPM right in Health Check") },
+                    new[] { "🔋", Lang.T("«Мой ПК»: здоровье батареи (износ, циклы) и время загрузки Windows с трендом",
+                                         "My PC: battery health (wear, cycles) and Windows boot time with a trend") },
+                    new[] { "🌐", Lang.T("Сеть: сброс сетевого стека одной кнопкой и блокировка интернета приложениям через брандмауэр",
+                                         "Network: one-click network-stack reset and per-app internet blocking via the firewall") },
                 };
             }
         }

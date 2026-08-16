@@ -5,7 +5,7 @@
 **Smart tweaker, cleaner and monitoring tool for Windows — in one app.**
 **Умный твикер, чистильщик и монитор для Windows — всё в одном.**
 
-[![Version](https://img.shields.io/badge/version-1.8.0-blue)](https://github.com/dep1xar/DeepTools/releases)
+[![Version](https://img.shields.io/badge/version-1.9.0-blue)](https://github.com/dep1xar/DeepTools/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D6)](#)
 [![.NET](https://img.shields.io/badge/.NET%20Framework-4.x-512BD4)](#)
 
@@ -37,17 +37,17 @@ DeepTools is a system tweaker, so it does things real malware also does: elevate
 | Section | What it does |
 |---|---|
 | **Home** | Quick tiles to jump to the most-used tools, live CPU/RAM/temperature monitoring, one-click RAM cleaner with **scheduled auto-clean** (every 5/10/30/60 min, pauses while a game is running), and an optional always-on-top desktop widget. |
-| **Smart Cleanup** | Clears temp files, caches and shader caches by category, with a size preview before you delete. Includes **scheduled auto cleanup** (silent, with a tray report), a **program uninstaller** with leftover cleanup and a **Windows bloatware** remover. |
+| **Smart Cleanup** | Clears temp files, caches and shader caches by category, with a size preview before you delete. Includes **scheduled auto cleanup** (silent, with a tray report), a **program uninstaller** with leftover cleanup and a **Windows bloatware** remover. It can also **auto-clean the standby memory** (ISLC-style, kills micro-stutter under low RAM) and **auto-clear shader caches when the GPU driver changes**. |
 | **Game Booster** | One-click "Ultimate Performance" power plan, disables core parking, boosts the running game's priority, optional auto-boost for new games, **Game DVR switch-off** (Game Bar background recording no longer eats FPS), **auto-pinning the game to the discrete GPU** on dual-GPU laptops, **freezing heavy background apps** (Discord/browser pause instead of being killed), **customizable FPS overlay** with accurate per-game FPS (PresentMon-style ETW tracing), 1% low and a frametime graph, on-screen **crosshair**, and Win-key blocking. Games are detected in both fullscreen and borderless mode. **Adaptive Power Profile** automatically switches the power plan by context — "Ultimate Performance" in a game, Balanced in a browser, Power Saver on idle — and backs off when FPS is already stable or CPU temperature is high. **VRAM Defrag** flushes fragmented video memory via DirectX on demand or automatically when fragmentation exceeds a threshold, eliminating stuttering in open-world games after hours of play without a restart. |
-| **Health Check** | Live CPU/GPU/RAM load and temperatures, overheat alerts with **user-adjustable CPU/GPU thresholds**, a **"time to clean the cooler" alert** when average CPU temperature keeps rising over the week, disk health (SMART), a **disk speed test** (sequential + random 4K, cache-bypassing, with an HDD/SSD/NVMe verdict), stress test, benchmark, BSOD analyzer and 24h temperature history. |
-| **My PC** | Full system spec on one page with a **Copy** button — handy for forums, sales listings or sending to a friend. |
-| **Startup** | See and toggle what launches with Windows, plus boot-time analysis and a **suspicion rating** per entry (no digital signature + runs from Temp + random-looking name = red flag, with reasons on hover). |
+| **Health Check** | Live CPU/GPU/RAM load and temperatures, **fan RPM (CPU/GPU/case)**, overheat alerts with **user-adjustable CPU/GPU thresholds**, a **"time to clean the cooler" alert** when average CPU temperature keeps rising over the week, disk health (SMART), a **disk speed test** (sequential + random 4K, cache-bypassing, with an HDD/SSD/NVMe verdict), stress test, benchmark, BSOD analyzer and 24h temperature history. |
+| **My PC** | Full system spec on one page with a **Copy** button — handy for forums, sales listings or sending to a friend. On laptops it also shows **battery health** (wear %, charge cycles, design vs current capacity) and **Windows uptime + boot-time trend**. |
+| **Startup** | See and toggle what launches with Windows, plus boot-time analysis and a **suspicion rating** per entry (no digital signature + runs from Temp + random-looking name = red flag, with reasons on hover). Now also covers **Task Scheduler** logon/boot tasks — same suspicion rating and on/off toggle, where updaters and junk often hide outside the normal startup list. |
 | **Services** | Enable/disable Windows services safely, with descriptions and a gaming preset. Includes a **Windows telemetry** switch-off panel (light/medium/aggressive presets, fully reversible). |
 | **Visual Effects** | Toggle Windows animations and effects for a snappier feel. |
 | **Clicker** | Configurable auto-clicker (mouse + keyboard, spam or hold) with hotkey and a **macro recorder**. |
 | **Screenshots** | Full-screen and region capture (with arrows/boxes/text annotations) via global hotkeys. Uses direct GPU-to-disk transfer (**zero-latency screenshot**) powered by DirectStorage — no CPU copy through RAM means no frametime spike even in the heaviest scenes. |
 | **Clipboard** | Clipboard history manager — text **and images**, with pinning and search, persists across restarts. |
-| **Network** | Live download/upload speed graphs, session traffic counter, ping test (avg/min/max/jitter) and a per-process "who is using the network" table. **Latency Surgeon** automatically kills background update traffic (Windows Update, Steam, browsers) while an online game is running, reassigns network priorities via Windows QoS, detects and throttles parasitic upload/download, and surfaces packet loss and jitter in the FPS overlay. A built-in **DNS switcher** applies Cloudflare, Google or AdGuard DNS — or reverts to automatic (DHCP) — across all active adapters in one click and flushes the DNS cache, for faster site response and to bypass a slow ISP resolver. |
+| **Network** | Live download/upload speed graphs, session traffic counter, ping test (avg/min/max/jitter) and a per-process "who is using the network" table. **Latency Surgeon** automatically kills background update traffic (Windows Update, Steam, browsers) while an online game is running, reassigns network priorities via Windows QoS, detects and throttles parasitic upload/download, and surfaces packet loss and jitter in the FPS overlay. A built-in **DNS switcher** applies Cloudflare, Google or AdGuard DNS — or reverts to automatic (DHCP) — across all active adapters in one click and flushes the DNS cache, for faster site response and to bypass a slow ISP resolver. **Network tools** add a one-click **network-stack reset** (winsock/IP) and **per-app internet blocking** via Windows Firewall. |
 
 ### Extra tools
 
@@ -87,6 +87,10 @@ No installer, no dependencies to download — all libraries (including the hardw
 ### Building from source
 
 You need the **.NET Framework 4.x** SDK (ships with Windows / Visual Studio; the compiler lives at `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
+
+**Easiest way — double-click `build.bat`.** It runs the build and keeps the window open so you can read the result or any error. Make sure you downloaded the **whole repository** (Code → Download ZIP): every `.cs` file and every `.dll` must sit next to `build.ps1`, otherwise the build fails.
+
+Or run it yourself from a PowerShell terminal (so the window doesn't close):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1
@@ -132,17 +136,17 @@ DeepTools — системный твикер, поэтому он делает 
 | Раздел | Что делает |
 |---|---|
 | **Главная** | Плитки быстрого перехода, живой мониторинг CPU/RAM/температур, очистка RAM в один клик с **автоочисткой по расписанию** (каждые 5/10/30/60 минут, во время игры не запускается) и опциональный виджет поверх окон. |
-| **Умная очистка** | Чистит временные файлы, кэши и кэши шейдеров по категориям, показывает размер до удаления. Включает **автоочистку по расписанию** (тихую, с отчётом из трея), **деинсталлятор программ** с чисткой хвостов и удаление **встроенного мусора Windows**. |
+| **Умная очистка** | Чистит временные файлы, кэши и кэши шейдеров по категориям, показывает размер до удаления. Включает **автоочистку по расписанию** (тихую, с отчётом из трея), **деинсталлятор программ** с чисткой хвостов и удаление **встроенного мусора Windows**. Умеет **авто-очистку standby-памяти** (в духе ISLC, убирает микрофризы при нехватке RAM) и **авто-очистку кэша шейдеров при смене драйвера GPU**. |
 | **Игровой буст** | В один клик включает план «Максимальная производительность», отключает парковку ядер, поднимает приоритет игры, авто-буст новых игр, **отключение Game DVR** (фоновая запись Game Bar больше не ест FPS), **авто-закрепление игры за дискретной GPU** на ноутбуках с двумя видеокартами, **заморозка тяжёлого фона** (Discord/браузер ставятся на паузу вместо закрытия), **настраиваемый FPS-оверлей** с точным FPS игры (ETW-трейсинг в стиле PresentMon), 1% low и графиком фреймтайма, накладной **прицел** и блокировку клавиши Win. Игры определяются и в полноэкранном, и в borderless-режиме. **Адаптивный профиль питания** автоматически переключает план по контексту — максималка в игре, баланс в браузере, экономия на простое — и снижает агрессивность, если FPS уже стабильный или температура высокая. **Дефрагментация VRAM** сбрасывает фрагментированную видеопамять через DirectX по запросу или автоматически при превышении порога, устраняя подвисания в открытых мирах после часов игры без перезапуска. |
-| **Проверка здоровья** | Нагрузка и температуры CPU/GPU/RAM, тревога перегрева с **настраиваемыми порогами CPU/GPU**, алерт **«пора чистить кулер»**, когда средняя температура CPU растёт неделю подряд, здоровье диска (SMART), **тест скорости диска** (последовательный + случайный 4K, мимо кэша, с вердиктом HDD/SSD/NVMe), стресс-тест, бенчмарк, разбор синих экранов и история температур за 24 часа. |
-| **Мой ПК** | Полная спека системы на одной странице с кнопкой **Копировать** — удобно для форумов, объявлений или отправки другу. |
-| **Автозагрузка** | Смотри и отключай то, что стартует с Windows, плюс анализ времени загрузки и **рейтинг подозрительности** каждой записи (нет подписи + запуск из Temp + случайное имя = красный флаг, причины — по наведению). |
+| **Проверка здоровья** | Нагрузка и температуры CPU/GPU/RAM, **обороты вентиляторов (CPU/GPU/корпус)**, тревога перегрева с **настраиваемыми порогами CPU/GPU**, алерт **«пора чистить кулер»**, когда средняя температура CPU растёт неделю подряд, здоровье диска (SMART), **тест скорости диска** (последовательный + случайный 4K, мимо кэша, с вердиктом HDD/SSD/NVMe), стресс-тест, бенчмарк, разбор синих экранов и история температур за 24 часа. |
+| **Мой ПК** | Полная спека системы на одной странице с кнопкой **Копировать** — удобно для форумов, объявлений или отправки другу. На ноутбуках дополнительно показывает **здоровье батареи** (износ %, циклы, заводская vs текущая ёмкость) и **время работы + тренд загрузки Windows**. |
+| **Автозагрузка** | Смотри и отключай то, что стартует с Windows, плюс анализ времени загрузки и **рейтинг подозрительности** каждой записи (нет подписи + запуск из Temp + случайное имя = красный флаг, причины — по наведению). Теперь охватывает и **Планировщик задач** (logon/boot-задачи) — тот же рейтинг и переключатель, где часто прячутся апдейтеры и мусор мимо обычной автозагрузки. |
 | **Службы** | Безопасно включай/отключай службы Windows, с описаниями и игровым пресетом. Внутри — панель отключения **телеметрии Windows** (пресеты мягко/средне/жёстко, всё обратимо). |
 | **Визуальные эффекты** | Отключай анимации и эффекты Windows для отзывчивости. |
 | **Кликер** | Настраиваемый авто-кликер (мышь + клавиатура, спам или зажатие) с горячей клавишей и **запись макросов**. |
 | **Скриншоты** | Снимок всего экрана и области (со стрелками/рамками/текстом) по глобальным горячим клавишам. Использует прямую передачу GPU→диск через DirectStorage (**мгновенный скриншот**) — никакого копирования через RAM, никаких фризов даже в самых тяжёлых сценах. |
 | **Буфер обмена** | Менеджер истории — текст **и картинки**, с закреплением и поиском, сохраняется между запусками. |
-| **Сеть** | Живые графики скорости загрузки/отдачи, счётчик трафика за сессию, пинг-тест (средний/мин/макс/джиттер) и таблица «кто использует сеть» по процессам. **Хирург латентности** автоматически режет фоновый трафик обновлений (Windows Update, Steam, браузеры) во время онлайн-игры, переназначает сетевые приоритеты через Windows QoS, детектирует и ограничивает паразитные upload/download, и выводит packet loss и джиттер в FPS-оверлее. Встроенный **DNS-переключатель** в один клик ставит DNS Cloudflare, Google или AdGuard — либо возвращает автоматический (DHCP) — на все активные адаптеры и сбрасывает кэш DNS: быстрее отклик сайтов и обход тормозного DNS провайдера. |
+| **Сеть** | Живые графики скорости загрузки/отдачи, счётчик трафика за сессию, пинг-тест (средний/мин/макс/джиттер) и таблица «кто использует сеть» по процессам. **Хирург латентности** автоматически режет фоновый трафик обновлений (Windows Update, Steam, браузеры) во время онлайн-игры, переназначает сетевые приоритеты через Windows QoS, детектирует и ограничивает паразитные upload/download, и выводит packet loss и джиттер в FPS-оверлее. Встроенный **DNS-переключатель** в один клик ставит DNS Cloudflare, Google или AdGuard — либо возвращает автоматический (DHCP) — на все активные адаптеры и сбрасывает кэш DNS: быстрее отклик сайтов и обход тормозного DNS провайдера. **Инструменты сети**: сброс сетевого стека (winsock/IP) в один клик и блокировка интернета приложениям через брандмауэр Windows. |
 
 ### Дополнительные инструменты
 
@@ -183,6 +187,10 @@ DeepTools — системный твикер, поэтому он делает 
 
 Нужен **.NET Framework 4.x** SDK (идёт с Windows / Visual Studio; компилятор лежит по пути `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
 
+**Самый простой способ — двойной клик по `build.bat`.** Он запускает сборку и оставляет окно открытым, чтобы можно было прочитать результат или текст ошибки. Убедись, что скачал **весь репозиторий** (Code → Download ZIP): рядом с `build.ps1` должны лежать все `.cs` и все `.dll`, иначе сборка не пройдёт.
+
+Или запусти вручную из терминала PowerShell (чтобы окно не закрылось):
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
@@ -207,6 +215,6 @@ DeepTools проверяет GitHub Releases при запуске. Когда �
 
 <div align="center">
 
-© 2026 dep1xar · DeepTools v1.8.0
+© 2026 dep1xar · DeepTools v1.9.0
 
 </div>

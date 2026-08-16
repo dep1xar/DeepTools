@@ -651,6 +651,82 @@ namespace DeepTools
             };
             dnsCard.Controls.Add(dnsStatusLabel);
 
+            // ---- Карточка: Инструменты сети (сброс стека + блокировка приложений) ----
+            var toolsCard = Theme.MakeCard(this, new Point(24, dnsCard.Bottom + 12), new Size(712, 108));
+
+            var toolsTitle = new Label
+            {
+                Text = Lang.T("Инструменты сети", "Network tools"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(16, 12),
+                AutoSize = true
+            };
+            toolsCard.Controls.Add(toolsTitle);
+
+            var toolsStatus = new Label
+            {
+                Text = "",
+                ForeColor = Theme.Accent,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(16, 78),
+                Size = new Size(680, 18),
+                AutoEllipsis = true
+            };
+
+            var resetBtn = new RoundedButton
+            {
+                Text = Lang.T("Сбросить сеть (winsock/IP)", "Reset network (winsock/IP)"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Font = new Font("Segoe UI", 9F),
+                Location = new Point(16, 40),
+                Size = new Size(240, 32)
+            };
+            resetBtn.Click += (s, e) => {
+                DialogResult r = DTDialog.Show(
+                    Lang.T("Сбросить сетевой стек? Часть настроек применится только после перезагрузки. Это чинит «нет интернета», но сбросит сетевые твики.",
+                           "Reset the network stack? Some changes apply only after a reboot. This fixes \"no internet\" issues but clears network tweaks."),
+                    "DeepTools", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (r != DialogResult.Yes) return;
+
+                resetBtn.Enabled = false;
+                toolsStatus.ForeColor = Theme.TextDim;
+                toolsStatus.Text = Lang.T("Сбрасываем сеть...", "Resetting network...");
+                var w = new System.ComponentModel.BackgroundWorker();
+                w.DoWork += (s2, e2) => NetworkTools.ResetNetworkStack();
+                w.RunWorkerCompleted += (s2, e2) => {
+                    if (IsDisposed) return;
+                    resetBtn.Enabled = true;
+                    toolsStatus.Text = Lang.T("Сеть сброшена. Перезагрузи компьютер, чтобы всё применилось.",
+                                              "Network reset. Reboot the PC to fully apply.");
+                    toolsStatus.ForeColor = Theme.Accent;
+                };
+                w.RunWorkerAsync();
+            };
+            toolsCard.Controls.Add(resetBtn);
+
+            var blockBtn = new RoundedButton
+            {
+                Text = Lang.T("Блокировка интернета приложениям", "Block apps from internet"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Font = new Font("Segoe UI", 9F),
+                Location = new Point(268, 40),
+                Size = new Size(280, 32)
+            };
+            blockBtn.Click += (s, e) => {
+                using (var f = new FirewallBlockForm())
+                    f.ShowDialog(FindForm());
+            };
+            toolsCard.Controls.Add(blockBtn);
+
+            toolsCard.Controls.Add(toolsStatus);
+
             ShowCurrentDns();
         }
 
