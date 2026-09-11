@@ -74,6 +74,7 @@ namespace DeepTools
             StartupGuard.Start();
             MinerGuard.Start();
             TempHistory.Start();
+            CoolerAdvisor.Start();
             AutoCleanup.Start();
             KeepAwake.Restore();
             NotesManager.RestoreAll();
@@ -82,10 +83,35 @@ namespace DeepTools
             FormClosed += (s, e) => WinKeyBlocker.Shutdown();
             // Замороженные фоновые процессы обязаны проснуться при выходе из программы
             FormClosed += (s, e) => BackgroundFreezer.ResumeAll();
+            // Выключаем новые фоновые сервисы при закрытии
+            FormClosed += (s, e) => LatencySurgeon.Disable();
+            FormClosed += (s, e) => RgbReactive.Enabled = false;
+            FormClosed += (s, e) => AdaptivePowerProfile.Enabled = false;
+            FormClosed += (s, e) => StandbyCleaner.Enabled = false;
+            // Восстанавливаем сохранённые состояния
+            if (AppConfig.GetBool("adaptive_power", false))  AdaptivePowerProfile.Enabled = true;
+            if (AppConfig.GetBool("rgb_reactive", false))    RgbReactive.Enabled = true;
+            if (AppConfig.GetBool("standby_auto", false))    StandbyCleaner.Enabled = true;
+            // Кэш шейдеров: если версия драйвера GPU сменилась - чистим на старте
+            // (в фоне, чтобы не тормозить показ окна)
+            if (AppConfig.GetBool("shader_auto", false))
+                System.Threading.ThreadPool.QueueUserWorkItem(_ => { try { ShaderCacheGuard.CheckAndClean(); } catch { } });
 
             Load += (s, e) => ApplyRoundedRegion();
             Load += (s, e) => RegisterHotkeys();
-            Shown += (s, e) => WhatsNew.ShowIfUpdated(this);
+            Shown += (s, e) => {
+                // Первый запуск: мастер вместо окна "Что нового" (и то и то сразу - перебор)
+                if (AppConfig.GetBool("wizard_pending", false))
+                {
+                    AppConfig.SetBool("wizard_pending", false);
+                    using (var wizard = new FirstRunWizardForm(key => NavigateByKey(key)))
+                        wizard.ShowDialog(this);
+                }
+                else
+                {
+                    WhatsNew.ShowIfUpdated(this);
+                }
+            };
             FormClosing += (s, e) => OnFormClosing(s, e);
             FormClosed += (s, e) => UnregisterHotkeys();
         }
@@ -204,10 +230,22 @@ namespace DeepTools
                 new TrayMenuItem("▢", Lang.T("Показать", "Show"), () => ShowWindow()),
                 new TrayMenuItem("📝", Lang.T("Новая заметка", "New note"), () => NotesManager.CreateNew()),
                 new TrayMenuItem("☕", Lang.T("Не спать: ", "Keep awake: ") + (KeepAwake.Enabled ? Lang.T("вкл", "on") : Lang.T("выкл", "off")),
-                    () => KeepAwake.Enabled = !KeepAwake.Enabled),
-                new TrayMenuItem("–", Lang.T("Скрыть", "Hide"), () => HideWindow()),
-                new TrayMenuItem("✕", Lang.T("Выход", "Exit"), () => ExitApplication()) { Danger = true }
+                    () => KeepAwake.Enabled = !KeepAwake.Enabled)
             };
+
+            // Переключатель звука показываем, только если устройств вывода больше одного
+            string audioName = AudioSwitcher.CurrentShortName();
+            if (audioName != null && AudioSwitcher.GetPlaybackDevices().Count > 1)
+            {
+                menuItems.Add(new TrayMenuItem("🔊", Lang.T("Звук: ", "Audio: ") + audioName, () => {
+                    string next = AudioSwitcher.CycleNext();
+                    if (next != null)
+                        TrayNotify.Info("🔊 " + Lang.T("Звук переключён", "Audio switched"), next);
+                }));
+            }
+
+            menuItems.Add(new TrayMenuItem("–", Lang.T("Скрыть", "Hide"), () => HideWindow()));
+            menuItems.Add(new TrayMenuItem("✕", Lang.T("Выход", "Exit"), () => ExitApplication()) { Danger = true });
             TrayMenuForm.Popup(menuItems);
         }
 
@@ -261,6 +299,14 @@ namespace DeepTools
 
         protected override void WndProc(ref Message m)
         {
+            // Второй запуск DeepTools попросил показать это (уже запущенное) окно
+            if (m.Msg == NativeMethods.WM_SHOW_DEEPTOOLS)
+            {
+                ShowWindow();
+                BringToFront();
+                base.WndProc(ref m);
+                return;
+            }
             if (m.Msg == NativeMethods.WM_HOTKEY)
             {
                 int id = m.WParam.ToInt32();
@@ -301,7 +347,7 @@ namespace DeepTools
                     HotkeyDef busy = Hotkeys.UsedBy(key, id);
                     if (busy != null)
                     {
-                        MessageBox.Show(
+                        DTDialog.Show(
                             Lang.T("Клавиша уже занята действием «", "This key is already used by \"") + busy.Name + Lang.T("»", "\""),
                             "DeepTools", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
@@ -465,13 +511,13 @@ namespace DeepTools
             navIndicator.BringToFront();
 
             navHome.Click += (s, e) => ShowPanel(panelHome, navHome);
-            navSysInfo.Click += (s, e) => ShowPanel(panelSysInfo, navSysInfo);
-            navCleanup.Click += (s, e) => ShowPanel(panelCleanup, navCleanup);
+            navSysInfo.Click += (s, e) => ShowPanel(GetSysInfo(), navSysInfo);
+            navCleanup.Click += (s, e) => ShowPanel(GetCleanup(), navCleanup);
             navBooster.Click += (s, e) => ShowPanel(panelBooster, navBooster);
             navHealth.Click += (s, e) => ShowPanel(panelHealth, navHealth);
-            navStartup.Click += (s, e) => ShowPanel(panelStartup, navStartup);
-            navServices.Click += (s, e) => ShowPanel(panelServices, navServices);
-            navVisual.Click += (s, e) => ShowPanel(panelVisual, navVisual);
+            navStartup.Click += (s, e) => ShowPanel(GetStartup(), navStartup);
+            navServices.Click += (s, e) => ShowPanel(GetServices(), navServices);
+            navVisual.Click += (s, e) => ShowPanel(GetVisual(), navVisual);
             navClicker.Click += (s, e) => ShowPanel(panelClicker, navClicker);
             navScreenshots.Click += (s, e) => ShowPanel(panelScreenshots, navScreenshots);
             navClipboard.Click += (s, e) => ShowPanel(panelClipboard, navClipboard);
@@ -484,7 +530,7 @@ namespace DeepTools
 
             panelHome = new HomePanel();
             panelHome.RequestNavigate += key => {
-                if (key == "cleanup") ShowPanel(panelCleanup, navCleanup);
+                if (key == "cleanup") ShowPanel(GetCleanup(), navCleanup);
                 else if (key == "booster") ShowPanel(panelBooster, navBooster);
                 else if (key == "health") ShowPanel(panelHealth, navHealth);
                 else if (key == "clicker") ShowPanel(panelClicker, navClicker);
@@ -494,10 +540,6 @@ namespace DeepTools
             contentArea.Controls.Add(panelHome);
             panelHome.Visible = false;
 
-            panelCleanup = new SmartCleanupPanel();
-            contentArea.Controls.Add(panelCleanup);
-            panelCleanup.Visible = false;
-
             panelBooster = new GameBoosterPanel();
             contentArea.Controls.Add(panelBooster);
             panelBooster.Visible = false;
@@ -505,22 +547,6 @@ namespace DeepTools
             panelHealth = new HealthCheckPanel();
             contentArea.Controls.Add(panelHealth);
             panelHealth.Visible = false;
-
-            panelSysInfo = new SystemInfoPanel();
-            contentArea.Controls.Add(panelSysInfo);
-            panelSysInfo.Visible = false;
-
-            panelStartup = new StartupPanel();
-            contentArea.Controls.Add(panelStartup);
-            panelStartup.Visible = false;
-
-            panelServices = new ServicesPanel();
-            contentArea.Controls.Add(panelServices);
-            panelServices.Visible = false;
-
-            panelVisual = new VisualEffectsPanel();
-            contentArea.Controls.Add(panelVisual);
-            panelVisual.Visible = false;
 
             panelClicker = new ClickerPanel();
             contentArea.Controls.Add(panelClicker);
@@ -572,16 +598,58 @@ namespace DeepTools
             sidebar.Controls.Add(lbl);
         }
 
+        // Ленивое создание тяжёлых панелей: строим при первом открытии, а не на
+        // старте - так окно показывается заметно быстрее (важно на слабых ПК)
+        private Panel GetCleanup()
+        {
+            if (panelCleanup == null) { panelCleanup = new SmartCleanupPanel(); contentArea.Controls.Add(panelCleanup); panelCleanup.Visible = false; }
+            return panelCleanup;
+        }
+        private SystemInfoPanel GetSysInfo()
+        {
+            if (panelSysInfo == null) { panelSysInfo = new SystemInfoPanel(); contentArea.Controls.Add(panelSysInfo); panelSysInfo.Visible = false; }
+            return panelSysInfo;
+        }
+        private StartupPanel GetStartup()
+        {
+            if (panelStartup == null) { panelStartup = new StartupPanel(); contentArea.Controls.Add(panelStartup); panelStartup.Visible = false; }
+            return panelStartup;
+        }
+        private ServicesPanel GetServices()
+        {
+            if (panelServices == null) { panelServices = new ServicesPanel(); contentArea.Controls.Add(panelServices); panelServices.Visible = false; }
+            return panelServices;
+        }
+        private VisualEffectsPanel GetVisual()
+        {
+            if (panelVisual == null) { panelVisual = new VisualEffectsPanel(); contentArea.Controls.Add(panelVisual); panelVisual.Visible = false; }
+            return panelVisual;
+        }
+
+        // Переход в раздел по строковому ключу: используют быстрые карточки главной
+        // и мастер первого запуска
+        private void NavigateByKey(string key)
+        {
+            if (key == "cleanup") ShowPanel(GetCleanup(), navCleanup);
+            else if (key == "booster") ShowPanel(panelBooster, navBooster);
+            else if (key == "health") ShowPanel(panelHealth, navHealth);
+            else if (key == "clicker") ShowPanel(panelClicker, navClicker);
+            else if (key == "screenshots") ShowPanel(panelScreenshots, navScreenshots);
+            else if (key == "settings") ShowPanel(panelSettings, navSettings);
+            else if (key == "services") ShowPanel(GetServices(), navServices);
+            else if (key == "startup") ShowPanel(GetStartup(), navStartup);
+        }
+
         private void ShowPanel(Panel panel, SidebarNavButton navItem)
         {
             panelHome.Visible = false;
-            panelCleanup.Visible = false;
+            if (panelCleanup != null) panelCleanup.Visible = false;
             panelBooster.Visible = false;
             panelHealth.Visible = false;
-            panelSysInfo.Visible = false;
-            panelStartup.Visible = false;
-            panelServices.Visible = false;
-            panelVisual.Visible = false;
+            if (panelSysInfo != null) panelSysInfo.Visible = false;
+            if (panelStartup != null) panelStartup.Visible = false;
+            if (panelServices != null) panelServices.Visible = false;
+            if (panelVisual != null) panelVisual.Visible = false;
             panelClicker.Visible = false;
             panelScreenshots.Visible = false;
             panelClipboard.Visible = false;
@@ -768,19 +836,32 @@ namespace DeepTools
             };
             lookCard.Controls.Add(themeLabel);
 
-            bool isLight = AppConfig.Get("theme", "dark") == "light";
-            var darkBtn = MakeChoiceButton(lookCard, Lang.T("Тёмная", "Dark"), new Point(90, 70), !isLight);
-            var lightBtn = MakeChoiceButton(lookCard, Lang.T("Светлая", "Light"), new Point(200, 70), isLight);
-            darkBtn.Click += (s, e) => {
-                AppConfig.Set("theme", "dark");
-                StyleChoice(darkBtn, true); StyleChoice(lightBtn, false);
-                OfferRestart();
-            };
-            lightBtn.Click += (s, e) => {
-                AppConfig.Set("theme", "light");
-                StyleChoice(darkBtn, false); StyleChoice(lightBtn, true);
-                OfferRestart();
-            };
+            string curTheme = AppConfig.Get("theme", "dark");
+            var themeBtns = new System.Collections.Generic.List<RoundedButton>();
+            string[] tKeys = { "dark", "neon", "graphite", "rust", "light" };
+            string[] tNames = { Lang.T("Тёмная", "Dark"), Lang.T("Неон", "Neon"), Lang.T("Графит", "Graphite"), Lang.T("Оранж", "Orange"), Lang.T("Светлая", "Light") };
+            int txp = 70;
+            for (int i = 0; i < tKeys.Length; i++)
+            {
+                string keyv = tKeys[i];
+                var tb = new RoundedButton
+                {
+                    Text = tNames[i],
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                    Location = new Point(txp, 70),
+                    Size = new Size(80, 28),
+                    Tag = keyv
+                };
+                StyleChoice(tb, curTheme == keyv);
+                tb.Click += (s, e) => {
+                    AppConfig.Set("theme", keyv);
+                    foreach (RoundedButton x in themeBtns) StyleChoice(x, (string)x.Tag == keyv);
+                    OfferRestart();
+                };
+                lookCard.Controls.Add(tb);
+                themeBtns.Add(tb);
+                txp += 86;
+            }
 
             var langLabel = new Label
             {
@@ -861,7 +942,7 @@ namespace DeepTools
                 Size = new Size(220, 34)
             };
             biosBtn.Click += (s, e) => {
-                if (MessageBox.Show(
+                if (DTDialog.Show(
                     Lang.T("Перезагрузить компьютер сейчас и войти в BIOS/UEFI?", "Restart the PC now and enter BIOS/UEFI?"),
                     "DeepTools", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
                     PowerTools.RestartToFirmware();
@@ -1080,7 +1161,7 @@ namespace DeepTools
 
         private void OfferRestart()
         {
-            DialogResult r = MessageBox.Show(
+            DialogResult r = DTDialog.Show(
                 Lang.T("Перезапустить DeepTools сейчас, чтобы применить изменения?", "Restart DeepTools now to apply changes?"),
                 "DeepTools",
                 MessageBoxButtons.YesNo,

@@ -89,6 +89,9 @@ namespace DeepTools
             return true;
         }
 
+        // GUID сбалансированного плана - для AdaptivePowerProfile
+        public static string GetBalancedGuid() { return BalancedGuid; }
+
         // Возврат на план, который был до включения Ultimate (или Сбалансированный)
         public static bool RestorePrevious()
         {

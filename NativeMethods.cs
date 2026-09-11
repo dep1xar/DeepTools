@@ -26,6 +26,20 @@ namespace DeepTools
         public const uint KEYEVENTF_KEYUP = 0x0002;
         public const int WM_HOTKEY = 0x0312;
 
+        // Один экземпляр: второй запуск шлёт это сообщение уже запущенному окну,
+        // чтобы оно вышло из трея, и сам закрывается. RegisterWindowMessage даёт
+        // одинаковый id во всех процессах для одной и той же строки.
+        public const int HWND_BROADCAST = 0xffff;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern int RegisterWindowMessage(string message);
+
+        [DllImport("user32.dll")]
+        public static extern bool PostMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+        public static readonly int WM_SHOW_DEEPTOOLS =
+            RegisterWindowMessage("DeepTools_ShowExistingInstance_dep1xar");
+
         [DllImport("user32.dll")]
         public static extern bool SetCursorPos(int x, int y);
 
@@ -127,5 +141,6 @@ namespace DeepTools
                 };
             }
         }
+
     }
 }

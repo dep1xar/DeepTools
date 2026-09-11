@@ -186,6 +186,42 @@ namespace DeepTools
                     Value = GetDisplays()
                 });
 
+                // Время работы / загрузка + тренд длительности загрузок
+                try
+                {
+                    TimeSpan up = BootInfo.Uptime();
+                    string upStr = ((int)up.TotalDays > 0 ? (int)up.TotalDays + Lang.T(" дн ", "d ") : "")
+                        + up.Hours + Lang.T(" ч ", "h ") + up.Minutes + Lang.T(" мин", "m");
+                    string bootVal = Lang.T("аптайм ", "uptime ") + upStr
+                        + Lang.T(",  загрузка: ", ",  booted: ") + BootInfo.LastBoot().ToString("dd.MM HH:mm");
+
+                    List<int> hist = BootInfo.RecordAndGetHistory();
+                    if (hist.Count > 0)
+                    {
+                        bootVal += Lang.T(",  старт: ", ",  boot: ") + hist[hist.Count - 1] + Lang.T(" сек", "s");
+                        if (hist.Count >= 2)
+                            bootVal += " (" + string.Join(", ", hist.ConvertAll(x => x.ToString()).ToArray()) + ")";
+                    }
+                    result.Add(new SpecRow { Title = Lang.T("Время работы", "Uptime"), Value = bootVal });
+                }
+                catch { }
+
+                // Здоровье батареи (только на ноутбуках)
+                try
+                {
+                    BatteryHealth.Info bat = BatteryHealth.Get();
+                    if (bat != null)
+                    {
+                        string batVal = Lang.T("износ ", "wear ") + bat.WearPercent + "%  ("
+                            + (bat.DesignedmWh / 1000.0).ToString("0.0") + " → "
+                            + (bat.FullChargemWh / 1000.0).ToString("0.0") + Lang.T(" Вт·ч", " Wh") + ")";
+                        if (bat.CycleCount > 0)
+                            batVal += Lang.T(",  циклов: ", ",  cycles: ") + bat.CycleCount;
+                        result.Add(new SpecRow { Title = Lang.T("Батарея", "Battery"), Value = batVal });
+                    }
+                }
+                catch { }
+
                 e.Result = result;
             };
             worker.RunWorkerCompleted += (s, e) => {

@@ -28,7 +28,7 @@ namespace DeepTools
                 }
                 if (path == null)
                 {
-                    MessageBox.Show(
+                    DTDialog.Show(
                         Lang.T("Установщик PawnIO не найден.", "PawnIO installer not found."),
                         "DeepTools", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
@@ -37,14 +37,14 @@ namespace DeepTools
                 var psi = new ProcessStartInfo(path) { UseShellExecute = true };
                 Process.Start(psi);
 
-                MessageBox.Show(
+                DTDialog.Show(
                     Lang.T("Пройди установку PawnIO, затем перезапусти DeepTools — температуры должны появиться.",
                            "Complete the PawnIO setup, then restart DeepTools — temperatures should appear."),
                     "DeepTools", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
+                DTDialog.Show(
                     Lang.T("Не удалось запустить установщик: ", "Failed to launch installer: ") + ex.Message,
                     "DeepTools", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }

@@ -8,6 +8,9 @@ namespace DeepTools
 {
     public class GameBoosterPanel : Panel
     {
+        private const int OptRowHeight = 50;
+        private const int OptRightReserve = 140;
+
         private static readonly string[] KnownHeavyApps = new string[]
         {
             "chrome", "msedge", "firefox", "opera", "yandexbrowser",
@@ -190,14 +193,17 @@ namespace DeepTools
         public GameBoosterPanel()
         {
             Size = new Size(760, 616);
+            AutoScroll = true;
             BackColor = Theme.BgColor;
+            NativeMethods.ApplyDarkScrollbar(this);
 
             detectTimer.Interval = 1500;
             detectTimer.Tick += (s, e) => DetectFullscreenGame();
 
             // ETW-трейсер Present-кадров: нужен детекту, чтобы отличать
-            // borderless-игру от просто развёрнутого окна (браузер и т.п.)
-            PresentTracer.Start();
+            // borderless-игру от просто развёрнутого окна (браузер и т.п.).
+            // Старт ETW-сессии небыстрый - уводим в фон, чтобы не тормозить показ окна
+            System.Threading.ThreadPool.QueueUserWorkItem(_ => { try { PresentTracer.Start(); } catch { } });
 
             BuildUi();
             LoadPersistedState();
@@ -452,33 +458,34 @@ namespace DeepTools
             }
 
             // Карточка оптимизаций: план питания, Game DVR, дискретная GPU
-            var powerCard = Theme.MakeCard(this, new Point(24, 278), new Size(712, 134));
+            const int optRowStep = 50;
+            var powerCard = Theme.MakeCard(this, new Point(24, 278), new Size(712, 12 + optRowStep * 3 + 8));
 
             MakeOptRow(powerCard, 12, "Ultimate Performance",
                 Lang.T("Скрытый план питания Windows для максимальной производительности + отключение парковки ядер CPU",
                        "Hidden Windows power plan for maximum performance + CPU core parking disabled"));
-            ultimateToggle = new ToggleSwitch { Location = new Point(646, 16), Checked = PowerPlan.IsUltimateActive() };
+            ultimateToggle = new ToggleSwitch { Location = new Point(646, OptRowToggleY(12)), Checked = PowerPlan.IsUltimateActive() };
             ultimateToggle.CheckedChanged += (s, e) => OnUltimateToggle();
             powerCard.Controls.Add(ultimateToggle);
 
-            MakeOptRow(powerCard, 52, Lang.T("Отключить Game DVR", "Disable Game DVR"),
+            MakeOptRow(powerCard, 12 + optRowStep, Lang.T("Отключить Game DVR", "Disable Game DVR"),
                 Lang.T("Фоновая запись Xbox Game Bar захватывает кадры даже без записи - реальный минус к FPS",
                        "Xbox Game Bar background capture grabs frames even when idle - a real FPS cost"));
-            dvrToggle = new ToggleSwitch { Location = new Point(646, 56), Checked = GameOptimizer.IsDvrDisabled() };
+            dvrToggle = new ToggleSwitch { Location = new Point(646, OptRowToggleY(12 + optRowStep)), Checked = GameOptimizer.IsDvrDisabled() };
             dvrToggle.CheckedChanged += (s, e) => OnDvrToggle();
             powerCard.Controls.Add(dvrToggle);
 
-            MakeOptRow(powerCard, 92, Lang.T("Дискретная GPU для игр", "Discrete GPU for games"),
+            MakeOptRow(powerCard, 12 + optRowStep * 2, Lang.T("Дискретная GPU для игр", "Discrete GPU for games"),
                 Lang.T("Обнаруженная игра автоматически закрепляется за мощной видеокартой (для ноутбуков с двумя GPU)",
                        "The detected game is auto-pinned to the powerful GPU (for laptops with dual GPUs)"));
-            gpuPinToggle = new ToggleSwitch { Location = new Point(646, 96), Checked = AppConfig.GetBool("gpu_auto_pin", false) };
+            gpuPinToggle = new ToggleSwitch { Location = new Point(646, OptRowToggleY(12 + optRowStep * 2)), Checked = AppConfig.GetBool("gpu_auto_pin", false) };
             gpuPinToggle.CheckedChanged += (s, e) => {
                 AppConfig.SetBool("gpu_auto_pin", gpuPinToggle.Checked);
                 lastGpuPinnedPath = null; // чтобы применилось к уже запущенной игре
             };
             powerCard.Controls.Add(gpuPinToggle);
 
-            var heavyCard = Theme.MakeCard(this, new Point(24, 424), new Size(712, 152));
+            var heavyCard = Theme.MakeCard(this, new Point(24, 462), new Size(712, 152));
 
             var heavyTitle = new Label
             {
@@ -551,29 +558,110 @@ namespace DeepTools
             heavyCard.Controls.Add(heavyList);
             NativeMethods.ApplyDarkScrollbar(heavyList);
 
+            // ---- Карточка: Адаптивный профиль питания + VRAM Defrag ----
+            int smartCardY = heavyCard.Bottom + 12;
+            var smartCard = Theme.MakeCard(this, new Point(24, smartCardY), new Size(712, 12 + optRowStep * 2 + 8));
+
+            MakeOptRow(smartCard, 12,
+                Lang.T("Адаптивный профиль питания", "Adaptive Power Profile"),
+                Lang.T("Ultimate в игре, Balanced в браузере, экономия на простое — автоматически",
+                       "Ultimate in-game, Balanced on browser, saver on idle — automatic"));
+            var adaptiveToggle = new ToggleSwitch
+            {
+                Location = new Point(646, OptRowToggleY(12)),
+                Checked = AppConfig.GetBool("adaptive_power", false)
+            };
+            adaptiveToggle.CheckedChanged += (s, e) => {
+                AdaptivePowerProfile.Enabled = adaptiveToggle.Checked;
+                AppConfig.SetBool("adaptive_power", adaptiveToggle.Checked);
+                statusLabel.Text = adaptiveToggle.Checked
+                    ? Lang.T("Адаптивный профиль питания включён", "Adaptive power profile enabled")
+                    : Lang.T("Адаптивный профиль питания выключен", "Adaptive power profile disabled");
+                statusLabel.ForeColor = Theme.Accent;
+            };
+            smartCard.Controls.Add(adaptiveToggle);
+
+            MakeOptRow(smartCard, 12 + optRowStep,
+                Lang.T("Дефрагментация VRAM", "VRAM Defrag"),
+                Lang.T("Сбрасывает фрагментированную видеопамять через DirectX — убирает подвисания в открытых мирах",
+                       "Flushes fragmented video memory via DirectX — eliminates stuttering in open-world games"));
+            var vramBtn = new RoundedButton
+            {
+                Text = Lang.T("Очистить VRAM", "Defrag VRAM"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Location = new Point(574, OptRowControlY(12 + optRowStep, 28)),
+                Size = new Size(120, 28)
+            };
+            vramBtn.Click += (s, e) => {
+                vramBtn.Text = "...";
+                vramBtn.Enabled = false;
+                var bw = new System.ComponentModel.BackgroundWorker();
+                bw.DoWork += (s2, e2) => VramDefrag.Run();
+                bw.RunWorkerCompleted += (s2, e2) => {
+                    vramBtn.Text = Lang.T("Очистить VRAM", "Defrag VRAM");
+                    vramBtn.Enabled = true;
+                    statusLabel.Text = VramDefrag.LastResult
+                        ? Lang.T("VRAM очищена", "VRAM defragmented")
+                        : ("VRAM defrag: " + VramDefrag.LastMessage);
+                    statusLabel.ForeColor = VramDefrag.LastResult ? Theme.Accent : Theme.Warning;
+                };
+                bw.RunWorkerAsync();
+            };
+            smartCard.Controls.Add(vramBtn);
+
+            // ---- Карточка: RGB-реакция ----
+            var rgbCard = Theme.MakeCard(this, new Point(24, smartCard.Bottom + 12), new Size(712, 12 + optRowStep + 8));
+
+            MakeOptRow(rgbCard, 12,
+                Lang.T("RGB-реакция (OpenRGB)", "RGB Reactive (OpenRGB)"),
+                Lang.T("Цвет подсветки следует температуре CPU/GPU, мигает красным при просадке FPS",
+                       "Lighting colour tracks CPU/GPU temp, flashes red on FPS drops"));
+            var rgbToggle = new ToggleSwitch
+            {
+                Location = new Point(646, OptRowToggleY(12)),
+                Checked = AppConfig.GetBool("rgb_reactive", false)
+            };
+            rgbToggle.CheckedChanged += (s, e) => {
+                RgbReactive.Enabled = rgbToggle.Checked;
+                AppConfig.SetBool("rgb_reactive", rgbToggle.Checked);
+                statusLabel.Text = rgbToggle.Checked
+                    ? Lang.T("RGB-реакция включена (нужен OpenRGB с HTTP-сервером)", "RGB Reactive on (requires OpenRGB with HTTP server)")
+                    : Lang.T("RGB-реакция выключена", "RGB Reactive disabled");
+                statusLabel.ForeColor = Theme.Accent;
+            };
+            rgbCard.Controls.Add(rgbToggle);
+
+            // Строка статуса под последней карточкой — создаётся после rgbCard,
+            // потому что её Y считается от rgbCard.Bottom
             statusLabel = new Label
             {
                 Text = "",
                 ForeColor = Theme.Accent,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(24, 586),
+                Location = new Point(24, rgbCard.Bottom + 8),
                 AutoSize = true
             };
             Controls.Add(statusLabel);
         }
 
-        // Строка карточки оптимизаций: жирный заголовок слева + серое описание
+        // Строка карточки оптимизаций: заголовок сверху, описание под ним —
+        // фиксированный x=215 ломался на длинных русских названиях
         private void MakeOptRow(Panel card, int y, string title, string desc)
         {
+            int contentW = card.Width - 18 - OptRightReserve;
+
             var titleLbl = new Label
             {
                 Text = title,
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Location = new Point(18, y + 6),
-                AutoSize = true
+                Location = new Point(18, y + 2),
+                AutoSize = true,
+                MaximumSize = new Size(contentW, 0)
             };
             card.Controls.Add(titleLbl);
 
@@ -583,10 +671,21 @@ namespace DeepTools
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8F),
-                Location = new Point(215, y + 2),
-                Size = new Size(420, 32)
+                Location = new Point(18, y + 22),
+                AutoSize = true,
+                MaximumSize = new Size(contentW, 0)
             };
             card.Controls.Add(descLbl);
+        }
+
+        private static int OptRowToggleY(int rowY)
+        {
+            return rowY + (OptRowHeight - 24) / 2;
+        }
+
+        private static int OptRowControlY(int rowY, int controlHeight)
+        {
+            return rowY + (OptRowHeight - controlHeight) / 2;
         }
 
         // Одна кнопка на два действия: если что-то заморожено - размораживаем всё,

@@ -68,6 +68,8 @@ namespace DeepTools
             if (hw == null)
             {
                 if (!initStarted) InitAsync();
+                int board0 = FanSensor.ReadBoardCpuTemp();
+                if (board0 > 0) return board0;
                 return GetAcpiTemperature();
             }
 
@@ -96,7 +98,11 @@ namespace DeepTools
             }
             catch { }
 
-            // LHM есть, но датчиков не отдал - пробуем ACPI как запасной вариант
+            // LHM есть, но датчиков CPU не отдал: пробуем датчик материнки (SuperIO),
+            // затем ACPI через WMI. Без этого владельцы плат, где WinRing0 не читает
+            // MSR процессора, видели просто «н/д»
+            int board = FanSensor.ReadBoardCpuTemp();
+            if (board > 0) return board;
             return GetAcpiTemperature();
         }
 

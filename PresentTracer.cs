@@ -334,6 +334,23 @@ namespace DeepTools
             return snap;
         }
 
+        // Максимальный FPS среди всех отслеживаемых процессов прямо сейчас.
+        // Используется AdaptivePowerProfile и RgbReactive, чтобы знать идёт ли игра
+        // без привязки к конкретному PID
+        public static int GetAnyFps()
+        {
+            if (!running) return 0;
+            int max = 0;
+            int[] pids;
+            lock (sync) { pids = new List<int>(presents.Keys).ToArray(); }
+            foreach (int pid in pids)
+            {
+                Snap snap = SnapshotForPid(pid);
+                if (snap != null && snap.Fps > max) max = snap.Fps;
+            }
+            return max;
+        }
+
         // Рисует ли процесс кадры прямо сейчас: было ли достаточно Present-событий
         // за последнюю секунду. Используется детектом игр для borderless-режима,
         // где геометрия окна не совпадает с экраном пиксель в пиксель

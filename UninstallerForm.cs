@@ -24,8 +24,10 @@ namespace DeepTools
         }
 
         private ListBox list;
+        private TextBox searchBox;
         private Label statusLabel;
         private List<AppEntry> apps = new List<AppEntry>();
+        private List<AppEntry> shown = new List<AppEntry>();
 
         private Point dragStart;
         private bool draggingForm = false;
@@ -41,10 +43,10 @@ namespace DeepTools
             ShowInTaskbar = false;
 
             BuildUi();
-            Load += (s, e) => { ApplyRoundedRegion(); LoadApps(); };
+            Load += (s, e) => { ApplyRoundedRegion(); LoadAppsAsync(); };
             // Когда пользователь возвращается в окно после штатного деинсталлятора,
             // перечитываем список - удалённая программа пропадёт
-            Activated += (s, e) => { if (loadedOnce) LoadApps(); };
+            Activated += (s, e) => { if (loadedOnce) LoadAppsAsync(); };
         }
 
         private bool loadedOnce = false;
@@ -101,17 +103,43 @@ namespace DeepTools
 
             var card = Theme.MakeCard(this, new Point(16, 52), new Size(528, 410));
 
-            list = new ListBox
+            searchBox = new TextBox
             {
                 Location = new Point(12, 12),
-                Size = new Size(504, 386),
+                Size = new Size(504, 26),
+                BackColor = Theme.InputColor,
+                ForeColor = Theme.TextMain,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 9.5F),
+                Text = Lang.T("Поиск программы...", "Search program...")
+            };
+            bool placeholder = true;
+            searchBox.GotFocus += (s, e) => { if (placeholder) { searchBox.Text = ""; placeholder = false; searchBox.ForeColor = Theme.TextMain; } };
+            searchBox.LostFocus += (s, e) => {
+                if (searchBox.Text.Length == 0)
+                {
+                    placeholder = true;
+                    searchBox.ForeColor = Theme.TextDim;
+                    searchBox.Text = Lang.T("Поиск программы...", "Search program...");
+                }
+            };
+            searchBox.ForeColor = Theme.TextDim;
+            searchBox.TextChanged += (s, e) => { if (!placeholder) ApplyFilter(); };
+            card.Controls.Add(searchBox);
+
+            list = new ListBox
+            {
+                Location = new Point(12, 46),
+                Size = new Size(504, 352),
                 BackColor = Theme.SidebarColor,
                 ForeColor = Theme.TextMain,
                 Font = new Font("Segoe UI", 9.5F),
                 BorderStyle = BorderStyle.None,
-                SelectionMode = SelectionMode.One
+                SelectionMode = SelectionMode.One,
+                IntegralHeight = false
             };
             card.Controls.Add(list);
+            NativeMethods.ApplyDarkScrollbar(list);
 
             var uninstallBtn = new RoundedButton
             {
@@ -156,23 +184,81 @@ namespace DeepTools
             apps.Clear();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            CollectFrom(Registry.LocalMachine, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", seen);
-            CollectFrom(Registry.LocalMachine, "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall", seen);
-            CollectFrom(Registry.CurrentUser, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", seen);
+            CollectFrom(apps, Registry.LocalMachine, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", seen);
+            CollectFrom(apps, Registry.LocalMachine, "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall", seen);
+            CollectFrom(apps, Registry.CurrentUser, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", seen);
 
             apps.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
 
-            list.Items.Clear();
+            ApplyFilter();
+            loadedOnce = true;
+        }
+
+        private bool loading = false;
+
+        // Реестр Uninstall читаем в фоне: на машинах с сотней программ синхронное
+        // чтение вешало окно («не отвечает»), особенно при повторном Activated
+        private void LoadAppsAsync()
+        {
+            if (loading) return;
+            loading = true;
+            statusLabel.Text = Lang.T("Читаем список программ...", "Reading program list...");
+
+            var w = new System.ComponentModel.BackgroundWorker();
+            w.DoWork += (s, e) => e.Result = CollectApps();
+            w.RunWorkerCompleted += (s, e) => {
+                loading = false;
+                if (IsDisposed) return;
+                if (e.Error != null || e.Result == null) { statusLabel.Text = Lang.T("Не удалось прочитать список", "Failed to read the list"); return; }
+                apps = (List<AppEntry>)e.Result;
+                ApplyFilter();
+                loadedOnce = true;
+            };
+            w.RunWorkerAsync();
+        }
+
+        // Сбор списка установленных программ (безопасно вызывать из фонового потока)
+        private static List<AppEntry> CollectApps()
+        {
+            var result = new List<AppEntry>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            CollectFrom(result, Registry.LocalMachine, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", seen);
+            CollectFrom(result, Registry.LocalMachine, "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall", seen);
+            CollectFrom(result, Registry.CurrentUser, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", seen);
+
+            result.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+            return result;
+        }
+
+        // Фильтр по строке поиска: перерисовываем список и держим shown в синхроне
+        private void ApplyFilter()
+        {
+            string q = searchBox == null ? "" : searchBox.Text.Trim();
+            if (q == Lang.T("Поиск программы...", "Search program...")) q = "";
+
+            shown.Clear();
             foreach (AppEntry a in apps)
+            {
+                if (q.Length > 0 && a.Name.IndexOf(q, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                shown.Add(a);
+            }
+
+            list.BeginUpdate();
+            list.Items.Clear();
+            foreach (AppEntry a in shown)
             {
                 string size = a.SizeKb > 0 ? "  —  " + FormatSize(a.SizeKb) : "";
                 list.Items.Add(a.Name + size);
             }
-            statusLabel.Text = Lang.T("Программ: ", "Programs: ") + apps.Count;
-            loadedOnce = true;
+            list.EndUpdate();
+
+            statusLabel.Text = q.Length > 0
+                ? Lang.T("Найдено: ", "Found: ") + shown.Count + " / " + apps.Count
+                : Lang.T("Программ: ", "Programs: ") + apps.Count;
         }
 
-        private void CollectFrom(RegistryKey hive, string subkey, HashSet<string> seen)
+        private static void CollectFrom(List<AppEntry> into, RegistryKey hive, string subkey, HashSet<string> seen)
         {
             try
             {
@@ -202,7 +288,7 @@ namespace DeepTools
                                 try { object es = app.GetValue("EstimatedSize"); if (es != null) sizeKb = Convert.ToInt64(es); }
                                 catch { }
 
-                                apps.Add(new AppEntry
+                                into.Add(new AppEntry
                                 {
                                     Name = name,
                                     UninstallCmd = uninstall,
@@ -222,8 +308,8 @@ namespace DeepTools
         private AppEntry Selected()
         {
             int idx = list.SelectedIndex;
-            if (idx < 0 || idx >= apps.Count) return null;
-            return apps[idx];
+            if (idx < 0 || idx >= shown.Count) return null;
+            return shown[idx];
         }
 
         private void UninstallSelected()
@@ -231,7 +317,7 @@ namespace DeepTools
             AppEntry a = Selected();
             if (a == null) { statusLabel.Text = Lang.T("Выбери программу", "Select a program"); return; }
 
-            if (MessageBox.Show(
+            if (DTDialog.Show(
                 Lang.T("Запустить удаление «", "Start uninstalling \"") + a.Name + Lang.T("»?\n\nОткроется штатный деинсталлятор. После него можно нажать «Почистить хвосты».",
                     "\"?\n\nThe program's own uninstaller will open. After it finishes, use \"Clean leftovers\"."),
                 "DeepTools", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
@@ -256,7 +342,7 @@ namespace DeepTools
             List<string> found = FindLeftovers(a);
             if (found.Count == 0)
             {
-                MessageBox.Show(Lang.T("Остаточных папок не найдено", "No leftover folders found"), "DeepTools");
+                DTDialog.Show(Lang.T("Остаточных папок не найдено", "No leftover folders found"), "DeepTools");
                 return;
             }
 
@@ -388,6 +474,7 @@ namespace DeepTools
             };
             foreach (string p in paths) clb.Items.Add(p, false);
             Controls.Add(clb);
+            NativeMethods.ApplyDarkScrollbar(clb);
 
             var delBtn = new RoundedButton
             {
@@ -428,7 +515,7 @@ namespace DeepTools
                 catch { }
             }
             for (int i = toRemove.Count - 1; i >= 0; i--) clb.Items.RemoveAt(toRemove[i]);
-            MessageBox.Show(Lang.T("Удалено папок: ", "Folders deleted: ") + deleted, "DeepTools");
+            DTDialog.Show(Lang.T("Удалено папок: ", "Folders deleted: ") + deleted, "DeepTools");
         }
     }
 }

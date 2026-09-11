@@ -299,6 +299,9 @@ namespace DeepTools
         {
             Size = new Size(760, 616);
             BackColor = Theme.BgColor;
+            AutoScroll = true;
+            NativeMethods.ApplyDarkScrollbar(this);
+            DarkScroll.Attach(this);
 
             categories = CleanupEngine.BuildCategories();
             BuildUi();
@@ -317,22 +320,17 @@ namespace DeepTools
             };
             Controls.Add(titleLbl);
 
-            var largeFilesBtn = new RoundedButton
+            var recycleBtn = new RoundedButton
             {
-                Text = Lang.T("📦 Большие файлы", "📦 Large files"),
+                Text = Lang.T("🗑 Корзина (откат)", "🗑 Bin (undo)"),
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
                 Location = new Point(560, 22),
                 Size = new Size(180, 32)
             };
-            largeFilesBtn.Click += (s, e) => {
-                using (var f = new LargeFilesForm())
-                {
-                    f.ShowDialog(FindForm());
-                }
-            };
-            Controls.Add(largeFilesBtn);
+            recycleBtn.Click += (s, e) => { using (var f = new RecycleBinForm()) f.ShowDialog(FindForm()); };
+            Controls.Add(recycleBtn);
 
             int y = 70;
             for (int i = 0; i < categories.Count; i++)
@@ -464,6 +462,198 @@ namespace DeepTools
             Controls.Add(statusLabel);
 
             BuildSchedulerUi(y + 102);
+            BuildAutoMaintenanceUi(y + 172);
+            BuildSystemExtrasUi(y + 312);
+        }
+
+        // Карточка тяжёлых системных остатков + твиков Windows 11
+        private void BuildSystemExtrasUi(int y)
+        {
+            var card = Theme.MakeCard(this, new Point(24, y), new Size(650, 96));
+
+            var title = new Label
+            {
+                Text = Lang.T("Системные остатки и Windows 11", "System leftovers & Windows 11"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(16, 12),
+                AutoSize = true
+            };
+            card.Controls.Add(title);
+
+            var sizeLbl = new Label
+            {
+                Text = "",
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(16, 34),
+                Size = new Size(618, 16),
+                AutoEllipsis = true
+            };
+            card.Controls.Add(sizeLbl);
+            // размер Windows.old считаем в фоне
+            var szWorker = new System.ComponentModel.BackgroundWorker();
+            szWorker.DoWork += (s, e) => e.Result = SystemCleanup.WindowsOldSizeBytes();
+            szWorker.RunWorkerCompleted += (s, e) => {
+                if (IsDisposed || e.Error != null || e.Result == null) return;
+                long b = (long)e.Result;
+                sizeLbl.Text = b > 0
+                    ? Lang.T("Найдена Windows.old: ", "Found Windows.old: ") + CleanupEngine.FormatSize(b)
+                    : Lang.T("Windows.old не найдена", "No Windows.old found");
+            };
+            szWorker.RunWorkerAsync();
+
+            var oldBtn = new RoundedButton
+            {
+                Text = Lang.T("🗑 Windows.old", "🗑 Windows.old"),
+                ButtonColor = Theme.KeyColor, HoverColor = Theme.KeyHover, TextColor = Theme.TextMain,
+                Location = new Point(16, 56), Size = new Size(150, 30)
+            };
+            oldBtn.Click += (s, e) => {
+                DialogResult r = DTDialog.Show(
+                    Lang.T("Удалить папку предыдущей установки Windows (Windows.old)? Откат к прошлой версии Windows станет невозможен.",
+                           "Delete the previous Windows installation (Windows.old)? Rolling back to the old Windows version will no longer be possible."),
+                    "DeepTools", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (r != DialogResult.Yes) return;
+                RunExtra(oldBtn, sizeLbl, () => SystemCleanup.CleanWindowsOld(),
+                         Lang.T("Windows.old удалена, освобождено ", "Windows.old removed, freed "));
+            };
+            card.Controls.Add(oldBtn);
+
+            var updBtn = new RoundedButton
+            {
+                Text = Lang.T("Кэш обновлений", "Update cache"),
+                ButtonColor = Theme.KeyColor, HoverColor = Theme.KeyHover, TextColor = Theme.TextMain,
+                Location = new Point(176, 56), Size = new Size(150, 30)
+            };
+            updBtn.Click += (s, e) => RunExtra(updBtn, sizeLbl, () => SystemCleanup.CleanUpdateCache(),
+                Lang.T("Кэш обновлений очищен, освобождено ", "Update cache cleared, freed "));
+            card.Controls.Add(updBtn);
+
+            var tweaksBtn = new RoundedButton
+            {
+                Text = Lang.T("⚙ Твики Windows 11", "⚙ Windows 11 tweaks"),
+                ButtonColor = Theme.Accent, HoverColor = Theme.AccentHover, TextColor = Theme.BgColor,
+                Location = new Point(336, 56), Size = new Size(180, 30)
+            };
+            tweaksBtn.Click += (s, e) => { using (var f = new Win11TweaksForm()) f.ShowDialog(FindForm()); };
+            card.Controls.Add(tweaksBtn);
+        }
+
+        // Запуск долгой очистки в фоне с блокировкой кнопки и отчётом в statusLabel
+        private void RunExtra(RoundedButton btn, Label sizeLbl, Func<long> action, string okPrefix)
+        {
+            btn.Enabled = false;
+            string prev = btn.Text;
+            btn.Text = "...";
+            var w = new System.ComponentModel.BackgroundWorker();
+            w.DoWork += (s, e) => e.Result = action();
+            w.RunWorkerCompleted += (s, e) => {
+                if (IsDisposed) return;
+                btn.Enabled = true;
+                btn.Text = prev;
+                long mb = (e.Error == null && e.Result != null) ? (long)e.Result : 0;
+                statusLabel.Text = okPrefix + mb + Lang.T(" МБ", " MB");
+                statusLabel.ForeColor = Theme.Accent;
+                sizeLbl.Text = SystemCleanup.WindowsOldSizeBytes() > 0
+                    ? sizeLbl.Text : Lang.T("Windows.old не найдена", "No Windows.old found");
+            };
+            w.RunWorkerAsync();
+        }
+
+        // Две карточки авто-обслуживания: сброс кэша шейдеров при смене драйвера GPU
+        // и авто-очистка standby-памяти. У каждой тумблер + кнопка «Очистить сейчас».
+        private void BuildAutoMaintenanceUi(int y)
+        {
+            BuildMaintCard(y,
+                Lang.T("Кэш шейдеров при смене драйвера GPU", "Shader cache on GPU driver change"),
+                Lang.T("После обновления драйвера старый кэш вызывает фризы — чистим автоматически на старте.",
+                       "After a driver update a stale cache causes stutter — cleared automatically on launch."),
+                "shader_auto", false,
+                Lang.T("Очистить сейчас", "Clean now"),
+                () => { long mb = ShaderCacheGuard.CleanNow(); return Lang.T("Кэш шейдеров очищен: ", "Shader cache cleared: ") + mb + Lang.T(" МБ", " MB"); });
+
+            BuildMaintCard(y + 70,
+                Lang.T("Авто-очистка standby-памяти", "Auto standby memory cleanup"),
+                Lang.T("Сбрасывает резервный кэш памяти при нехватке RAM — убирает микрофризы в тяжёлых играх.",
+                       "Purges the standby cache when RAM runs low — removes micro-stutter in heavy games."),
+                "standby_auto", true,
+                Lang.T("Очистить сейчас", "Clean now"),
+                () => { long mb = StandbyCleaner.Purge(); return Lang.T("Освобождено из standby: ", "Freed from standby: ") + mb + Lang.T(" МБ", " MB"); });
+        }
+
+        // startService: true = фича управляет фоновым сервисом StandbyCleaner,
+        // false = разовое действие на старте (ShaderCacheGuard)
+        private void BuildMaintCard(int y, string title, string desc, string cfgKey,
+            bool startService, string btnText, Func<string> action)
+        {
+            var card = Theme.MakeCard(this, new Point(24, y), new Size(650, 58));
+
+            var toggle = new ToggleSwitch
+            {
+                Location = new Point(16, 17),
+                Checked = AppConfig.GetBool(cfgKey, false)
+            };
+            toggle.CheckedChanged += (s, e) => {
+                AppConfig.SetBool(cfgKey, toggle.Checked);
+                if (startService) StandbyCleaner.Enabled = toggle.Checked;
+            };
+            card.Controls.Add(toggle);
+
+            var titleLbl = new Label
+            {
+                Text = title,
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(74, 8),
+                AutoSize = true
+            };
+            card.Controls.Add(titleLbl);
+
+            var infoLbl = new Label
+            {
+                Text = desc,
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(75, 32),
+                Size = new Size(430, 18),
+                AutoEllipsis = true
+            };
+            card.Controls.Add(infoLbl);
+
+            var nowBtn = new RoundedButton
+            {
+                Text = btnText,
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(512, 15),
+                Size = new Size(124, 28)
+            };
+            nowBtn.Click += (s, e) => {
+                nowBtn.Enabled = false;
+                string prevText = nowBtn.Text;
+                nowBtn.Text = "...";
+                var worker = new System.ComponentModel.BackgroundWorker();
+                worker.DoWork += delegate(object s2, System.ComponentModel.DoWorkEventArgs e2) { e2.Result = action(); };
+                worker.RunWorkerCompleted += delegate(object s2, System.ComponentModel.RunWorkerCompletedEventArgs e2) {
+                    nowBtn.Enabled = true;
+                    nowBtn.Text = prevText;
+                    if (IsDisposed) return;
+                    if (e2.Error == null && e2.Result != null)
+                    {
+                        statusLabel.Text = (string)e2.Result;
+                        statusLabel.ForeColor = Theme.Accent;
+                    }
+                };
+                worker.RunWorkerAsync();
+            };
+            card.Controls.Add(nowBtn);
         }
 
         // Карточка планировщика автоочистки: тумблер, интервал в днях, дата последней очистки.
@@ -631,7 +821,7 @@ namespace DeepTools
                 {
                     if (!categories[i].Scanned)
                     {
-                        MessageBox.Show(Lang.T("Сначала нажми \"Сканировать\", чтобы увидеть, что будет удалено.", "Press Scan first to see what will be deleted."), "DeepTools",
+                        DTDialog.Show(Lang.T("Сначала нажми \"Сканировать\", чтобы увидеть, что будет удалено.", "Press Scan first to see what will be deleted."), "DeepTools",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return;
                     }
@@ -646,7 +836,7 @@ namespace DeepTools
                 return;
             }
 
-            DialogResult result = MessageBox.Show(
+            DialogResult result = DTDialog.Show(
                 Lang.T("Будет очищено примерно ", "Approximately ") + FormatSize(total) + Lang.T(".\n\nПродолжить?", " will be cleaned.\n\nContinue?"),
                 Lang.T("Подтверждение очистки", "Cleanup confirmation"),
                 MessageBoxButtons.YesNo,

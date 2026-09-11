@@ -11,6 +11,10 @@ namespace DeepTools
     // Список изменений редактируется тут же (Notes) при каждом релизе
     public static class WhatsNew
     {
+        // Ревизия списка изменений: позволяет показать окно ещё раз,
+        // когда фичи доехали без смены номера версии
+        private const string NotesRev = "2.0.0-a";
+
         public static void ShowIfUpdated(Form owner)
         {
             try
@@ -18,8 +22,10 @@ namespace DeepTools
                 Version v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
                 string current = v.Major + "." + v.Minor + "." + v.Build;
                 string seen = AppConfig.Get("last_seen_version", "");
-                if (seen == current) return;
+                string seenRev = AppConfig.Get("last_seen_notes_rev", "");
+                if (seen == current && seenRev == NotesRev) return;
                 AppConfig.Set("last_seen_version", current);
+                AppConfig.Set("last_seen_notes_rev", NotesRev);
 
                 // seen == "" - либо чистая установка, либо обновление со старой
                 // версии, где этого ключа ещё не было: показываем как приветствие
@@ -39,14 +45,20 @@ namespace DeepTools
             {
                 return new string[][]
                 {
-                    new[] { "🎮", Lang.T("Дискретная GPU для игр: обнаруженная игра сама закрепляется за мощной видеокартой (ноутбуки)",
-                                         "Discrete GPU for games: the detected game is auto-pinned to the powerful GPU (laptops)") },
-                    new[] { "⚡", Lang.T("Отключение Game DVR: фоновая запись Game Bar больше не ест FPS",
-                                         "Game DVR switch-off: Game Bar background recording no longer eats FPS") },
-                    new[] { "❄", Lang.T("Заморозка тяжёлого фона: Discord и браузер можно заморозить на время игры, а не закрывать",
-                                         "Freeze heavy background: pause Discord and the browser while you play instead of killing them") },
-                    new[] { "⏱", Lang.T("Автоочистка RAM по расписанию на главной: каждые 5/10/30/60 минут",
-                                         "Scheduled RAM auto-clean on Home: every 5/10/30/60 minutes") },
+                    new[] { "◈", Lang.T("Оценка ПК: единый счёт 0-100 на главной — что тянет систему вниз, и кнопка «Оптимизировать» с замером до/после",
+                                        "PC Score: a single 0-100 score on Home — what drags the system down, plus an \"Optimize\" button measuring before/after") },
+                    new[] { "🗑", Lang.T("Корзина с откатом: очистка сначала копирует файлы в бэкап, вернуть можно 7 дней",
+                                         "Recycle bin with undo: emptying backs files up first, restorable for 7 days") },
+                    new[] { "🧹", Lang.T("Чистка Windows.old и кэша обновлений — часто это десятки гигабайт",
+                                         "Windows.old and update-cache cleanup — often tens of gigabytes") },
+                    new[] { "⚙", Lang.T("Дебloat Windows 11: отключение Copilot, Recall, рекламы в Пуске и на локскрине, виджетов, Bing в поиске",
+                                         "Windows 11 debloat: turn off Copilot, Recall, Start & lock-screen ads, widgets, Bing in search") },
+                    new[] { "🌡", Lang.T("Температуры теперь читаются и на AMD/Intel, а если датчик молчит — кнопка «Почему н/д?» скажет причину",
+                                         "Temperatures now work on AMD/Intel too, and if a sensor is silent the \"Why n/a?\" button explains it") },
+                    new[] { "🎨", Lang.T("Пять тем оформления в настройках и поиск в деинсталляторе программ",
+                                         "Five themes in settings and search in the program uninstaller") },
+                    new[] { "⚡", Lang.T("Интерфейс больше не подвисает: опрос датчиков и тяжёлые списки ушли в фон, запуск ускорен",
+                                         "No more freezing: sensor polling and heavy lists moved to background threads, faster startup") },
                 };
             }
         }

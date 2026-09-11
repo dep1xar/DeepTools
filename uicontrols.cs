@@ -272,47 +272,121 @@ namespace DeepTools
         // Текущая тема: нужно контролам, которые красятся системно (скроллбары, комбобоксы)
         public static bool IsLight = false;
 
-        public static void Apply(bool light)
+        public static void Apply(bool light) { ApplyNamed(light ? "light" : "dark"); }
+
+        // Именованные темы 2.0: dark (по умолчанию), neon, graphite, light
+        public static void ApplyNamed(string name)
         {
-            IsLight = light;
-            if (light)
+            IsLight = (name == "light");
+            switch (name)
             {
-                BgColor = Color.FromArgb(243, 245, 249);
-                CardColor = Color.White;
-                SidebarColor = Color.FromArgb(232, 236, 243);
-                BorderColor = Color.FromArgb(208, 214, 226);
-                Accent = Color.FromArgb(20, 165, 105);
-                Danger = Color.FromArgb(215, 70, 70);
-                Warning = Color.FromArgb(200, 140, 30);
-                TextMain = Color.FromArgb(28, 34, 48);
-                TextDim = Color.FromArgb(105, 115, 135);
-                InputColor = Color.FromArgb(236, 239, 245);
-                KeyColor = Color.FromArgb(222, 227, 236);
-                KeyHover = Color.FromArgb(205, 212, 225);
-                NavActiveBg = Color.FromArgb(216, 224, 236);
-                NavHoverBg = Color.FromArgb(228, 233, 242);
-                AccentHover = Color.FromArgb(26, 190, 122);
-                DangerHover = Color.FromArgb(235, 90, 90);
+                case "light": ApplyLight(); break;
+                case "neon": ApplyNeon(); break;
+                case "graphite": ApplyGraphite(); break;
+                case "rust": ApplyRust(); break;
+                default: ApplyDark(); break;
             }
-            else
-            {
-                BgColor = Color.FromArgb(15, 20, 31);
-                CardColor = Color.FromArgb(22, 28, 43);
-                SidebarColor = Color.FromArgb(18, 23, 36);
-                BorderColor = Color.FromArgb(38, 46, 64);
-                Accent = Color.FromArgb(46, 214, 140);
-                Danger = Color.FromArgb(230, 90, 90);
-                Warning = Color.FromArgb(240, 180, 70);
-                TextMain = Color.FromArgb(232, 236, 243);
-                TextDim = Color.FromArgb(138, 147, 166);
-                InputColor = Color.FromArgb(30, 37, 54);
-                KeyColor = Color.FromArgb(40, 50, 70);
-                KeyHover = Color.FromArgb(50, 65, 90);
-                NavActiveBg = Color.FromArgb(34, 42, 60);
-                NavHoverBg = Color.FromArgb(27, 34, 49);
-                AccentHover = Color.FromArgb(70, 240, 160);
-                DangerHover = Color.FromArgb(220, 50, 50);
-            }
+        }
+
+        private static void ApplyDark()
+        {
+            BgColor = Color.FromArgb(15, 20, 31);
+            CardColor = Color.FromArgb(22, 28, 43);
+            SidebarColor = Color.FromArgb(18, 23, 36);
+            BorderColor = Color.FromArgb(38, 46, 64);
+            Accent = Color.FromArgb(46, 214, 140);
+            Danger = Color.FromArgb(230, 90, 90);
+            Warning = Color.FromArgb(240, 180, 70);
+            TextMain = Color.FromArgb(232, 236, 243);
+            TextDim = Color.FromArgb(138, 147, 166);
+            InputColor = Color.FromArgb(30, 37, 54);
+            KeyColor = Color.FromArgb(40, 50, 70);
+            KeyHover = Color.FromArgb(50, 65, 90);
+            NavActiveBg = Color.FromArgb(34, 42, 60);
+            NavHoverBg = Color.FromArgb(27, 34, 49);
+            AccentHover = Color.FromArgb(70, 240, 160);
+            DangerHover = Color.FromArgb(220, 50, 50);
+        }
+
+        private static void ApplyLight()
+        {
+            BgColor = Color.FromArgb(243, 245, 249);
+            CardColor = Color.White;
+            SidebarColor = Color.FromArgb(232, 236, 243);
+            BorderColor = Color.FromArgb(208, 214, 226);
+            Accent = Color.FromArgb(20, 165, 105);
+            Danger = Color.FromArgb(215, 70, 70);
+            Warning = Color.FromArgb(200, 140, 30);
+            TextMain = Color.FromArgb(28, 34, 48);
+            TextDim = Color.FromArgb(105, 115, 135);
+            InputColor = Color.FromArgb(236, 239, 245);
+            KeyColor = Color.FromArgb(222, 227, 236);
+            KeyHover = Color.FromArgb(205, 212, 225);
+            NavActiveBg = Color.FromArgb(216, 224, 236);
+            NavHoverBg = Color.FromArgb(228, 233, 242);
+            AccentHover = Color.FromArgb(26, 190, 122);
+            DangerHover = Color.FromArgb(235, 90, 90);
+        }
+        // PLACEHOLDER_THEMES
+        private static void ApplyNeon()
+        {
+            BgColor = Color.FromArgb(8, 10, 15);
+            CardColor = Color.FromArgb(15, 18, 26);
+            SidebarColor = Color.FromArgb(11, 14, 20);
+            BorderColor = Color.FromArgb(34, 42, 58);
+            Accent = Color.FromArgb(0, 225, 190);
+            Danger = Color.FromArgb(255, 80, 95);
+            Warning = Color.FromArgb(255, 190, 70);
+            TextMain = Color.FromArgb(235, 240, 248);
+            TextDim = Color.FromArgb(128, 144, 168);
+            InputColor = Color.FromArgb(18, 22, 32);
+            KeyColor = Color.FromArgb(26, 38, 56);
+            KeyHover = Color.FromArgb(36, 54, 80);
+            NavActiveBg = Color.FromArgb(16, 40, 46);
+            NavHoverBg = Color.FromArgb(14, 24, 34);
+            AccentHover = Color.FromArgb(70, 255, 220);
+            DangerHover = Color.FromArgb(255, 60, 80);
+        }
+
+        private static void ApplyGraphite()
+        {
+            BgColor = Color.FromArgb(26, 28, 33);
+            CardColor = Color.FromArgb(34, 37, 44);
+            SidebarColor = Color.FromArgb(30, 32, 38);
+            BorderColor = Color.FromArgb(52, 56, 66);
+            Accent = Color.FromArgb(58, 190, 150);
+            Danger = Color.FromArgb(225, 95, 95);
+            Warning = Color.FromArgb(230, 175, 80);
+            TextMain = Color.FromArgb(228, 231, 238);
+            TextDim = Color.FromArgb(150, 157, 172);
+            InputColor = Color.FromArgb(40, 43, 51);
+            KeyColor = Color.FromArgb(52, 57, 68);
+            KeyHover = Color.FromArgb(64, 70, 84);
+            NavActiveBg = Color.FromArgb(46, 52, 64);
+            NavHoverBg = Color.FromArgb(38, 42, 52);
+            AccentHover = Color.FromArgb(74, 210, 168);
+            DangerHover = Color.FromArgb(235, 90, 90);
+        }
+
+        // Тёмно-тёплая тема с оранжевым акцентом (в духе RustTweaker)
+        private static void ApplyRust()
+        {
+            BgColor = Color.FromArgb(16, 16, 19);
+            CardColor = Color.FromArgb(26, 26, 30);
+            SidebarColor = Color.FromArgb(12, 12, 14);
+            BorderColor = Color.FromArgb(38, 38, 43);
+            Accent = Color.FromArgb(240, 92, 44);
+            Danger = Color.FromArgb(230, 90, 90);
+            Warning = Color.FromArgb(240, 180, 70);
+            TextMain = Color.FromArgb(236, 237, 240);
+            TextDim = Color.FromArgb(140, 142, 150);
+            InputColor = Color.FromArgb(30, 30, 34);
+            KeyColor = Color.FromArgb(40, 40, 46);
+            KeyHover = Color.FromArgb(52, 52, 60);
+            NavActiveBg = Color.FromArgb(42, 30, 24);
+            NavHoverBg = Color.FromArgb(28, 25, 24);
+            AccentHover = Color.FromArgb(255, 116, 66);
+            DangerHover = Color.FromArgb(220, 50, 50);
         }
 
         public static GraphicsPath RoundedRect(Rectangle r, int radius)
@@ -343,17 +417,12 @@ namespace DeepTools
             card.Paint += (s, e) => {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 var rect = new Rectangle(0, 0, card.Width - 1, card.Height - 1);
-                using (var path = RoundedRect(rect, 10))
+                using (var path = RoundedRect(rect, 12))
                 using (var brush = new SolidBrush(CardColor))
                 using (var pen = new Pen(BorderColor))
                 {
                     e.Graphics.FillPath(brush, path);
                     e.Graphics.DrawPath(pen, path);
-                }
-                // Тонкий блик по верхней кромке - карточка кажется приподнятой
-                using (var hi = new Pen(Color.FromArgb(28, 255, 255, 255)))
-                {
-                    e.Graphics.DrawLine(hi, 11, 1, card.Width - 12, 1);
                 }
             };
             parent.Controls.Add(card);
@@ -437,6 +506,85 @@ namespace DeepTools
             // из других шрифтов, когда в основном их нет
             TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(0, 0, Width, Height), TextColor,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+        }
+    }
+
+    // Тултип в стиле приложения: системный ToolTip рисует белую плашку,
+    // которая выбивается из тёмной темы. Один хелпер - единый вид везде
+    public static class DarkTip
+    {
+        public static void Set(Control control, string text)
+        {
+            var tip = new ToolTip { OwnerDraw = true };
+            var font = new Font("Segoe UI", 8.5F);
+
+            tip.Popup += (s, e) => {
+                Size sz = TextRenderer.MeasureText(tip.GetToolTip(e.AssociatedControl), font);
+                e.ToolTipSize = new Size(sz.Width + 16, sz.Height + 10);
+            };
+            tip.Draw += (s, e) => {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                var rect = new Rectangle(0, 0, e.Bounds.Width - 1, e.Bounds.Height - 1);
+                using (var bg = new SolidBrush(Theme.InputColor))
+                    e.Graphics.FillRectangle(bg, e.Bounds);
+                using (var border = new Pen(Theme.BorderColor))
+                    e.Graphics.DrawRectangle(border, rect);
+                TextRenderer.DrawText(e.Graphics, e.ToolTipText, font, e.Bounds, Theme.TextMain,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+
+            tip.SetToolTip(control, text);
+        }
+    }
+
+    // Строка списка с подсветкой при наведении - как пункты меню трея.
+    // Дочерние Label перехватывают мышь, поэтому наведение слушаем и у детей
+    public class HoverRow : Panel
+    {
+        private bool hovered = false;
+
+        public HoverRow()
+        {
+            DoubleBuffered = true;
+            BackColor = Color.Transparent;
+        }
+
+        protected override void OnControlAdded(ControlEventArgs e)
+        {
+            base.OnControlAdded(e);
+            e.Control.MouseEnter += (s, ev) => SetHover(true);
+            e.Control.MouseLeave += (s, ev) => ReCheckHover();
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { SetHover(true); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { ReCheckHover(); base.OnMouseLeave(e); }
+
+        // Уход с дочернего контрола на саму строку - не считается уходом со строки
+        private void ReCheckHover()
+        {
+            SetHover(ClientRectangle.Contains(PointToClient(Cursor.Position)));
+        }
+
+        private void SetHover(bool value)
+        {
+            if (hovered == value) return;
+            hovered = value;
+            Invalidate(true);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (hovered)
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                var rect = new Rectangle(0, 0, Width - 1, Height - 1);
+                using (var path = Theme.RoundedRect(rect, 8))
+                using (var bg = new SolidBrush(Theme.NavHoverBg))
+                {
+                    e.Graphics.FillPath(bg, path);
+                }
+            }
+            base.OnPaint(e);
         }
     }
 }   

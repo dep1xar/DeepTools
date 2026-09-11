@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -412,7 +412,7 @@ namespace DeepTools
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Location = new Point(552, 8),
+                Location = new Point(560, 8),
                 Size = new Size(144, 28)
             };
             deepCheckBtn.Click += (s, e) => RunDeepDiskCheck();
@@ -864,3 +864,4 @@ namespace DeepTools
         }
     }
 }
+

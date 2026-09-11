@@ -1,0 +1,27 @@
+name: Build DeepTools
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build with build.ps1
+        shell: powershell
+        run: |
+          powershell -ExecutionPolicy Bypass -File build.ps1
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepTools
+          path: DeepTools.exe
+          if-no-files-found: error
