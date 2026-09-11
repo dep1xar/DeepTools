@@ -1,20 +1,20 @@
-# Скрипт сборки DeepTools.
-# Запуск: powershell -ExecutionPolicy Bypass -File build.ps1
-# Собирает DeepTools.exe из всех .cs в папке. Если программа запущена - просит закрыть.
+﻿# DeepTools build script.
+# Usage: powershell -ExecutionPolicy Bypass -File build.ps1
+# Compiles DeepTools.exe from all .cs files in the folder.
 
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 if (-not (Test-Path $csc)) {
-    Write-Host "csc.exe не найден. Нужен .NET Framework 4.x" -ForegroundColor Red
+    Write-Host "csc.exe not found. .NET Framework 4.x is required." -ForegroundColor Red
     exit 1
 }
 
 $sources = Get-ChildItem *.cs | ForEach-Object { $_.Name }
 
-# Managed-зависимости встраиваем в exe как ресурсы вида DeepTools.Embedded.<Имя>.dll.
-# EmbeddedAssemblies.cs достаёт их оттуда в рантайме - релиз становится одним файлом.
+# Managed dependencies are embedded as resources: DeepTools.Embedded.<Name>.dll
+# EmbeddedAssemblies.cs extracts them at runtime - release becomes a single file.
 $embedDlls = @(
     "LibreHardwareMonitorLib.dll",
     "HidSharp.dll",
@@ -26,8 +26,8 @@ $embedDlls = @(
     "System.Runtime.CompilerServices.Unsafe.dll",
     "System.Threading.AccessControl.dll"
 )
-# Ресурсы встраиваются сжатыми (gzip), EmbeddedAssemblies/SensorDriver распаковывают
-# их в рантайме - exe худеет примерно вдвое. Сжатые копии складываются во временную папку
+
+# Resources are embedded compressed (gzip). Compressed copies go to a temp folder.
 $gzDir = Join-Path $env:TEMP "deeptools_build_gz"
 New-Item -ItemType Directory -Force -Path $gzDir | Out-Null
 Add-Type -AssemblyName System.IO.Compression | Out-Null
@@ -43,41 +43,38 @@ function Compress-ToGz([string]$srcPath, [string]$gzPath) {
 $resourceArgs = @()
 foreach ($dll in $embedDlls) {
     if (-not (Test-Path $dll)) {
-        Write-Host "Не найдена DLL для встраивания: $dll" -ForegroundColor Red
+        Write-Host "DLL not found for embedding: $dll" -ForegroundColor Red
         exit 1
     }
-    # Имя ресурса = простое имя сборки (без -NDD и т.п. суффиксов файла) + .dll.gz
+    # Resource name = simple assembly name (without -NDD etc. suffixes) + .dll.gz
     $asmName = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $dll)).Name
     $gzPath = Join-Path $gzDir "$asmName.dll.gz"
     Compress-ToGz $dll $gzPath
     $resourceArgs += "/resource:$gzPath,DeepTools.Embedded.$asmName.dll.gz"
 }
 
-# Встраиваем установщик драйвера датчиков PawnIO, чтобы предлагать его прямо из программы,
-# когда LibreHardwareMonitor заблокирован (Целостность памяти в Windows 11)
+# Embed PawnIO sensor driver installer so it can be offered from the app
+# when LibreHardwareMonitor is blocked (Memory Integrity in Windows 11)
 if (Test-Path "PawnIO_setup.exe") {
     $gzPawn = Join-Path $gzDir "PawnIO_setup.exe.gz"
     Compress-ToGz "PawnIO_setup.exe" $gzPawn
     $resourceArgs += "/resource:$gzPawn,DeepTools.PawnIO_setup.exe.gz"
 }
 
-Write-Host "Компиляция $($sources.Count) файлов, встраивание $($embedDlls.Count) DLL..." -ForegroundColor Cyan
+Write-Host "Compiling $($sources.Count) files, embedding $($embedDlls.Count) DLLs..." -ForegroundColor Cyan
 
-& $csc /nologo /target:winexe /out:DeepTools_build.exe `
-    /win32icon:logo.ico /win32manifest:app.manifest `
-    /reference:System.dll /reference:System.Drawing.dll `
-    /reference:System.Windows.Forms.dll /reference:System.Core.dll `
-    /reference:System.Management.dll `
-    /reference:LibreHardwareMonitorLib.dll `
-    $resourceArgs `
-    $sources
+$cscArgs = @("/nologo", "/target:winexe", "/out:DeepTools_build.exe", "/win32icon:logo.ico", "/win32manifest:app.manifest", "/reference:System.dll", "/reference:System.Drawing.dll", "/reference:System.Windows.Forms.dll", "/reference:System.Core.dll", "/reference:System.Management.dll", "/reference:LibreHardwareMonitorLib.dll")
+$cscArgs += $resourceArgs
+$cscArgs += $sources
+
+& $csc $cscArgs
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Ошибка компиляции" -ForegroundColor Red
+    Write-Host "Compilation error" -ForegroundColor Red
     exit 1
 }
 
-# Заменяем рабочий exe; если программа запущена - пробуем с паузой до 5 раз
+# Replace the working exe; if the program is running - retry up to 5 times
 $replaced = $false
 for ($i = 0; $i -lt 5; $i++) {
     try {
@@ -85,15 +82,15 @@ for ($i = 0; $i -lt 5; $i++) {
         $replaced = $true
         break
     } catch {
-        Write-Host "DeepTools.exe занят - закрой программу (трей -> Выход), попытка $($i+1)/5..." -ForegroundColor Yellow
+        Write-Host "DeepTools.exe is locked - close the program (tray -> Exit), attempt $($i+1)/5..." -ForegroundColor Yellow
         Start-Sleep -Seconds 3
     }
 }
 if (-not $replaced) {
-    Write-Host "Не удалось заменить DeepTools.exe - новая сборка лежит как DeepTools_build.exe" -ForegroundColor Red
+    Write-Host "Could not replace DeepTools.exe - new build is at DeepTools_build.exe" -ForegroundColor Red
     exit 1
 }
 
 $ver = (Get-Item DeepTools.exe).VersionInfo.FileVersion
-$size = [math]::Round((Get-Item DeepTools.exe).Length / 1KB)
-Write-Host "Готово: DeepTools.exe v$ver ($size КБ)" -ForegroundColor Green
+$sizeKB = [math]::Round((Get-Item DeepTools.exe).Length / 1KB)
+Write-Host "Done: DeepTools.exe v$ver ($sizeKB KB)" -ForegroundColor Green
