@@ -360,6 +360,76 @@ namespace DeepTools
             return snap != null && snap.Fps >= minFps;
         }
 
+        // Окно кадров, которое потребитель забирает один раз (в отличие от Snap,
+        // где окно перекрывается): так один и тот же фриз не попадёт в статистику
+        // дважды, и его видно в отчёте как отдельное событие
+        public class FrameWindow
+        {
+            public int Frames;   // сколько кадров отрисовано после отметки
+            public float[] Ms;   // интервалы между ними
+            public long Newest;  // Stopwatch-время последнего кадра
+        }
+
+        // Кадры, отрисованные ПОСЛЕ отметки since (Stopwatch-тики). null - процесс
+        // не рисует или трейсер выключен
+        public static FrameWindow TakeFrames(int pid, long since)
+        {
+            if (!running || pid <= 0) return null;
+            long freq = Stopwatch.Frequency;
+            long now = Stopwatch.GetTimestamp();
+            long[] copy;
+            lock (sync)
+            {
+                CleanupLocked(now, freq);
+                List<long> list;
+                if (!presents.TryGetValue(pid, out list) || list.Count < 2) return null;
+                long cutoff = now - freq * 4;
+                int firstKeep = 0;
+                while (firstKeep < list.Count && list[firstKeep] < cutoff) firstKeep++;
+                if (firstKeep > 0) list.RemoveRange(0, firstKeep);
+                if (list.Count < 2) return null;
+                copy = list.ToArray();
+            }
+
+            var w = new FrameWindow();
+            w.Newest = copy[copy.Length - 1];
+            var ms = new List<float>(copy.Length);
+            long prev = -1;
+            for (int i = 0; i < copy.Length; i++)
+            {
+                long t = copy[i];
+                if (t <= since) { prev = t; continue; }
+                if (prev > 0)
+                {
+                    float delta = (t - prev) * 1000f / freq;
+                    // Дыра в данных (игра на паузе, трейсер не успел) - это не кадр
+                    if (delta < 1000f) ms.Add(delta);
+                }
+                prev = t;
+            }
+            if (ms.Count == 0) return null;
+            w.Ms = ms.ToArray();
+            w.Frames = ms.Count;
+            return w;
+        }
+
+        // Самый активный по кадрам процесс - для статистики, если игра ещё не
+        // опознана детектом
+        public static int BestPid(out int fps)
+        {
+            fps = 0;
+            if (!running) return 0;
+            int best = 0;
+            int[] pids;
+            lock (sync) { pids = new List<int>(presents.Keys).ToArray(); }
+            foreach (int pid in pids)
+            {
+                Snap snap = SnapshotForPid(pid);
+                if (snap != null && snap.Fps > fps) { fps = snap.Fps; best = pid; }
+            }
+            return best;
+        }
+
         // Выкидываем процессы, которые давно не рисовали (закрытые игры)
         private static void CleanupLocked(long now, long freq)
         {

@@ -5,7 +5,7 @@
 **Smart tweaker, cleaner and monitoring tool for Windows — in one app.**
 **Умный твикер, чистильщик и монитор для Windows — всё в одном.**
 
-[![Version](https://img.shields.io/badge/version-1.9.0-blue)](https://github.com/dep1xar/DeepTools/releases)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue)](https://github.com/dep1xar/DeepTools/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D6)](#)
 [![.NET](https://img.shields.io/badge/.NET%20Framework-4.x-512BD4)](#)
 
@@ -32,6 +32,10 @@ DeepTools is a system tweaker, so it does things real malware also does: elevate
 - You can verify any release on [VirusTotal](https://www.virustotal.com/).
 - If Windows SmartScreen warns you, click **More info → Run anyway**.
 
+### Game Tweaks
+
+A card grid of per-feature game tweaks: HAGS, Game Mode, fullscreen optimizations, PCIe link power management (ASPM), HVCI, Power Throttling, the page file, background telemetry services and CPU affinity for the running game. Every card reads the **real system state** instead of remembering what you last clicked, one click applies or reverts a tweak, and the ones that need a reboot are marked **⟳**. *Disable all* turns every applied tweak back off in one go.
+
 ### Extra tools
 
 - **Macro recorder** — record mouse clicks and key presses with timing, replay with repeats or looping, save/load macros. Hotkeys: **F6** record, **F7** play (while the macro window is open).
@@ -43,7 +47,7 @@ DeepTools is a system tweaker, so it does things real malware also does: elevate
 - **Benchmark** — quick before/after CPU, RAM and disk test. Saves the result so you can see if your tweaks actually helped.
 - **Stress Test** — loads all CPU cores to 100% for 2 minutes and reports peak temperature.
 - **Temperature History** — 24-hour CPU/GPU graph with peak analysis.
-- **Game Time** — tracks your gaming sessions (playtime, average FPS, 1% low, average CPU, peak temps) and reports when you close a game. Works with fullscreen and borderless games. A **Share** button renders a PNG card with your PC spec and top games. A per-game 📈 **FPS history** chart shows average FPS and 1% low across sessions with a trend verdict — so system degradation is visible at a glance.
+- **Game Time** — tracks your gaming sessions (playtime, average FPS, 1% low, average CPU, peak temps) and reports when you close a game. Works with fullscreen and borderless games. A **Share** button renders a PNG card with your PC spec and top games. A per-game ≡ **FPS history** chart shows average FPS and 1% low across sessions with a trend verdict — so system degradation is visible at a glance. The **≡ Report** button opens frame statistics for the last 30 minutes / hour / 2 hours: average FPS, worst 1% low and **every micro-stutter** (when it happened and how many milliseconds it lasted) on a timeline. Non-games (messengers, browsers, terminals, video editors) are filtered out of the game statistics, and anything already recorded can be removed per game or in one click.
 - **Telemetry off** — disables Windows telemetry via official policies, services and scheduler tasks. Three presets (light/medium/aggressive), live status per tweak, one-click full revert.
 - **Restore point** — offered automatically before risky tweaks (debloat, service presets, telemetry) so you can always roll back.
 - **Crosshair** — customizable on-screen crosshair overlay (cross, dot, circle, T-shape); settings are remembered.
@@ -116,6 +120,10 @@ DeepTools — системный твикер, поэтому он делает 
 - Иногда антивирус сразу же посылает файл в карантин, тогда **надо добавить его в исключение**
 
 
+### Игровые твики
+
+Сетка карточек с твиками по отдельным фичам: HAGS, Game Mode, оптимизации во весь экран, энергосбережение шины PCIe (ASPM), HVCI, Power Throttling, файл подкачки, фоновые службы телеметрии и привязка активной игры к ядрам. Каждая карточка показывает **реальное состояние системы**, а не «что мы последний раз нажали»; один клик применяет или откатывает твик, а те, которым нужна перезагрузка, помечены **⟳**. Кнопка *Отключить всё* возвращает все применённые твики в обычное состояние.
+
 ### Дополнительные инструменты
 
 - **Запись макросов** — запись кликов мыши и нажатий клавиш с таймингами, воспроизведение с повторами или в цикле, сохранение/загрузка. Хоткеи: **F6** запись, **F7** воспроизведение (пока открыто окно макросов).
@@ -127,7 +135,7 @@ DeepTools — системный твикер, поэтому он делает 
 - **Бенчмарк** — быстрый тест CPU, RAM и диска «до/после». Сохраняет результат, чтобы увидеть реальный прирост.
 - **Стресс-тест** — грузит все ядра CPU на 100% в течение 2 минут и показывает пиковую температуру.
 - **История температур** — график CPU/GPU за 24 часа с разбором пиков.
-- **Время в играх** — считает игровые сессии (время, средний FPS, 1% low, средний CPU, пиковые температуры) и шлёт отчёт при закрытии игры. Работает с полноэкранными и borderless-играми. Кнопка **Поделиться** рендерит PNG-карточку со спекой ПК и топом игр. График 📈 **истории FPS** по каждой игре — средний FPS и 1% low по сессиям с вердиктом тренда: деградация системы видна с одного взгляда.
+- **Время в играх** — считает игровые сессии (время, средний FPS, 1% low, средний CPU, пиковые температуры) и шлёт отчёт при закрытии игры. Работает с полноэкранными и borderless-играми. Кнопка **Поделиться** рендерит PNG-карточку со спекой ПК и топом игр. График ≡ **истории FPS** по каждой игре — средний FPS и 1% low по сессиям с вердиктом тренда: деградация системы видна с одного взгляда. Кнопка **≡ Отчёт** открывает статистику кадров за последние 30 минут / час / 2 часа: средний FPS, худший 1% low и **каждый микрофриз** — когда случился и сколько миллисекунд длился, на таймлайне. Не-игры (мессенджеры, браузеры, терминалы, видеоредакторы) в статистику игр не попадают, а уже записанные сессии можно убрать по одной или одной кнопкой.
 - **Отключение телеметрии** — выключает телеметрию Windows через официальные политики, службы и задачи планировщика. Три пресета (мягко/средне/жёстко), живой статус каждого твика, полный откат одной кнопкой.
 - **Точка восстановления** — автоматически предлагается перед рискованными твиками (деблоат, пресеты служб, телеметрия), чтобы всегда можно было откатиться.
 - **Прицел** — настраиваемый накладной прицел (крест, точка, круг, T-образный); настройки запоминаются.
@@ -183,6 +191,6 @@ DeepTools проверяет GitHub Releases при запуске. Когда �
 
 <div align="center">
 
-© 2026 dep1xar · DeepTools v1.9.0
+© 2026 dep1xar · DeepTools v2.1.0
 
 </div>

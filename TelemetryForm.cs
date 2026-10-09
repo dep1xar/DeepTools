@@ -80,8 +80,17 @@ namespace DeepTools
 
             public override bool IsApplied()
             {
-                string output = RunTool("sc.exe", "qc " + ServiceName);
-                return output != null && output.IndexOf("DISABLED", StringComparison.OrdinalIgnoreCase) >= 0;
+                try
+                {
+                    using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                        @"SYSTEM\CurrentControlSet\Services\" + ServiceName))
+                    {
+                        if (key == null) return false;
+                        object val = key.GetValue("Start");
+                        return val != null && (int)val == 4; // 4 = SERVICE_DISABLED
+                    }
+                }
+                catch { return false; }
             }
 
             public override bool Apply()
@@ -487,7 +496,7 @@ namespace DeepTools
                 for (int i = 0; i < states.Length; i++)
                 {
                     stateBadges[i].Text = states[i] ? Lang.T("отключено ✓", "disabled ✓") : Lang.T("активно", "active");
-                    stateBadges[i].ForeColor = states[i] ? Theme.Accent : Theme.TextDim;
+                    stateBadges[i].ForeColor = states[i] ? Theme.On : Theme.Off;
                     checks[i].Checked = states[i];
                     if (states[i]) applied++;
                 }
@@ -541,7 +550,7 @@ namespace DeepTools
                     revertBtn.Enabled = true;
                     statusLabel.Text = (apply ? Lang.T("Готово: применено ", "Done: applied ") : Lang.T("Готово: откачено ", "Done: reverted "))
                         + e.Result + " / " + selected.Count;
-                    statusLabel.ForeColor = Theme.Accent;
+                    statusLabel.ForeColor = Theme.On;
                     RefreshStates();
                 };
                 worker.RunWorkerAsync();
@@ -553,3 +562,4 @@ namespace DeepTools
         }
     }
 }
+

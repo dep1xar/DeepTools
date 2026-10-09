@@ -142,7 +142,7 @@ namespace DeepTools
 
             var titleLbl = new Label
             {
-                Text = Lang.T("🎬 Макросы", "🎬 Macros"),
+                Text = Lang.T("≡ Макросы", "≡ Macros"),
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),
@@ -376,7 +376,7 @@ namespace DeepTools
         {
             if (Owner != null)
             {
-                try { NativeMethods.UnregisterHotKey(Owner.Handle, NativeMethods.HOTKEY_ID_REGION); } catch { }
+                try { Hotkeys.Suspend(NativeMethods.HOTKEY_ID_REGION, Owner.Handle); } catch { }
             }
             NativeMethods.RegisterHotKey(Handle, NativeMethods.HOTKEY_ID_MACRO_REC, 0, (uint)Keys.F6);
             NativeMethods.RegisterHotKey(Handle, NativeMethods.HOTKEY_ID_MACRO_PLAY, 0, (uint)Keys.F7);
@@ -390,7 +390,7 @@ namespace DeepTools
             // (могла быть переназначена в Настройках, поэтому берём из Hotkeys)
             if (Owner != null)
             {
-                try { NativeMethods.RegisterHotKey(Owner.Handle, NativeMethods.HOTKEY_ID_REGION, 0, (uint)Hotkeys.Get(NativeMethods.HOTKEY_ID_REGION)); } catch { }
+                try { Hotkeys.Resume(NativeMethods.HOTKEY_ID_REGION, Owner.Handle); } catch { }
             }
         }
 
@@ -440,7 +440,7 @@ namespace DeepTools
             recordBtn.Text = Lang.T("⏺ Запись (F6)", "⏺ Record (F6)");
             recordBtn.Invalidate();
             statusLabel.Text = Lang.T("Записано событий: ", "Recorded events: ") + events.Count;
-            statusLabel.ForeColor = Theme.Accent;
+            statusLabel.ForeColor = Theme.On;
             UpdateEventsLabel();
         }
 
@@ -534,7 +534,7 @@ namespace DeepTools
             playBtn.Text = Lang.T("▶ Стоп (F7)", "▶ Stop (F7)");
             playBtn.Invalidate();
             statusLabel.Text = Lang.T("▶ Воспроизведение... F7 чтобы остановить", "▶ Playing... F7 to stop");
-            statusLabel.ForeColor = Theme.Accent;
+            statusLabel.ForeColor = Theme.On;
 
             var snapshot = new List<MacroEvent>(events);
             playThread = new Thread(() => PlayLoop(snapshot, loop, repeats));
@@ -647,7 +647,7 @@ namespace DeepTools
                 File.WriteAllLines(Path.Combine(MacrosDir, name + ".dtm"), lines.ToArray());
 
                 statusLabel.Text = Lang.T("Сохранено: ", "Saved: ") + name;
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
                 nameBox.Text = "";
                 RefreshSavedList();
             }
@@ -686,7 +686,7 @@ namespace DeepTools
                 events = loaded;
                 UpdateEventsLabel();
                 statusLabel.Text = Lang.T("Загружено: ", "Loaded: ") + Path.GetFileNameWithoutExtension(path) + " (" + events.Count + ")";
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
             catch (Exception ex)
             {

@@ -106,6 +106,10 @@ namespace DeepTools
                 if (snap.LowFps > 0 && (worstLowFps < 0 || snap.LowFps < worstLowFps))
                     worstLowFps = snap.LowFps;
             }
+
+            // Тот же трейсер отдаёт сырые кадры: из них копится статистика «за
+            // последние 30 минут / час / 2 часа» с микрофризами
+            FrameLog.Tick(procId, procName);
         }
 
         private static void Finish()
@@ -119,6 +123,9 @@ namespace DeepTools
             int lowFps = worstLowFps;
             proc = null;
             procId = 0;
+
+            // Отмечаем конец данных: в отчёте это разрыв, а не падение FPS до нуля
+            FrameLog.MarkGap(name);
 
             if (durationSec < MinSessionSec) return;
 
@@ -173,11 +180,18 @@ namespace DeepTools
         private Point dragStart;
         private bool draggingForm = false;
 
+        private FlowLayoutPanel list;
+        private Label summaryLabel;
+        private RoundedButton purgeBtn;
+        private Label ignoreLabel;
+        private int totalAll;
+        private int totalWeek;
+
         public GameTimeForm()
         {
             Text = "DeepTools Game Time";
             FormBorderStyle = FormBorderStyle.None;
-            Size = new Size(540, 460);
+            Size = new Size(560, 520);
             StartPosition = FormStartPosition.CenterParent;
             BackColor = Theme.BgColor;
             DoubleBuffered = true;
@@ -212,7 +226,7 @@ namespace DeepTools
 
             var titleLbl = new Label
             {
-                Text = Lang.T("🕒 Время в играх", "🕒 Game time"),
+                Text = Lang.T("⏱ Время в играх", "⏱ Game time"),
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),
@@ -239,14 +253,29 @@ namespace DeepTools
 
             List<GameStat> stats = LoadStats();
 
-            int totalAll = 0;
-            int totalWeek = 0;
+            totalAll = 0;
+            totalWeek = 0;
             foreach (GameStat g in stats) { totalAll += g.TotalSec; totalWeek += g.WeekSec; }
+
+            // Отчёт за последние 30 минут / час / 2 часа с микрофризами
+            var statsBtn = new RoundedButton
+            {
+                Text = Lang.T("▤ Отчёт", "▤ Report"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Location = new Point(Width - 312, 6),
+                Size = new Size(128, 28)
+            };
+            statsBtn.Click += (s, e) => { using (var f = new GameStatsForm()) f.ShowDialog(this); };
+            DarkTip.Set(statsBtn, Lang.T("Кадры за последние 30 минут, час или 2 часа",
+                                        "Frames for the last 30 minutes, hour or 2 hours"));
+            titleBar.Controls.Add(statsBtn);
 
             // PNG-карточка со спекой и топом игр - в буфер и в Изображения\DeepTools
             var shareBtn = new RoundedButton
             {
-                Text = Lang.T("📤 Поделиться", "📤 Share"),
+                Text = Lang.T("⧉ Поделиться", "⧉ Share"),
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
@@ -270,7 +299,7 @@ namespace DeepTools
                 }
                 ShareCard.CreateGameTimeCard(lines, totalAll, totalWeek, path => {
                     shareBtn.Enabled = true;
-                    shareBtn.Text = Lang.T("📤 Поделиться", "📤 Share");
+                    shareBtn.Text = Lang.T("⧉ Поделиться", "⧉ Share");
                     if (path != null)
                         TrayNotify.Info(
                             Lang.T("Карточка готова", "Card is ready"),
@@ -282,22 +311,17 @@ namespace DeepTools
             };
             titleBar.Controls.Add(shareBtn);
 
-            var summaryLabel = new Label
+            summaryLabel = new Label
             {
-                Text = stats.Count == 0
-                    ? Lang.T("Пока пусто. Сессии от 3 минут записываются автоматически, когда GameBooster видит игру",
-                             "Nothing yet. Sessions over 3 minutes are recorded automatically when GameBooster detects a game")
-                    : Lang.T("Всего: ", "Total: ") + GameSessionTracker.FormatDuration(totalAll)
-                        + Lang.T("   За 7 дней: ", "   Last 7 days: ") + GameSessionTracker.FormatDuration(totalWeek),
-                ForeColor = stats.Count == 0 ? Theme.TextDim : Theme.Accent,
+                ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Location = new Point(18, 48),
-                Size = new Size(504, 34)
+                Size = new Size(524, 34)
             };
             Controls.Add(summaryLabel);
 
-            var card = Theme.MakeCard(this, new Point(16, 88), new Size(508, 352));
+            var card = Theme.MakeCard(this, new Point(16, 88), new Size(528, 368));
 
             var header = new Label
             {
@@ -316,15 +340,15 @@ namespace DeepTools
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8F),
-                Location = new Point(300, 10),
+                Location = new Point(270, 10),
                 AutoSize = true
             };
             card.Controls.Add(headerTotal);
 
-            var list = new FlowLayoutPanel
+            list = new FlowLayoutPanel
             {
                 Location = new Point(10, 30),
-                Size = new Size(488, 312),
+                Size = new Size(508, 328),
                 BackColor = Theme.SidebarColor,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
@@ -333,9 +357,88 @@ namespace DeepTools
             card.Controls.Add(list);
             NativeMethods.ApplyDarkScrollbar(list);
 
+            // Низ окна: чистка статистики от не-игр и список игнорируемых
+            purgeBtn = new RoundedButton
+            {
+                Text = Lang.T("♻ Убрать не-игры", "♻ Remove non-games"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                CornerRadius = 10,
+                Location = new Point(16, 466),
+                Size = new Size(170, 28)
+            };
+            purgeBtn.Click += (s, e) => PurgeNonGames();
+            Controls.Add(purgeBtn);
+
+            var ignoreBtn = new RoundedButton
+            {
+                Text = Lang.T("⚙ Кого не считаем игрой", "⚙ Ignored apps"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                CornerRadius = 10,
+                Location = new Point(194, 466),
+                Size = new Size(196, 28)
+            };
+            ignoreBtn.Click += (s, e) =>
+            {
+                using (var f = new GameIgnoreForm()) f.ShowDialog(this);
+                RebuildList();
+            };
+            Controls.Add(ignoreBtn);
+
+            ignoreLabel = new Label
+            {
+                Text = "",
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(398, 470),
+                Size = new Size(146, 20),
+                TextAlign = ContentAlignment.MiddleRight,
+                AutoEllipsis = true
+            };
+            Controls.Add(ignoreLabel);
+
+            RebuildList();
+        }
+
+        // Перестраивает список игр и подписи: вызывается после удаления записей
+        // или изменения игнор-листа
+        private void RebuildList()
+        {
+            if (list == null) return;
+            List<GameStat> stats = LoadStats();
+
+            totalAll = 0;
+            totalWeek = 0;
+            foreach (GameStat g in stats) { totalAll += g.TotalSec; totalWeek += g.WeekSec; }
+
+            summaryLabel.Text = stats.Count == 0
+                ? Lang.T("Пока пусто. Сессии от 3 минут записываются автоматически, когда GameBooster видит игру",
+                         "Nothing yet. Sessions over 3 minutes are recorded automatically when GameBooster detects a game")
+                : Lang.T("Всего: ", "Total: ") + GameSessionTracker.FormatDuration(totalAll)
+                    + Lang.T("   За 7 дней: ", "   Last 7 days: ") + GameSessionTracker.FormatDuration(totalWeek);
+            summaryLabel.ForeColor = stats.Count == 0 ? Theme.TextDim : Theme.Accent;
+
+            int nonGames = GameFilter.CountInLog();
+            purgeBtn.Visible = nonGames > 0;
+            purgeBtn.Text = Lang.T("♻ Убрать не-игры (", "♻ Remove non-games (") + nonGames + ")";
+
+            List<string> ignored = GameFilter.UserIgnored();
+            ignoreLabel.Text = ignored.Count == 0
+                ? Lang.T("игнор: стандартный список", "ignored: default list")
+                : Lang.T("игнор: ", "ignored: ") + string.Join(", ", ignored.ToArray());
+
+            list.SuspendLayout();
+            list.Controls.Clear();
+
             foreach (GameStat g in stats)
             {
-                var row = new HoverRow { Size = new Size(464, 40), Margin = new Padding(2, 1, 0, 1) };
+                var row = new HoverRow { Size = new Size(484, 40), Margin = new Padding(2, 1, 0, 1) };
 
                 var nameLbl = new Label
                 {
@@ -344,7 +447,7 @@ namespace DeepTools
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                     Location = new Point(6, 3),
-                    Size = new Size(280, 18),
+                    Size = new Size(218, 18),
                     AutoEllipsis = true
                 };
                 row.Controls.Add(nameLbl);
@@ -368,8 +471,10 @@ namespace DeepTools
                     ForeColor = Theme.Accent,
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                    Location = new Point(290, 10),
-                    AutoSize = true
+                    Location = new Point(232, 10),
+                    Size = new Size(126, 18),
+                    AutoSize = false,
+                    AutoEllipsis = true
                 };
                 row.Controls.Add(timeLbl);
 
@@ -377,28 +482,74 @@ namespace DeepTools
                 if (g.FpsSec > 0)
                 {
                     string gameName = g.Name;
-                    var histBtn = new Label
-                    {
-                        Text = "📈",
-                        ForeColor = Theme.TextDim,
-                        BackColor = Color.Transparent,
-                        Font = new Font("Segoe UI", 11F),
-                        Size = new Size(28, 28),
-                        Location = new Point(430, 6),
-                        TextAlign = ContentAlignment.MiddleCenter,
-                        Cursor = Cursors.Hand
-                    };
-                    DarkTip.Set(histBtn, Lang.T("История FPS", "FPS history"));
-                    histBtn.MouseEnter += (s, e) => histBtn.ForeColor = Theme.Accent;
-                    histBtn.MouseLeave += (s, e) => histBtn.ForeColor = Theme.TextDim;
+                    var histBtn = MakeRowButton("≡", Lang.T("История FPS", "FPS history"), 366, Theme.Accent);
                     histBtn.Click += (s, e) => {
                         using (var f = new FpsHistoryForm(gameName)) f.ShowDialog(this);
                     };
                     row.Controls.Add(histBtn);
                 }
 
+                // Убрать не-игру из статистики и больше её игрой не считать
+                string rowName = g.Name;
+                var ignoreBtn = MakeRowButton("⊘", Lang.T("Больше не считать игрой", "Never count as a game"), 396, Theme.Danger);
+                ignoreBtn.Click += (s, e) =>
+                {
+                    int removed = GameFilter.RemoveFromLog(rowName);
+                    GameFilter.Ignore(rowName);
+                    TrayNotify.Info(
+                        rowName + Lang.T(" больше не игра", " is no longer a game"),
+                        Lang.T("Убрано сессий: ", "Sessions removed: ") + removed);
+                    RebuildList();
+                };
+                row.Controls.Add(ignoreBtn);
+
+                var delBtn = MakeRowButton("✕", Lang.T("Убрать из статистики", "Remove from statistics"), 426, Theme.Danger);
+                delBtn.Click += (s, e) =>
+                {
+                    int removed = GameFilter.RemoveFromLog(rowName);
+                    TrayNotify.Info(
+                        Lang.T("Записи удалены", "Records removed"),
+                        rowName + Lang.T(": сессий убрано ", ": sessions removed ") + removed);
+                    RebuildList();
+                };
+                row.Controls.Add(delBtn);
+
                 list.Controls.Add(row);
             }
+            list.ResumeLayout();
+        }
+
+        // Мелкая иконка-кнопка справа в строке игры
+        private Label MakeRowButton(string glyph, string tip, int x, Color hover)
+        {
+            var btn = new Label
+            {
+                Text = glyph,
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 10F),
+                Size = new Size(26, 28),
+                Location = new Point(x, 6),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Cursor = Cursors.Hand
+            };
+            DarkTip.Set(btn, tip);
+            btn.MouseEnter += (s, e) => btn.ForeColor = hover;
+            btn.MouseLeave += (s, e) => btn.ForeColor = Theme.TextDim;
+            return btn;
+        }
+
+        // Одной кнопкой убирает из журнала все записи, которые не считаются играми
+        private void PurgeNonGames()
+        {
+            int removed = GameFilter.PurgeFromLog();
+            if (removed > 0)
+            {
+                TrayNotify.Info(
+                    Lang.T("Статистика почищена", "Statistics cleaned"),
+                    Lang.T("Убрано сессий не-игр: ", "Non-game sessions removed: ") + removed);
+            }
+            RebuildList();
         }
 
         private List<GameStat> LoadStats()
@@ -447,6 +598,211 @@ namespace DeepTools
             var result = new List<GameStat>(byName.Values);
             result.Sort((a, b) => b.TotalSec.CompareTo(a.TotalSec));
             return result;
+        }
+    }
+
+    // Список «кого не считаем игрой»: всё, что фильтр отсеивает (и стандартный
+    // список, и ручные пометки). Любое имя можно вернуть в статистику - например,
+    // javaw.exe у кого-то это Minecraft, а не «просто Java»
+    public class GameIgnoreForm : Form
+    {
+        private Point dragStart;
+        private bool dragging;
+        private FlowLayoutPanel list;
+
+        public GameIgnoreForm()
+        {
+            Text = "DeepTools Game Filter";
+            FormBorderStyle = FormBorderStyle.None;
+            Size = new Size(460, 420);
+            StartPosition = FormStartPosition.CenterParent;
+            BackColor = Theme.BgColor;
+            DoubleBuffered = true;
+            ShowInTaskbar = false;
+
+            BuildUi();
+            Load += (s, e) => ApplyRoundedRegion();
+        }
+
+        private void ApplyRoundedRegion()
+        {
+            var path = new GraphicsPath();
+            int r = 12, d = r * 2;
+            var rect = new Rectangle(0, 0, Width, Height);
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            Region = new Region(path);
+        }
+
+        private void BuildUi()
+        {
+            var titleBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Theme.BgColor };
+            titleBar.MouseDown += (s, e) => { dragging = true; dragStart = new Point(e.X, e.Y); };
+            titleBar.MouseMove += (s, e) =>
+            {
+                if (dragging) Location = new Point(Location.X + e.X - dragStart.X, Location.Y + e.Y - dragStart.Y);
+            };
+            titleBar.MouseUp += (s, e) => { dragging = false; };
+            Controls.Add(titleBar);
+
+            var titleLbl = new Label
+            {
+                Text = Lang.T("⚙ Кого не считаем игрой", "⚙ Ignored apps"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Location = new Point(18, 9),
+                AutoSize = true
+            };
+            titleBar.Controls.Add(titleLbl);
+
+            var closeBtn = new Label
+            {
+                Text = "✕",
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 11F),
+                Size = new Size(30, 26),
+                Location = new Point(Width - 42, 7),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Cursor = Cursors.Hand
+            };
+            closeBtn.Click += (s, e) => Close();
+            closeBtn.MouseEnter += (s, e) => closeBtn.ForeColor = Theme.Danger;
+            closeBtn.MouseLeave += (s, e) => closeBtn.ForeColor = Theme.TextDim;
+            titleBar.Controls.Add(closeBtn);
+
+            var hint = new Label
+            {
+                Text = Lang.T("Полноэкранные мессенджеры, браузеры и терминалы не попадают в статистику игр. Если это всё-таки игра — верни её кнопкой ↩",
+                              "Fullscreen messengers, browsers and terminals are kept out of game statistics. If it really is a game, bring it back with ↩"),
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(18, 44),
+                Size = new Size(424, 34)
+            };
+            Controls.Add(hint);
+
+            var card = Theme.MakeCard(this, new Point(16, 84), new Size(428, 282));
+            list = new FlowLayoutPanel
+            {
+                Location = new Point(10, 10),
+                Size = new Size(408, 262),
+                BackColor = Theme.SidebarColor,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                AutoScroll = true
+            };
+            card.Controls.Add(list);
+            NativeMethods.ApplyDarkScrollbar(list);
+
+            var resetBtn = new RoundedButton
+            {
+                Text = Lang.T("Сбросить мои пометки", "Reset my marks"),
+                ButtonColor = Theme.KeyColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextMain,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                CornerRadius = 10,
+                Location = new Point(16, 376),
+                Size = new Size(180, 28)
+            };
+            resetBtn.Click += (s, e) =>
+            {
+                GameFilter.ResetUserLists();
+                Fill();
+            };
+            Controls.Add(resetBtn);
+
+            var doneBtn = new RoundedButton
+            {
+                Text = "OK",
+                ButtonColor = Theme.Accent,
+                HoverColor = Theme.AccentHover,
+                TextColor = Theme.BgColor,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                CornerRadius = 10,
+                Location = new Point(Width - 106, 376),
+                Size = new Size(90, 28)
+            };
+            doneBtn.Click += (s, e) => Close();
+            Controls.Add(doneBtn);
+
+            Fill();
+        }
+
+        private void Fill()
+        {
+            list.SuspendLayout();
+            list.Controls.Clear();
+
+            // Ручные пометки + всё из журнала, что отсеивает стандартный список
+            var names = new List<string>();
+            foreach (string n in GameFilter.UserIgnored()) if (!names.Contains(n)) names.Add(n);
+            foreach (string n in GameFilter.IgnoredInLog()) if (!names.Contains(n)) names.Add(n);
+
+            if (names.Count == 0)
+            {
+                list.Controls.Add(new Label
+                {
+                    Text = Lang.T("Пока никого: не-игры из журнала уже убраны",
+                                  "Nobody yet: non-games are already cleaned from the log"),
+                    ForeColor = Theme.TextDim,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9F),
+                    Location = new Point(6, 6),
+                    Size = new Size(390, 40)
+                });
+                list.ResumeLayout();
+                return;
+            }
+
+            foreach (string name in names)
+            {
+                var row = new HoverRow { Size = new Size(384, 32), Margin = new Padding(2, 1, 0, 1) };
+
+                var nameLbl = new Label
+                {
+                    Text = name + ".exe",
+                    ForeColor = Theme.TextMain,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                    Location = new Point(8, 6),
+                    Size = new Size(300, 20),
+                    AutoEllipsis = true
+                };
+                row.Controls.Add(nameLbl);
+
+                string captured = name;
+                var back = new Label
+                {
+                    Text = "↩",
+                    ForeColor = Theme.TextDim,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 11F),
+                    Size = new Size(30, 26),
+                    Location = new Point(344, 3),
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Cursor = Cursors.Hand
+                };
+                DarkTip.Set(back, Lang.T("Это всё-таки игра — вернуть в статистику",
+                                         "This is a game after all — bring it back"));
+                back.MouseEnter += (s, e) => back.ForeColor = Theme.Accent;
+                back.MouseLeave += (s, e) => back.ForeColor = Theme.TextDim;
+                back.Click += (s, e) =>
+                {
+                    GameFilter.Allow(captured);
+                    Fill();
+                };
+                row.Controls.Add(back);
+
+                list.Controls.Add(row);
+            }
+            list.ResumeLayout();
         }
     }
 }

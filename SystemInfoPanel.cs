@@ -235,7 +235,7 @@ namespace DeepTools
                 foreach (SpecRow row in rows) AddRow(row);
                 copyBtn.Enabled = true;
                 statusLabel.Text = Lang.T("Готово", "Done");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             };
             worker.RunWorkerAsync();
         }
@@ -298,7 +298,7 @@ namespace DeepTools
                 }
                 Clipboard.SetText(sb.ToString());
                 statusLabel.Text = Lang.T("Спека скопирована в буфер обмена ✓", "Specs copied to clipboard ✓");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
             catch
             {

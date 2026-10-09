@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -18,6 +18,7 @@ namespace DeepTools
         private HomePanel panelHome;
         private Panel panelCleanup;
         private GameBoosterPanel panelBooster;
+        private GameTweaksPanel panelGameTweaks;
         private HealthCheckPanel panelHealth;
         private SystemInfoPanel panelSysInfo;
         private StartupPanel panelStartup;
@@ -32,6 +33,7 @@ namespace DeepTools
         private SidebarNavButton navHome;
         private SidebarNavButton navCleanup;
         private SidebarNavButton navBooster;
+        private SidebarNavButton navGameTweaks;
         private SidebarNavButton navHealth;
         private SidebarNavButton navSysInfo;
         private SidebarNavButton navStartup;
@@ -100,16 +102,12 @@ namespace DeepTools
             Load += (s, e) => ApplyRoundedRegion();
             Load += (s, e) => RegisterHotkeys();
             Shown += (s, e) => {
-                // Первый запуск: мастер вместо окна "Что нового" (и то и то сразу - перебор)
+                // Первый запуск: короткий мастер знакомства
                 if (AppConfig.GetBool("wizard_pending", false))
                 {
                     AppConfig.SetBool("wizard_pending", false);
                     using (var wizard = new FirstRunWizardForm(key => NavigateByKey(key)))
                         wizard.ShowDialog(this);
-                }
-                else
-                {
-                    WhatsNew.ShowIfUpdated(this);
                 }
             };
             FormClosing += (s, e) => OnFormClosing(s, e);
@@ -290,10 +288,13 @@ namespace DeepTools
         private void RegisterHotkeys()
         {
             Hotkeys.RegisterAll(this.Handle);
+            // Страховка от игр и античитов: если клавишу перехватили, сработает хук
+            Hotkeys.InstallHook(this.Handle);
         }
 
         private void UnregisterHotkeys()
         {
+            Hotkeys.RemoveHook();
             Hotkeys.UnregisterAll(this.Handle);
         }
 
@@ -310,24 +311,36 @@ namespace DeepTools
             if (m.Msg == NativeMethods.WM_HOTKEY)
             {
                 int id = m.WParam.ToInt32();
-                if (id == NativeMethods.HOTKEY_ID_CLICKER)
-                {
-                    panelClicker.ToggleRunning();
-                }
-                else if (id == NativeMethods.HOTKEY_ID_SCREENSHOT)
-                {
-                    panelScreenshots.CaptureScreen();
-                }
-                else if (id == NativeMethods.HOTKEY_ID_OVERLAY)
-                {
-                    panelBooster.ToggleOverlay();
-                }
-                else if (id == NativeMethods.HOTKEY_ID_REGION)
-                {
-                    panelScreenshots.CaptureRegion();
-                }
+                // Ту же клавишу мог уже поймать хук-страховка: тогда это дубль,
+                // и обрабатывать его второй раз нельзя (кликер включился бы и
+                // сразу выключился)
+                if (!Hotkeys.IsHookDuplicate(id)) DispatchHotkey(id);
+            }
+            else if (m.Msg == Hotkeys.WM_HOTKEY_HOOK)
+            {
+                DispatchHotkey(m.WParam.ToInt32());
             }
             base.WndProc(ref m);
+        }
+
+        private void DispatchHotkey(int id)
+        {
+            if (id == NativeMethods.HOTKEY_ID_CLICKER)
+            {
+                panelClicker.ToggleRunning();
+            }
+            else if (id == NativeMethods.HOTKEY_ID_SCREENSHOT)
+            {
+                panelScreenshots.CaptureScreen();
+            }
+            else if (id == NativeMethods.HOTKEY_ID_OVERLAY)
+            {
+                panelBooster.ToggleOverlay();
+            }
+            else if (id == NativeMethods.HOTKEY_ID_REGION)
+            {
+                panelScreenshots.CaptureRegion();
+            }
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -482,27 +495,28 @@ namespace DeepTools
             sidebar.Controls.Add(divider);
 
             // Навигация сгруппирована по смыслу; кнопки чуть компактнее (33px),
-            // чтобы 13 пунктов + 3 заголовка влезли в 616px сайдбара
+            // чтобы 14 пунктов + 3 заголовка влезли в 616px сайдбара
             navHome = MakeNavItem("⌂   " + Lang.T("Главная", "Home"), 90);
 
-            MakeNavGroupLabel(Lang.T("ОПТИМИЗАЦИЯ", "OPTIMIZATION"), 129);
-            navCleanup = MakeNavItem("♻   SmartCleanup", 147);
-            navBooster = MakeNavItem("⚡   GameBooster", 182);
-            navStartup = MakeNavItem("⭯   " + Lang.T("Автозагрузка", "Startup"), 217);
-            navServices = MakeNavItem("⚙   " + Lang.T("Службы", "Services"), 252);
-            navVisual = MakeNavItem("✦   " + Lang.T("Визуальные эффекты", "Visual effects"), 287);
+            MakeNavGroupLabel(Lang.T("ОПТИМИЗАЦИЯ", "OPTIMIZATION"), 127);
+            navCleanup = MakeNavItem("♻   SmartCleanup", 143);
+            navBooster = MakeNavItem("⚡   GameBooster", 175);
+            navGameTweaks = MakeNavItem("✚   " + Lang.T("Игровые твики", "Game tweaks"), 207);
+            navStartup = MakeNavItem("⭯   " + Lang.T("Автозагрузка", "Startup"), 239);
+            navServices = MakeNavItem("⚙   " + Lang.T("Службы", "Services"), 271);
+            navVisual = MakeNavItem("✦   " + Lang.T("Визуальные эффекты", "Visual effects"), 303);
 
-            MakeNavGroupLabel(Lang.T("МОНИТОРИНГ", "MONITORING"), 326);
-            navHealth = MakeNavItem("❤   Health Check", 344);
-            navSysInfo = MakeNavItem("▤   " + Lang.T("Мой ПК", "My PC"), 379);
-            navNetwork = MakeNavItem("⇅   " + Lang.T("Сеть", "Network"), 414);
+            MakeNavGroupLabel(Lang.T("МОНИТОРИНГ", "MONITORING"), 340);
+            navHealth = MakeNavItem("❤   Health Check", 356);
+            navSysInfo = MakeNavItem("▤   " + Lang.T("Мой ПК", "My PC"), 388);
+            navNetwork = MakeNavItem("⇅   " + Lang.T("Сеть", "Network"), 420);
 
-            MakeNavGroupLabel(Lang.T("ИНСТРУМЕНТЫ", "TOOLS"), 453);
-            navClicker = MakeNavItem("⊙   Clicker", 471);
-            navScreenshots = MakeNavItem("▣   " + Lang.T("Скриншоты", "Screenshots"), 506);
-            navClipboard = MakeNavItem("❏   " + Lang.T("Буфер обмена", "Clipboard"), 541);
+            MakeNavGroupLabel(Lang.T("ИНСТРУМЕНТЫ", "TOOLS"), 457);
+            navClicker = MakeNavItem("⊙   Clicker", 473);
+            navScreenshots = MakeNavItem("▣   " + Lang.T("Скриншоты", "Screenshots"), 505);
+            navClipboard = MakeNavItem("❏   " + Lang.T("Буфер обмена", "Clipboard"), 537);
 
-            navSettings = MakeNavItem("⚙   " + Lang.T("Настройки", "Settings"), 579);
+            navSettings = MakeNavItem("⚙   " + Lang.T("Настройки", "Settings"), 578);
 
             // Бегущая акцентная полоска: переезжает к активному пункту при
             // переключении раздела вместо мгновенного скачка
@@ -514,6 +528,7 @@ namespace DeepTools
             navSysInfo.Click += (s, e) => ShowPanel(GetSysInfo(), navSysInfo);
             navCleanup.Click += (s, e) => ShowPanel(GetCleanup(), navCleanup);
             navBooster.Click += (s, e) => ShowPanel(panelBooster, navBooster);
+            navGameTweaks.Click += (s, e) => ShowPanel(panelGameTweaks, navGameTweaks);
             navHealth.Click += (s, e) => ShowPanel(panelHealth, navHealth);
             navStartup.Click += (s, e) => ShowPanel(GetStartup(), navStartup);
             navServices.Click += (s, e) => ShowPanel(GetServices(), navServices);
@@ -543,6 +558,10 @@ namespace DeepTools
             panelBooster = new GameBoosterPanel();
             contentArea.Controls.Add(panelBooster);
             panelBooster.Visible = false;
+
+            panelGameTweaks = new GameTweaksPanel();
+            contentArea.Controls.Add(panelGameTweaks);
+            panelGameTweaks.Visible = false;
 
             panelHealth = new HealthCheckPanel();
             contentArea.Controls.Add(panelHealth);
@@ -632,6 +651,7 @@ namespace DeepTools
         {
             if (key == "cleanup") ShowPanel(GetCleanup(), navCleanup);
             else if (key == "booster") ShowPanel(panelBooster, navBooster);
+            else if (key == "gametweaks") ShowPanel(panelGameTweaks, navGameTweaks);
             else if (key == "health") ShowPanel(panelHealth, navHealth);
             else if (key == "clicker") ShowPanel(panelClicker, navClicker);
             else if (key == "screenshots") ShowPanel(panelScreenshots, navScreenshots);
@@ -645,6 +665,7 @@ namespace DeepTools
             panelHome.Visible = false;
             if (panelCleanup != null) panelCleanup.Visible = false;
             panelBooster.Visible = false;
+            panelGameTweaks.Visible = false;
             panelHealth.Visible = false;
             if (panelSysInfo != null) panelSysInfo.Visible = false;
             if (panelStartup != null) panelStartup.Visible = false;
@@ -659,6 +680,7 @@ namespace DeepTools
             navHome.SetActive(false);
             navCleanup.SetActive(false);
             navBooster.SetActive(false);
+            navGameTweaks.SetActive(false);
             navHealth.SetActive(false);
             navSysInfo.SetActive(false);
             navStartup.SetActive(false);
@@ -759,7 +781,7 @@ namespace DeepTools
                 Text = isAdmin
                     ? Lang.T("Права администратора: включены", "Administrator rights: enabled")
                     : Lang.T("Права администратора: не включены", "Administrator rights: not enabled"),
-                ForeColor = isAdmin ? Theme.Accent : Theme.Warning,
+                ForeColor = isAdmin ? Theme.On : Theme.Warning,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 Location = new Point(20, 16),

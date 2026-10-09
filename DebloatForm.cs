@@ -247,7 +247,7 @@ namespace DeepTools
                 if (installedApps.Count == 0)
                 {
                     statusLabel.Text = Lang.T("Мусора не найдено - система уже чистая ✓", "No bloat found - system is already clean ✓");
-                    statusLabel.ForeColor = Theme.Accent;
+                    statusLabel.ForeColor = Theme.On;
                 }
                 else
                 {
@@ -312,7 +312,7 @@ namespace DeepTools
                 removeBtn.Text = Lang.T("Удалить выбранное", "Remove selected");
                 statusLabel.Text = Lang.T("Готово! Удалено приложений: ", "Done! Apps removed: ") + (e.Result ?? 0)
                     + Lang.T(". Перезапусти окно, чтобы обновить список", ". Reopen this window to refresh the list");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             };
             worker.RunWorkerAsync();
         }

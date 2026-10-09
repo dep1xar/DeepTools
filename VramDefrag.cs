@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 
 namespace DeepTools
@@ -81,7 +81,7 @@ namespace DeepTools
                 // IDXGIDevice3::Trim находится в слоте 17 vtable:
                 // IUnknown 3 + IDXGIObject 4 + IDXGIDevice 4 + IDXGIDevice1 2 + IDXGIDevice2 2 + Trim 1
                 IntPtr vtable = Marshal.ReadIntPtr(dxgiDev3);
-                IntPtr trimPtr = Marshal.ReadIntPtr(vtable, 17 * IntPtr.Size);
+                IntPtr trimPtr = Marshal.ReadIntPtr(vtable, 16 * IntPtr.Size);
                 TrimDelegate trim = (TrimDelegate)Marshal.GetDelegateForFunctionPointer(
                     trimPtr, typeof(TrimDelegate));
                 trim(dxgiDev3);
@@ -102,3 +102,4 @@ namespace DeepTools
         }
     }
 }
+

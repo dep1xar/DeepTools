@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
@@ -159,7 +159,7 @@ namespace DeepTools
             else if (toggle == dragFullToggle) SetDragFullWindows(toggle.Checked);
 
             statusLabel.Text = Lang.T("Изменено. Если эффект не применился сразу - нажми \"Перезапустить проводник\"", "Changed. If the effect did not apply immediately, press Restart Explorer");
-            statusLabel.ForeColor = Theme.Accent;
+            statusLabel.ForeColor = Theme.On;
         }
 
         private void LoadCurrentState()
@@ -202,7 +202,7 @@ namespace DeepTools
             statusLabel.Text = restoreDefaults
                 ? Lang.T("Эффекты включены обратно. Нажми \"Перезапустить проводник\", если что-то не обновилось", "Effects restored. Press Restart Explorer if something did not update")
                 : Lang.T("Применена максимальная производительность. Нажми \"Перезапустить проводник\", если что-то не обновилось", "Maximum performance applied. Press Restart Explorer if something did not update");
-            statusLabel.ForeColor = Theme.Accent;
+            statusLabel.ForeColor = Theme.On;
         }
 
         private void SetTransparency(bool enabled)
@@ -242,7 +242,7 @@ namespace DeepTools
                 System.Threading.Thread.Sleep(500);
                 Process.Start("explorer.exe");
                 statusLabel.Text = Lang.T("Проводник перезапущен", "Explorer restarted");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
             catch (Exception ex)
             {

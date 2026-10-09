@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -621,7 +621,7 @@ namespace DeepTools
                 else
                 {
                     deepResultLabel.Text = Lang.T("Всё чисто: SMART в норме, ошибок в журнале за 30 дней нет", "All clear: SMART is fine, no disk errors in the event log for 30 days");
-                    deepResultLabel.ForeColor = Theme.Accent;
+                    deepResultLabel.ForeColor = Theme.On;
                 }
             };
             worker.RunWorkerAsync();
@@ -644,7 +644,7 @@ namespace DeepTools
                     bool healthy = status == "OK";
 
                     var dot = new Panel { Size = new Size(10, 10), Location = new Point(20, y + 4), BackColor = Color.Transparent };
-                    Color dotColor = healthy ? Theme.Accent : Theme.Danger;
+                    Color dotColor = healthy ? Theme.On : Theme.Off;
                     dot.Paint += (s, e) => {
                         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                         using (var b = new SolidBrush(dotColor)) e.Graphics.FillEllipse(b, 0, 0, 10, 10);
@@ -667,7 +667,7 @@ namespace DeepTools
                         Text = healthy
                             ? Lang.T("Работает нормально", "Healthy")
                             : Lang.T("Проблема: ", "Problem: ") + status,
-                        ForeColor = healthy ? Theme.Accent : Theme.Danger,
+                        ForeColor = healthy ? Theme.On : Theme.Off,
                         BackColor = Color.Transparent,
                         Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                         Location = new Point(540, y),
@@ -782,7 +782,7 @@ namespace DeepTools
                 }
 
                 statusLabel.Text = Lang.T("Данные обновлены", "Data updated");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
             catch
             {

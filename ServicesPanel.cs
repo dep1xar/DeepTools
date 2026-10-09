@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -188,7 +188,7 @@ namespace DeepTools
                     newState = isEnabled ? "Включена" : Lang.T("Отключена", "Disabled");
                     statusBadge.Text = newState;
                     statusLabel.Text = entry.DisplayName + ": " + newState;
-                    statusLabel.ForeColor = Theme.Accent;
+                    statusLabel.ForeColor = Theme.On;
                 }
                 else
                 {
@@ -277,7 +277,7 @@ namespace DeepTools
                 }
 
                 statusLabel.Text = Lang.T("Пресет применён: отключено служб ", "Preset applied: services disabled ") + success + Lang.T(" из ", " of ") + toDisable.Length;
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
                 RefreshList();
             });
         }

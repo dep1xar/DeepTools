@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Drawing;
@@ -238,7 +238,7 @@ namespace DeepTools
                 }
 
                 bootTimeLabel.Text = Lang.T("Последняя загрузка: ", "Last boot: ") + bootSec.ToString("0.#") + Lang.T(" сек", " s");
-                bootTimeLabel.ForeColor = bootSec < 40 ? Theme.Accent : (bootSec < 80 ? Theme.Warning : Theme.Danger);
+                bootTimeLabel.ForeColor = bootSec < 40 ? Theme.On : (bootSec < 80 ? Theme.Warning : Theme.Off);
 
                 if (culprits.Count > 0)
                 {
@@ -416,7 +416,7 @@ namespace DeepTools
                 bytes[0] = enabled ? (byte)0x02 : (byte)0x03;
                 approved.SetValue(valueName, bytes, RegistryValueKind.Binary);
                 statusLabel.Text = Lang.T("Изменено: ", "Changed: ") + valueName;
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
             catch (Exception ex)
             {
@@ -440,7 +440,7 @@ namespace DeepTools
                 bytes[0] = enabled ? (byte)0x02 : (byte)0x03;
                 approved.SetValue(fileName, bytes, RegistryValueKind.Binary);
                 statusLabel.Text = Lang.T("Изменено: ", "Changed: ") + fileName;
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
             catch (Exception ex)
             {
@@ -595,7 +595,7 @@ namespace DeepTools
                     if (StartupTasks.SetEnabled(item.TaskPath, toggle.Checked))
                     {
                         statusLabel.Text = Lang.T("Изменено: ", "Changed: ") + item.Name;
-                        statusLabel.ForeColor = Theme.Accent;
+                        statusLabel.ForeColor = Theme.On;
                     }
                     else
                     {

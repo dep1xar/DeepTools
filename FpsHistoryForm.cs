@@ -10,7 +10,7 @@ namespace DeepTools
 {
     // История FPS по конкретной игре: каждая записанная сессия - точка на графике.
     // Видно деградацию системы: если полгода назад CS выдавала 200 FPS, а теперь 140 -
-    // линия наглядно ползёт вниз. Открывается по клику 📈 из окна Game Time
+    // линия наглядно ползёт вниз. Открывается по клику ≡ из окна Game Time
     public class FpsHistoryForm : Form
     {
         private class Session
@@ -67,7 +67,7 @@ namespace DeepTools
 
             var titleLbl = new Label
             {
-                Text = "📈 " + gameName + ".exe",
+                Text = "≡ " + gameName + ".exe",
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),
@@ -126,13 +126,13 @@ namespace DeepTools
                 }
                 else if (change >= 8)
                 {
-                    trendLbl.Text = Lang.T("FPS вырос на ", "FPS improved by ") + change.ToString("0") + "%" + Lang.T(" — твики работают 🎉", " — your tweaks are working 🎉");
-                    trendLbl.ForeColor = Theme.Accent;
+                    trendLbl.Text = Lang.T("FPS вырос на ", "FPS improved by ") + change.ToString("0") + "%" + Lang.T(" — твики работают ✦", " — your tweaks are working ✦");
+                    trendLbl.ForeColor = Theme.On;
                 }
                 else
                 {
                     trendLbl.Text = Lang.T("FPS стабилен — система в порядке", "FPS is stable — the system is fine");
-                    trendLbl.ForeColor = Theme.Accent;
+                    trendLbl.ForeColor = Theme.On;
                 }
             }
 

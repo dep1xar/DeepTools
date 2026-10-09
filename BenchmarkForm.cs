@@ -178,7 +178,7 @@ namespace DeepTools
                     double deltaPct = (value - prev) / prev * 100;
                     string sign = deltaPct >= 0 ? "+" : "";
                     prevLabels[i].Text = prev.ToString("0.#") + Units[i] + "  (" + sign + deltaPct.ToString("0") + "%)";
-                    prevLabels[i].ForeColor = deltaPct >= 0 ? Theme.Accent : Theme.Danger;
+                    prevLabels[i].ForeColor = deltaPct >= 0 ? Theme.On : Theme.Off;
                 }
             }));
         }

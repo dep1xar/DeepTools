@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -21,6 +21,23 @@ namespace DeepTools
         private System.Windows.Forms.Timer detectTimer = new System.Windows.Forms.Timer();
         private Process detectedProcess;
         private Process lastBoostedProcess;
+
+        // Текущая обнаруженная полноэкранная игра (или null). Использует
+        // GameTweaksPanel для твиков, привязанных к процессу игры
+        public static Process DetectedGame
+        {
+            get
+            {
+                try
+                {
+                    if (instance == null || instance.detectedProcess == null) return null;
+                    if (instance.detectedProcess.HasExited) return null;
+                    return instance.detectedProcess;
+                }
+                catch { return null; }
+            }
+        }
+        private static GameBoosterPanel instance;
 
         private Label statusName;
         private Label warningLabel;
@@ -48,7 +65,7 @@ namespace DeepTools
                 statusLabel.Text = enable
                     ? Lang.T("План Ultimate Performance активирован, парковка ядер отключена", "Ultimate Performance plan activated, core parking disabled")
                     : Lang.T("Возвращён прежний план питания", "Previous power plan restored");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
             else
             {
@@ -76,7 +93,7 @@ namespace DeepTools
                 statusLabel.Text = disable
                     ? Lang.T("Game DVR отключён - фоновая запись Game Bar больше не ест FPS", "Game DVR disabled - Game Bar background recording no longer eats FPS")
                     : Lang.T("Game DVR снова включён", "Game DVR re-enabled");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
             else
             {
@@ -104,7 +121,7 @@ namespace DeepTools
             {
                 statusLabel.Text = proc.ProcessName + ".exe " +
                     Lang.T("закреплена за дискретной GPU (нужен перезапуск игры)", "pinned to the discrete GPU (restart the game to apply)");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
         }
 
@@ -192,6 +209,7 @@ namespace DeepTools
 
         public GameBoosterPanel()
         {
+            instance = this;
             Size = new Size(760, 616);
             AutoScroll = true;
             BackColor = Theme.BgColor;
@@ -577,7 +595,7 @@ namespace DeepTools
                 statusLabel.Text = adaptiveToggle.Checked
                     ? Lang.T("Адаптивный профиль питания включён", "Adaptive power profile enabled")
                     : Lang.T("Адаптивный профиль питания выключен", "Adaptive power profile disabled");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             };
             smartCard.Controls.Add(adaptiveToggle);
 
@@ -605,7 +623,7 @@ namespace DeepTools
                     statusLabel.Text = VramDefrag.LastResult
                         ? Lang.T("VRAM очищена", "VRAM defragmented")
                         : ("VRAM defrag: " + VramDefrag.LastMessage);
-                    statusLabel.ForeColor = VramDefrag.LastResult ? Theme.Accent : Theme.Warning;
+                    statusLabel.ForeColor = VramDefrag.LastResult ? Theme.On : Theme.Warning;
                 };
                 bw.RunWorkerAsync();
             };
@@ -629,7 +647,7 @@ namespace DeepTools
                 statusLabel.Text = rgbToggle.Checked
                     ? Lang.T("RGB-реакция включена (нужен OpenRGB с HTTP-сервером)", "RGB Reactive on (requires OpenRGB with HTTP server)")
                     : Lang.T("RGB-реакция выключена", "RGB Reactive disabled");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             };
             rgbCard.Controls.Add(rgbToggle);
 
@@ -696,7 +714,7 @@ namespace DeepTools
             {
                 int woken = BackgroundFreezer.ResumeAll();
                 statusLabel.Text = Lang.T("Разморожено процессов: ", "Processes unfrozen: ") + woken;
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
             else
             {
@@ -714,7 +732,7 @@ namespace DeepTools
                 {
                     statusLabel.Text = Lang.T("Заморожено программ: ", "Apps frozen: ") + frozenGroups +
                         " (" + frozenProcs + Lang.T(" процессов). Окна не отвечают, пока заморожены - это нормально", " processes). Windows stay unresponsive while frozen - that's expected");
-                    statusLabel.ForeColor = Theme.Accent;
+                    statusLabel.ForeColor = Theme.On;
                 }
                 else
                 {
@@ -775,13 +793,20 @@ namespace DeepTools
             try
             {
                 Process proc = Process.GetProcessById((int)pid);
-                if (IsShellProcess(proc.ProcessName)) { WinKeyBlocker.GameActive = false; ClearDetection(); return; }
+                // Полноэкранное видео, мессенджер или терминал - не игра: в
+                // статистику игр такое попадать не должно
+                if (IsShellProcess(proc.ProcessName) || GameFilter.IsIgnored(proc.ProcessName))
+                { WinKeyBlocker.GameActive = false; ClearDetection(); return; }
 
                 WinKeyBlocker.GameActive = true;
+                // Игра могла поставить свой низкоуровневый хук клавиатуры уже после
+                // нас: переставляем свой, чтобы горячие клавиши (например, F8 для
+                // кликера) доходили до DeepTools, а не тонули в игре
+                if (detectedProcess == null || detectedProcess.Id != proc.Id) Hotkeys.ReinstallHook();
                 detectedProcess = proc;
                 GameSessionTracker.OnGameDetected(proc);
                 statusName.Text = proc.ProcessName + ".exe";
-                statusName.ForeColor = Theme.Accent;
+                statusName.ForeColor = Theme.On;
                 boostBtn.Enabled = true;
                 warningLabel.Visible = false;
 
@@ -823,7 +848,7 @@ namespace DeepTools
             {
                 proc.PriorityClass = ProcessPriorityClass.High;
                 statusLabel.Text = Lang.T("Приоритет повышен: ", "Priority boosted: ") + proc.ProcessName + ".exe";
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
             }
             catch (Exception ex)
             {
@@ -950,7 +975,7 @@ namespace DeepTools
             statusLabel.Text = killedProcs > 0
                 ? Lang.T("Завершено программ: ", "Apps closed: ") + killedGroups + " (" + killedProcs + Lang.T(" процессов)", " processes)")
                 : Lang.T("Ничего не выбрано или не удалось завершить", "Nothing selected or failed to close");
-            statusLabel.ForeColor = killedProcs > 0 ? Theme.Accent : Theme.Warning;
+            statusLabel.ForeColor = killedProcs > 0 ? Theme.On : Theme.Warning;
             RefreshHeavyList();
         }
     }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -556,7 +556,7 @@ namespace DeepTools
                 btn.Text = prev;
                 long mb = (e.Error == null && e.Result != null) ? (long)e.Result : 0;
                 statusLabel.Text = okPrefix + mb + Lang.T(" МБ", " MB");
-                statusLabel.ForeColor = Theme.Accent;
+                statusLabel.ForeColor = Theme.On;
                 sizeLbl.Text = SystemCleanup.WindowsOldSizeBytes() > 0
                     ? sizeLbl.Text : Lang.T("Windows.old не найдена", "No Windows.old found");
             };
@@ -648,7 +648,7 @@ namespace DeepTools
                     if (e2.Error == null && e2.Result != null)
                     {
                         statusLabel.Text = (string)e2.Result;
-                        statusLabel.ForeColor = Theme.Accent;
+                        statusLabel.ForeColor = Theme.On;
                     }
                 };
                 worker.RunWorkerAsync();

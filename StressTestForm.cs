@@ -214,7 +214,7 @@ namespace DeepTools
                 tempGraph.AddPoint(temp);
                 if (temp > maxTemp) maxTemp = temp;
                 currentTempLabel.Text = temp + "°C";
-                currentTempLabel.ForeColor = temp >= 90 ? Theme.Danger : (temp >= 80 ? Theme.Warning : Theme.Accent);
+                currentTempLabel.ForeColor = temp >= 90 ? Theme.Off : (temp >= 80 ? Theme.Warning : Theme.On);
                 maxTempLabel.Text = maxTemp + "°C";
             }
             else
@@ -257,12 +257,12 @@ namespace DeepTools
             if (maxTemp < 75)
             {
                 verdictLabel.Text = prefix + maxTemp + Lang.T("°C - отличное охлаждение, запас есть ✓", "°C - excellent cooling, plenty of headroom ✓");
-                verdictLabel.ForeColor = Theme.Accent;
+                verdictLabel.ForeColor = Theme.On;
             }
             else if (maxTemp < 85)
             {
                 verdictLabel.Text = prefix + maxTemp + Lang.T("°C - норма для нагрузки, но летом может быть жарче", "°C - fine under load, but summer may push it higher");
-                verdictLabel.ForeColor = Theme.Accent;
+                verdictLabel.ForeColor = Theme.On;
             }
             else if (maxTemp < 95)
             {
@@ -272,7 +272,7 @@ namespace DeepTools
             else
             {
                 verdictLabel.Text = prefix + maxTemp + Lang.T("°C - перегрев! CPU сбрасывает частоты. Срочно займись охлаждением", "°C - overheating! CPU is throttling. Fix your cooling ASAP");
-                verdictLabel.ForeColor = Theme.Danger;
+                verdictLabel.ForeColor = Theme.Off;
             }
         }
     }

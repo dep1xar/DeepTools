@@ -269,6 +269,14 @@ namespace DeepTools
         public static Color AccentHover = Color.FromArgb(70, 240, 160);
         public static Color DangerHover = Color.FromArgb(220, 50, 50);
 
+        // Семантические цвета состояния: включено / выключено / не применимо.
+        // Их нельзя брать от акцента темы: в тёплых темах (rust) акцент оранжевый и
+        // почти не отличается от красного, из-за чего статус-полоски сливались.
+        // Поэтому «включено» всегда зелёное, «выключено» - красное, независимо от темы
+        public static Color On = Color.FromArgb(46, 214, 140);
+        public static Color Off = Color.FromArgb(230, 90, 90);
+        public static Color Idle = Color.FromArgb(50, 65, 90);
+
         // Текущая тема: нужно контролам, которые красятся системно (скроллбары, комбобоксы)
         public static bool IsLight = false;
 
@@ -306,6 +314,9 @@ namespace DeepTools
             NavHoverBg = Color.FromArgb(27, 34, 49);
             AccentHover = Color.FromArgb(70, 240, 160);
             DangerHover = Color.FromArgb(220, 50, 50);
+            On = Color.FromArgb(46, 214, 140);
+            Off = Color.FromArgb(230, 90, 90);
+            Idle = Color.FromArgb(50, 65, 90);
         }
 
         private static void ApplyLight()
@@ -326,6 +337,9 @@ namespace DeepTools
             NavHoverBg = Color.FromArgb(228, 233, 242);
             AccentHover = Color.FromArgb(26, 190, 122);
             DangerHover = Color.FromArgb(235, 90, 90);
+            On = Color.FromArgb(20, 165, 105);
+            Off = Color.FromArgb(215, 70, 70);
+            Idle = Color.FromArgb(205, 212, 225);
         }
         // PLACEHOLDER_THEMES
         private static void ApplyNeon()
@@ -346,6 +360,9 @@ namespace DeepTools
             NavHoverBg = Color.FromArgb(14, 24, 34);
             AccentHover = Color.FromArgb(70, 255, 220);
             DangerHover = Color.FromArgb(255, 60, 80);
+            On = Color.FromArgb(0, 225, 190);
+            Off = Color.FromArgb(255, 80, 95);
+            Idle = Color.FromArgb(36, 54, 80);
         }
 
         private static void ApplyGraphite()
@@ -366,6 +383,9 @@ namespace DeepTools
             NavHoverBg = Color.FromArgb(38, 42, 52);
             AccentHover = Color.FromArgb(74, 210, 168);
             DangerHover = Color.FromArgb(235, 90, 90);
+            On = Color.FromArgb(58, 190, 150);
+            Off = Color.FromArgb(225, 95, 95);
+            Idle = Color.FromArgb(64, 70, 84);
         }
 
         // Тёмно-тёплая тема с оранжевым акцентом (в духе RustTweaker)
@@ -387,6 +407,12 @@ namespace DeepTools
             NavHoverBg = Color.FromArgb(28, 25, 24);
             AccentHover = Color.FromArgb(255, 116, 66);
             DangerHover = Color.FromArgb(220, 50, 50);
+            // В тёплой теме акцент оранжевый, поэтому «включено» здесь именно
+            // зелёный, а «выключено» - холоднее красного акцента: иначе статус
+            // не отличить от бренда
+            On = Color.FromArgb(96, 198, 116);
+            Off = Color.FromArgb(214, 64, 72);
+            Idle = Color.FromArgb(52, 52, 60);
         }
 
         public static GraphicsPath RoundedRect(Rectangle r, int radius)

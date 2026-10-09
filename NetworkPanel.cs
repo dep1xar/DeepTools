@@ -704,7 +704,7 @@ namespace DeepTools
                     resetBtn.Enabled = true;
                     toolsStatus.Text = Lang.T("Сеть сброшена. Перезагрузи компьютер, чтобы всё применилось.",
                                               "Network reset. Reboot the PC to fully apply.");
-                    toolsStatus.ForeColor = Theme.Accent;
+                    toolsStatus.ForeColor = Theme.On;
                 };
                 w.RunWorkerAsync();
             };
@@ -939,7 +939,7 @@ namespace DeepTools
                         names[h], avg, min, max, jitter).Replace("мс", Lang.T("мс", "ms"))
                         .Replace("мин", Lang.T("мин", "min")).Replace("макс", Lang.T("макс", "max"))
                         .Replace("джиттер", Lang.T("джиттер", "jitter")));
-                    colors.Add(avg < 30 ? Theme.Accent : (avg < 80 ? Theme.Warning : Theme.Danger));
+                    colors.Add(avg < 30 ? Theme.On : (avg < 80 ? Theme.Warning : Theme.Off));
                 }
                 e2.Result = new object[] { results, colors };
             };
@@ -989,7 +989,7 @@ namespace DeepTools
                         : preset.Name + " (" + preset.Primary + ")";
                     dnsStatusLabel.Text = what + Lang.T(" — применён на ", " — applied to ") + n +
                         Lang.T(" адаптер(ах), кэш DNS сброшен", " adapter(s), DNS cache flushed");
-                    dnsStatusLabel.ForeColor = Theme.Accent;
+                    dnsStatusLabel.ForeColor = Theme.On;
                 }
                 else
                 {

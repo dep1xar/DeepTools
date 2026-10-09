@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.NetworkInformation;
@@ -99,7 +99,7 @@ namespace DeepTools
         {
             foreach (Process p in _suspended)
             {
-                try { BackgroundFreezer.ResumeAll(); } catch { }
+                try { if (!p.HasExited) BackgroundFreezer.ResumeOne(p.Id); } catch { } finally { try { p.Dispose(); } catch { } }
             }
             _suspended.Clear();
         }

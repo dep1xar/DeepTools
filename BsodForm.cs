@@ -195,7 +195,7 @@ namespace DeepTools
                 if (entries.Count == 0)
                 {
                     summaryLabel.Text = Lang.T("Синих экранов за 90 дней не найдено — система стабильна ✓", "No blue screens in 90 days — system is stable ✓");
-                    summaryLabel.ForeColor = Theme.Accent;
+                    summaryLabel.ForeColor = Theme.On;
                     return;
                 }
 

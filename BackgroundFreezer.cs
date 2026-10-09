@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -58,6 +58,28 @@ namespace DeepTools
                 catch { /* процесс уже вышел или нет доступа - пропускаем */ }
             }
             return done;
+        }
+
+        // Размораживает один процесс по PID (для LatencySurgeon)
+        public static void ResumeOne(int pid)
+        {
+            lock (frozen)
+            {
+                for (int i = frozen.Count - 1; i >= 0; i--)
+                {
+                    try
+                    {
+                        if (frozen[i].Id == pid)
+                        {
+                            NtResumeProcess(frozen[i].Handle);
+                            frozen[i].Dispose();
+                            frozen.RemoveAt(i);
+                            return;
+                        }
+                    }
+                    catch { }
+                }
+            }
         }
 
         // Размораживает всё, возвращает сколько процессов разбужено

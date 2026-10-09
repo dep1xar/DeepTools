@@ -81,7 +81,7 @@ namespace DeepTools
                 if (IsDisposed) return;
                 btn.Enabled = true; btn.Text = Lang.T("🗑 Очистить корзину (с откатом)", "🗑 Empty bin (with undo)");
                 int n = (e.Error == null && e.Result != null) ? (int)e.Result : 0;
-                status.ForeColor = Theme.Accent;
+                status.ForeColor = Theme.On;
                 status.Text = Lang.T("Корзина очищена, в бэкапе: ", "Emptied, backed up: ") + n;
                 RefreshList();
             };
@@ -135,7 +135,7 @@ namespace DeepTools
             btn.Click += (s, e) => {
                 btn.Enabled = false;
                 string res = RecycleGuard.Restore(b);
-                status.ForeColor = res != null ? Theme.Accent : Theme.Warning;
+                status.ForeColor = res != null ? Theme.On : Theme.Warning;
                 status.Text = res != null ? Lang.T("Восстановлено: ", "Restored: ") + b.Name
                                           : Lang.T("Не удалось восстановить", "Restore failed");
                 btn.Enabled = true;

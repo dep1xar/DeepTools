@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -122,6 +122,11 @@ namespace DeepTools
         private long totalClicks = 0;
         private Label sessionClicksLabel;
         private Label totalClicksLabel;
+        private Label hotkeyLabel;
+        // Нажатие хоткея может прийти дважды (RegisterHotKey и хук-страховка),
+        // поэтому переключаем состояние не чаще, чем раз в четверть секунды
+        private DateTime lastHotkeyToggle = DateTime.MinValue;
+        private bool blockedWarned;
 
         public ClickerPanel()
         {
@@ -136,6 +141,10 @@ namespace DeepTools
 
             BuildUi();
             UpdateModeButtons();
+
+            // Хоткеи регистрируются при показе главного окна, поэтому проверяем
+            // их состояние каждый раз, когда открывают этот раздел
+            VisibleChanged += (s, e) => { if (Visible) RefreshHotkeyState(); };
         }
 
         // Отпустить всё зажатое (вызывается при выходе из программы)
@@ -168,7 +177,7 @@ namespace DeepTools
 
             var macrosBtn = new RoundedButton
             {
-                Text = Lang.T("🎬 Макросы", "🎬 Macros"),
+                Text = Lang.T("≡ Макросы", "≡ Macros"),
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
@@ -188,7 +197,7 @@ namespace DeepTools
             statusDot = new Panel { Size = new Size(14, 14), Location = new Point(20, 17), BackColor = Color.Transparent };
             statusDot.Paint += (s, e) => {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                Color c = running ? Theme.Accent : Theme.TextDim;
+                Color c = running ? Theme.On : Theme.Idle;
                 using (var glow = new SolidBrush(Color.FromArgb(60, c)))
                     e.Graphics.FillEllipse(glow, -3, -3, 20, 20);
                 using (var b = new SolidBrush(c))
@@ -223,7 +232,7 @@ namespace DeepTools
             powerToggle.CheckedChanged += (s, e) => SetRunning(powerToggle.Checked);
             statusCard.Controls.Add(powerToggle);
 
-            var hintLabel = new Label
+            hotkeyLabel = new Label
             {
                 Text = Hotkeys.Get(NativeMethods.HOTKEY_ID_CLICKER).ToString(),
                 ForeColor = Theme.TextDim,
@@ -232,7 +241,7 @@ namespace DeepTools
                 Location = new Point(635, 16),
                 AutoSize = true
             };
-            statusCard.Controls.Add(hintLabel);
+            statusCard.Controls.Add(hotkeyLabel);
 
             // Нижний ряд: режим работы и подпись, что выбрано
             var modeLabel = new Label
@@ -482,6 +491,7 @@ namespace DeepTools
                 rightBtnLabel.ForeColor = Theme.TextDim; rightBtnLabel.Text = Lang.T("○ Правая", "○ Right");
             }
             UpdateSelectionLabel();
+            if (running) RefreshStatusText(); // «НЕТ КЛАВИШ» должно появляться сразу
         }
 
         // Раскладка: {подпись, клавиша, ширина}. Ширина 0 = стандартные 40px
@@ -664,6 +674,7 @@ namespace DeepTools
             }
 
             UpdateSelectionLabel();
+            if (running) RefreshStatusText();
         }
 
         private void ShowIntervalEditor()
@@ -681,6 +692,10 @@ namespace DeepTools
             int v;
             if (int.TryParse(intervalEditBox.Text, out v))
             {
+                // Timer с Interval = 0 забивает очередь сообщений и приложение
+                // выглядит зависшим, поэтому держим значение в границах слайдера
+                if (v < slider.Minimum) v = slider.Minimum;
+                if (v > slider.Maximum) v = slider.Maximum;
                 slider.Value = v;
                 UpdateInterval();
             }
@@ -691,7 +706,7 @@ namespace DeepTools
         private void UpdateInterval()
         {
             intervalValueLabel.Text = slider.Value.ToString();
-            clickTimer.Interval = slider.Value;
+            clickTimer.Interval = slider.Value < 1 ? 1 : slider.Value;
             double cps = 1000.0 / slider.Value;
             cpsNumber.Text = cps >= 10 ? Math.Round(cps).ToString() : cps.ToString("0.#");
         }
@@ -777,17 +792,73 @@ namespace DeepTools
             }
 
             if (!running) SaveTotalClicks();
-            statusLabel.Text = running
-                ? (holdMode ? Lang.T("ЗАЖАТО", "HOLDING") : Lang.T("РАБОТАЕТ", "RUNNING"))
-                : Lang.T("ОСТАНОВЛЕН", "STOPPED");
-            statusLabel.ForeColor = running ? Theme.Accent : Theme.TextDim;
+            // Считаем заново, сколько событий Windows откажется принять
+            if (running) { NativeMethods.ResetInputDiagnostics(); blockedWarned = false; }
+            RefreshStatusText();
             powerToggle.Checked = running;
             powerToggle.Invalidate();
             statusDot.Invalidate();
         }
 
+        // Статус должен объяснять, почему ничего не происходит: нет выбранных
+        // клавиш в мультирежиме, ввод заблокирован Windows, клавишу заняла
+        // другая программа
+        private void RefreshStatusText()
+        {
+            if (!running)
+            {
+                statusLabel.Text = Lang.T("ОСТАНОВЛЕН", "STOPPED");
+                statusLabel.ForeColor = Theme.TextDim;
+                return;
+            }
+
+            if (multiKeyMode && multiKeys.Count == 0)
+            {
+                statusLabel.Text = Lang.T("НЕТ КЛАВИШ", "NO KEYS PICKED");
+                statusLabel.ForeColor = Theme.Warning;
+                return;
+            }
+
+            if (blockedWarned)
+            {
+                statusLabel.Text = Lang.T("ВВОД ЗАБЛОКИРОВАН", "INPUT BLOCKED");
+                statusLabel.ForeColor = Theme.Off;
+                return;
+            }
+
+            statusLabel.Text = holdMode ? Lang.T("ЗАЖАТО", "HOLDING") : Lang.T("РАБОТАЕТ", "RUNNING");
+            statusLabel.ForeColor = Theme.On;
+        }
+
+        // Хоткей мог не зарегистрироваться: клавишу держит другая программа.
+        // Раньше это молча терялось, и «F8 не работает» выглядело как баг кликера
+        private void RefreshHotkeyState()
+        {
+            Keys key = Hotkeys.Get(NativeMethods.HOTKEY_ID_CLICKER);
+            bool taken = key != Keys.None && !Hotkeys.IsRegistered(NativeMethods.HOTKEY_ID_CLICKER);
+
+            hotkeyLabel.Text = key == Keys.None
+                ? Lang.T("нет", "none")
+                : key + (taken ? " ✕" : "");
+            hotkeyLabel.ForeColor = taken ? Theme.Off : Theme.TextDim;
+
+            if (taken && !running)
+            {
+                statusLabel.Text = Lang.T("ХОТКЕЙ ЗАНЯТ ДРУГОЙ ПРОГРАММОЙ", "HOTKEY TAKEN BY ANOTHER APP");
+                statusLabel.ForeColor = Theme.Off;
+            }
+            else if (!running)
+            {
+                RefreshStatusText();
+            }
+        }
+
         public void ToggleRunning()
         {
+            // Дублирующее нажатие (WM_HOTKEY и хук) отсекает Hotkeys, здесь только
+            // короткая страховка от случайного двойного вызова
+            if ((DateTime.UtcNow - lastHotkeyToggle).TotalMilliseconds < 150) return;
+            lastHotkeyToggle = DateTime.UtcNow;
             SetRunning(!running);
         }
 
@@ -806,6 +877,14 @@ namespace DeepTools
             totalClicks++;
             sessionClicksLabel.Text = Lang.T("За сессию: ", "Session: ") + sessionClicks.ToString("N0");
             totalClicksLabel.Text = Lang.T("Всего: ", "Total: ") + totalClicks.ToString("N0");
+
+            // SendInput не сообщает, кто именно отказал (права или античит), но сам
+            // факт блокады виден - и о нём лучше сказать вслух, чем молчать
+            if (!blockedWarned && NativeMethods.BlockedInputs > 3)
+            {
+                blockedWarned = true;
+                RefreshStatusText();
+            }
         }
     }
 }
