@@ -1,11 +1,23 @@
-﻿name: Build and Release DeepTools
+name: Build and Release DeepTools
 
+# Когда запускается:
+#  - пуш в основную ветку  -> только сборка (артефакт), без релиза
+#  - пуш ЛЮБОГО тега       -> сборка + релиз на этот тег
+#  - ручной запуск         -> можно пересобрать и выпустить релиз для уже
+#                             существующего тега (выбрать тег в "Use workflow from")
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
+    branches: [ main, master ]
+    tags: [ '**' ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
+  workflow_dispatch:
+
+# Без contents: write токен по умолчанию только читает репозиторий, и шаг
+# создания релиза падает с 403 "Resource not accessible by integration":
+# сборка проходит, а релиза нет
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -20,16 +32,52 @@ jobs:
         run: |
           powershell -ExecutionPolicy Bypass -File build.ps1
 
+      - name: Show built version
+        shell: powershell
+        run: |
+          $v = (Get-Item DeepTools.exe).VersionInfo
+          Write-Host "FileVersion:    $($v.FileVersion)"
+          Write-Host "ProductVersion: $($v.ProductVersion)"
+
+      # Защита от «релиз вышел, а внутри старая версия»: если в теге есть номер,
+      # он должен совпадать с версией exe (AssemblyInfo.cs)
+      - name: Check version matches tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: powershell
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $m = [regex]::Match($tag, '(\d+)\.(\d+)(\.(\d+))?')
+          if (-not $m.Success) {
+            Write-Host "Тег '$tag' без номера версии - сверять нечего, продолжаем"
+            exit 0
+          }
+          $patch = if ($m.Groups[4].Success) { $m.Groups[4].Value } else { '0' }
+          $want = "$($m.Groups[1].Value).$($m.Groups[2].Value).$patch"
+          $exe = (Get-Item DeepTools.exe).VersionInfo.FileVersion
+          if ($exe -notlike "$want.*") {
+            Write-Host "::error::В exe версия $exe, а тег $tag. Обнови AssemblyInfo.cs и пересобери."
+            exit 1
+          }
+          Write-Host "Версия совпадает: тег $tag, exe $exe"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DeepTools
+          name: "DeepTools-${{ github.ref_name }}"
           path: DeepTools.exe
           if-no-files-found: error
 
+      # Релиз создаётся только для тега. Тег с дефисом (v2.1.0-beta) помечаем
+      # как pre-release, чтобы он не стал "Latest" вместо стабильного
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: "DeepTools ${{ github.ref_name }}"
           files: DeepTools.exe
+          fail_on_unmatched_files: true
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          draft: false
