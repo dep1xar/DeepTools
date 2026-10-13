@@ -612,6 +612,7 @@ namespace DeepTools
             protected override void OnPaint(PaintEventArgs e)
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
                 var rect = new Rectangle(0, 0, Width - 1, Height - 1);
                 using (var path = RoundedRect(rect, 6))
                 {
@@ -623,7 +624,6 @@ namespace DeepTools
                     }
                     else if (_state == 0)
                     {
-                        // Выключено: контур вместо заливки - состояние видно и без цвета
                         using (var brush = new SolidBrush(Theme.CardColor))
                             e.Graphics.FillPath(brush, path);
                         using (var pen = new Pen(Theme.Off, 2f))
@@ -641,11 +641,13 @@ namespace DeepTools
 
             private void DrawGlyph(Graphics g, string glyph, Color color)
             {
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
                 using (var f = new Font("Segoe UI", 9.5F, FontStyle.Bold))
-                using (var b = new SolidBrush(color))
                 {
                     SizeF sz = g.MeasureString(glyph, f);
-                    g.DrawString(glyph, f, b, (Width - sz.Width) / 2f, (Height - sz.Height) / 2f);
+                    TextRenderer.DrawText(g, glyph, f, new Rectangle(0, 0, Width, Height), color,
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 }
             }
         }

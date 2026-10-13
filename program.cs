@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Security.Principal;
 using System.Threading;
@@ -15,6 +15,16 @@ namespace DeepTools
         [STAThread]
         static void Main()
         {
+            // Исправление "пиксельного" интерфейса: включаем High DPI и сглаживание
+            // SetProcessDPIAware делает приложение DPI-aware - текст и контролы не растягиваются билинейно
+            try
+            {
+                // Попытка включить Per-Monitor V2 через SetProcessDpiAwareness (Win8.1+) или SetProcessDPIAware (Vista+)
+                // Делаем ДО любых UI-операций и до EmbeddedAssemblies
+                TryEnableDpiAwareness();
+            }
+            catch { }
+
             // Должно быть до первого обращения к встроенным сборкам (датчики температур)
             EmbeddedAssemblies.Install();
 
@@ -76,7 +86,33 @@ namespace DeepTools
                 return;
             }
 
-            Application.Run(new MainForm(isAdmin));
+            try { Application.Run(new MainForm(isAdmin)); }
+            finally
+            {
+                try { if (_singleInstance != null) { _singleInstance.ReleaseMutex(); _singleInstance.Dispose(); _singleInstance = null; } } catch { }
+            }
+        }
+
+        private static void TryEnableDpiAwareness()
+        {
+            try
+            {
+                // Windows 8.1+ : SetProcessDpiAwareness (shcore.dll)
+                IntPtr shcore = NativeMethods.LoadLibrary("shcore.dll");
+                if (shcore != IntPtr.Zero)
+                {
+                    IntPtr proc = NativeMethods.GetProcAddress(shcore, "SetProcessDpiAwareness");
+                    if (proc != IntPtr.Zero)
+                    {
+                        // 2 = PROCESS_PER_MONITOR_DPI_AWARE (достаточно; 1 = SYSTEM_AWARE)
+                        var del = (NativeMethods.SetProcessDpiAwarenessDelegate)System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer(proc, typeof(NativeMethods.SetProcessDpiAwarenessDelegate));
+                        del(2);
+                        return;
+                    }
+                }
+            }
+            catch { }
+            try { NativeMethods.SetProcessDPIAware(); } catch { }
         }
 
         private static void LogCrash(Exception ex)

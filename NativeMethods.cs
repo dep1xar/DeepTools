@@ -283,5 +283,18 @@ namespace DeepTools
             }
         }
 
+        // DPI awareness — чтобы интерфейс не был "пиксельным" на 125%/150%/175% масштабе
+        [DllImport("user32.dll")]
+        public static extern bool SetProcessDPIAware();
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+        public static extern IntPtr LoadLibrary(string lpFileName);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
+        public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        public delegate int SetProcessDpiAwarenessDelegate(int awareness);
+
     }
 }

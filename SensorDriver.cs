@@ -54,8 +54,6 @@ namespace DeepTools
         {
             try
             {
-                // Ресурс лежит сжатым (.gz, см. build.ps1); несжатое имя - запасной
-                // вариант на случай сборки старым скриптом
                 Assembly self = Assembly.GetExecutingAssembly();
                 bool gzipped = true;
                 Stream s = self.GetManifestResourceStream(ResourceName + ".gz");
@@ -68,8 +66,9 @@ namespace DeepTools
 
                 using (s)
                 {
-                    string path = Path.Combine(Path.GetTempPath(), "PawnIO_setup.exe");
-                    using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write))
+                    // Случайное имя — защита от предсказуемой подмены в TEMP (TOCTOU)
+                    string path = Path.Combine(Path.GetTempPath(), "PawnIO_setup_" + Guid.NewGuid().ToString("N") + ".exe");
+                    using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
                     {
                         if (gzipped)
                         {

@@ -143,7 +143,11 @@ namespace DeepTools
 
         public static void Start()
         {
-            refCount++;
+            if (System.Threading.Interlocked.Increment(ref refCount) > 1)
+            {
+                if (running) return;
+                // refCount > 1 но running == false — состояние гонки, продолжаем инициализацию
+            }
             if (running) return;
             if (!exitHooked)
             {
@@ -202,8 +206,9 @@ namespace DeepTools
 
         public static void Stop()
         {
-            if (refCount > 0) refCount--;
-            if (refCount > 0) return; // трейсер ещё нужен другому потребителю
+            if (System.Threading.Interlocked.Decrement(ref refCount) > 0) return; // трейсер ещё нужен другому потребителю
+            // защита от ухода в минус при двойном Stop
+            if (refCount < 0) System.Threading.Interlocked.Exchange(ref refCount, 0);
             running = false;
             StopSession();
             if (traceHandle != unchecked((ulong)~0L))

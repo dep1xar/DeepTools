@@ -19,8 +19,11 @@ namespace DeepTools
 
         public static void Install()
         {
-            if (installed) return;
-            installed = true;
+            lock (sync)
+            {
+                if (installed) return;
+                installed = true;
+            }
             AppDomain.CurrentDomain.AssemblyResolve += Resolve;
         }
 

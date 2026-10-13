@@ -184,21 +184,42 @@ namespace DeepTools
 
         private static string RunPowerShell(string command, int timeoutMs)
         {
+            Process p = null;
             try
             {
                 var psi = new ProcessStartInfo("powershell.exe",
                     "-NoProfile -ExecutionPolicy Bypass -Command \"" + command + "\"");
                 psi.RedirectStandardOutput = true;
+                psi.RedirectStandardError = true;
                 psi.UseShellExecute = false;
                 psi.CreateNoWindow = true;
-                Process p = Process.Start(psi);
-                string output = p.StandardOutput.ReadToEnd();
-                p.WaitForExit(timeoutMs);
-                return output;
+                p = Process.Start(psi);
+                if (p == null) return "";
+                // Асинхронное чтение обоих потоков — защита от deadlock при переполнении буфера
+                var outSb = new System.Text.StringBuilder();
+                var errDone = new System.Threading.ManualResetEvent(false);
+                var outDone = new System.Threading.ManualResetEvent(false);
+                p.OutputDataReceived += (s, e) => { if (e.Data == null) outDone.Set(); else outSb.AppendLine(e.Data); };
+                p.ErrorDataReceived += (s, e) => { if (e.Data == null) errDone.Set(); };
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+                bool exited = p.WaitForExit(timeoutMs);
+                if (!exited)
+                {
+                    try { p.Kill(); } catch { }
+                    p.WaitForExit(5000);
+                }
+                outDone.WaitOne(3000);
+                errDone.WaitOne(3000);
+                return outSb.ToString();
             }
             catch
             {
                 return "";
+            }
+            finally
+            {
+                try { if (p != null) p.Dispose(); } catch { }
             }
         }
 

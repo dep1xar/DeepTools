@@ -25,7 +25,9 @@ namespace DeepTools
             AutoSize = false;
             Size = new Size(190, 38);
             TextAlign = ContentAlignment.MiddleLeft;
+            // Segoe UI Emoji fallback для эмодзи — без него они пиксельные/квадраты на старых Win
             Font = new Font("Segoe UI", 10F);
+            UseCompatibleTextRendering = false; // GDI ClearType вместо GDI+
             BackColor = Color.Transparent;
             ForeColor = Theme.TextDim;
             Cursor = Cursors.Hand;
@@ -35,6 +37,14 @@ namespace DeepTools
 
             MouseEnter += (s, e) => { if (!_active) { ForeColor = Theme.TextMain; BackColor = Theme.NavHoverBg; } };
             MouseLeave += (s, e) => { if (!_active) { ForeColor = Theme.TextDim; BackColor = Color.Transparent; } };
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            // Включаем ClearType сглаживание текста — убирает "пиксельность"
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            base.OnPaint(e);
         }
 
         public void SetActive(bool active)
@@ -142,6 +152,8 @@ namespace DeepTools
         {
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
             Color track = Theme.Lerp(Theme.KeyHover, Theme.Accent, anim);
 
@@ -223,6 +235,8 @@ namespace DeepTools
         {
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             int pad = 8;
             int trackY = Height / 2;
 
@@ -514,6 +528,8 @@ namespace DeepTools
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
             var rect = new Rectangle(0, 0, Width - 1, Height - 1);
             Color currentColor = Theme.Lerp(ButtonColor, HoverColor, hoverAnim);

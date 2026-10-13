@@ -5,7 +5,7 @@
 **Smart tweaker, cleaner and monitoring tool for Windows — in one app.**
 **Умный твикер, чистильщик и монитор для Windows — всё в одном.**
 
-[![Version](https://img.shields.io/badge/version-2.1.0-blue)](https://github.com/dep1xar/DeepTools/releases)
+[![Version](https://img.shields.io/badge/version-2.1.1-blue)](https://github.com/dep1xar/DeepTools/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D6)](#)
 [![.NET](https://img.shields.io/badge/.NET%20Framework-4.x-512BD4)](#)
 
@@ -191,6 +191,6 @@ DeepTools проверяет GitHub Releases при запуске. Когда �
 
 <div align="center">
 
-© 2026 dep1xar · DeepTools v2.1.0
+© 2026 dep1xar · DeepTools v2.1.1
 
 </div>

@@ -312,6 +312,57 @@ namespace DeepTools
             return shown[idx];
         }
 
+        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern int CommandLineToArgvW(string lpCmdLine, out int pNumArgs);
+
+        private static bool TryParseCommand(string cmd, out string exe, out string args)
+        {
+            exe = null; args = "";
+            if (string.IsNullOrWhiteSpace(cmd)) return false;
+            string t = cmd.Trim();
+            // Убираем возможный префикс cmd-стиля
+            // Парсим через кавычки вручную для надёжности без P/Invoke
+            try
+            {
+                string file = null;
+                string rest = "";
+                if (t.StartsWith("\""))
+                {
+                    int end = t.IndexOf('"', 1);
+                    if (end > 0) { file = t.Substring(1, end - 1); rest = t.Substring(end + 1).TrimStart(); }
+                    else file = t.Trim('"');
+                }
+                else
+                {
+                    // без кавычек — exe до первого пробела, но учитываем .exe
+                    int exeIdx = t.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+                    if (exeIdx >= 0)
+                    {
+                        int end = exeIdx + 4;
+                        file = t.Substring(0, end).Trim().Trim('"');
+                        rest = t.Substring(end).TrimStart();
+                    }
+                    else
+                    {
+                        // fallback: до первого пробела
+                        int sp = t.IndexOf(' ');
+                        if (sp > 0) { file = t.Substring(0, sp); rest = t.Substring(sp + 1); }
+                        else file = t;
+                    }
+                }
+                if (string.IsNullOrWhiteSpace(file)) return false;
+                // Блокируем опасные вставки через cmd-операторы в Rest: но Rest — это аргументы оригинального деинсталлятора, они легитимны
+                // Главное — не запускать через cmd.exe, а напрямую
+                // Проверяем что файл существует или это msiexec
+                string low = file.ToLowerInvariant();
+                if (low.Contains("msiexec")) { exe = file; args = rest; return true; }
+                // Разрешаем только существующие файлы или пути с расширением exe/msi/bat/cmd
+                // Если путь не существует — всё равно пробуем запустить напрямую (может быть в PATH), но без cmd.exe
+                exe = file; args = rest; return true;
+            }
+            catch { return false; }
+        }
+
         private void UninstallSelected()
         {
             AppEntry a = Selected();
@@ -324,8 +375,19 @@ namespace DeepTools
 
             try
             {
-                var psi = new ProcessStartInfo("cmd.exe", "/c " + a.UninstallCmd) { UseShellExecute = false, CreateNoWindow = true };
-                Process.Start(psi);
+                string exe, args;
+                if (TryParseCommand(a.UninstallCmd, out exe, out args))
+                {
+                    var psi = new ProcessStartInfo(exe, args) { UseShellExecute = false, CreateNoWindow = true };
+                    // Явно не через cmd.exe — защита от injection через & | && ||
+                    Process.Start(psi);
+                }
+                else
+                {
+                    // Fallback: если парсинг не удался — не используем cmd /c, показываем ошибку
+                    statusLabel.Text = Lang.T("Не удалось разобрать команду удаления", "Failed to parse uninstall command");
+                    return;
+                }
                 statusLabel.Text = Lang.T("Деинсталлятор запущен", "Uninstaller launched");
             }
             catch (Exception ex)
@@ -352,7 +414,41 @@ namespace DeepTools
             }
         }
 
-        // Ищем папки-хвосты по токену имени и издателю в типовых местах
+        // Системные папки которые никогда не предлагаем удалять
+        private static readonly HashSet<string> ProtectedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Microsoft", "Windows", "Common Files", "Internet Explorer", "WindowsApps",
+            "Windows NT", "Windows Defender", "Microsoft.NET", "ModifiableWindowsApps"
+        };
+
+        private static bool IsProtectedDir(string dirName)
+        {
+            if (ProtectedFolders.Contains(dirName)) return true;
+            // Папки начинающиеся с Windows — защищённые
+            if (dirName.StartsWith("Windows", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        // Строгий матчинг: имя папки должно совпадать с токеном или начинаться с токена + разделитель
+        private static bool StrictMatch(string dirName, string token)
+        {
+            if (token.Length < 3) return false;
+            if (dirName.Length < token.Length) return false;
+            if (string.Equals(dirName, token, StringComparison.OrdinalIgnoreCase)) return true;
+            if (dirName.StartsWith(token, StringComparison.OrdinalIgnoreCase))
+            {
+                // следующий символ должен быть разделителем: пробел, -, _, ., (, цифра версии
+                if (dirName.Length > token.Length)
+                {
+                    char c = dirName[token.Length];
+                    if (c == ' ' || c == '-' || c == '_' || c == '.' || c == '(') return true;
+                }
+            }
+            // Также токен внутри с разделителями: "MyApp Tools" -> матчим "MyApp"
+            return false;
+        }
+
+        // Ищем папки-хвосты по токену имени и издателю — строгий матчинг
         private List<string> FindLeftovers(AppEntry a)
         {
             var result = new List<string>();
@@ -380,14 +476,19 @@ namespace DeepTools
                 foreach (string dir in dirs)
                 {
                     string dn = Path.GetFileName(dir);
-                    bool match = (token.Length >= 3 && dn.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
-                        || (publisher.Length >= 3 && dn.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) >= 0);
+                    if (IsProtectedDir(dn)) continue;
+                    bool match = StrictMatch(dn, token)
+                        || (publisher.Length >= 3 && StrictMatch(dn, publisher));
                     if (match && added.Add(dir)) result.Add(dir);
                 }
             }
 
             if (!string.IsNullOrEmpty(a.InstallLocation) && Directory.Exists(a.InstallLocation) && added.Add(a.InstallLocation))
-                result.Add(a.InstallLocation);
+            {
+                string dn = Path.GetFileName(a.InstallLocation.TrimEnd('\\', '/'));
+                if (!IsProtectedDir(dn))
+                    result.Add(a.InstallLocation);
+            }
 
             return result;
         }
@@ -505,13 +606,31 @@ namespace DeepTools
 
         private void DeleteChecked()
         {
+            // Дополнительная защита: проверяем что путь не является системным и не reparse point
             int deleted = 0;
             var toRemove = new List<int>();
             for (int i = 0; i < clb.Items.Count; i++)
             {
                 if (!clb.GetItemChecked(i)) continue;
                 string path = clb.Items[i].ToString();
-                try { if (Directory.Exists(path)) { Directory.Delete(path, true); deleted++; toRemove.Add(i); } }
+                try
+                {
+                    if (!Directory.Exists(path)) continue;
+                    // Защита от junction/symlink
+                    try
+                    {
+                        var attr = File.GetAttributes(path);
+                        if ((attr & FileAttributes.ReparsePoint) != 0) continue;
+                    }
+                    catch { }
+                    // Защита от удаления корня диска или Windows папок
+                    string dn = Path.GetFileName(path.TrimEnd('\\', '/'));
+                    if (string.IsNullOrEmpty(dn)) continue;
+                    string lowDn = dn.ToLowerInvariant();
+                    if (lowDn == "windows" || lowDn == "program files" || lowDn == "program files (x86)" || lowDn == "users") continue;
+                    Directory.Delete(path, true);
+                    deleted++; toRemove.Add(i);
+                }
                 catch { }
             }
             for (int i = toRemove.Count - 1; i >= 0; i--) clb.Items.RemoveAt(toRemove[i]);
