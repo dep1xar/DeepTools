@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -987,6 +987,7 @@ namespace DeepTools
             // Карточка: экран и сон. Карточка ниже видимой области - панель скроллится
             panel.AutoScroll = true;
             NativeMethods.ApplyDarkScrollbar(panel);
+            DarkScroll.Attach(panel);
             var pwCard = Theme.MakeCard(panel, new Point(24, 546), new Size(640, 172));
 
             var pwTitle = new Label

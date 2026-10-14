@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -74,6 +74,7 @@ namespace DeepTools
             };
             Controls.Add(list);
             NativeMethods.ApplyDarkScrollbar(list);
+            DarkScroll.Attach(list);
         }
 
         // PLACEHOLDER_POPULATE
@@ -181,3 +182,4 @@ namespace DeepTools
         }
     }
 }
+

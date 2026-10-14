@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -354,6 +354,7 @@ namespace DeepTools
             };
             savedCard.Controls.Add(savedList);
             NativeMethods.ApplyDarkScrollbar(savedList);
+            DarkScroll.Attach(savedList);
 
             var hint = new Label
             {
@@ -793,3 +794,4 @@ namespace DeepTools
         }
     }
 }
+

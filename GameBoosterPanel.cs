@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -214,6 +214,7 @@ namespace DeepTools
             AutoScroll = true;
             BackColor = Theme.BgColor;
             NativeMethods.ApplyDarkScrollbar(this);
+            DarkScroll.Attach(this);
 
             detectTimer.Interval = 1500;
             detectTimer.Tick += (s, e) => DetectFullscreenGame();
@@ -575,6 +576,7 @@ namespace DeepTools
             };
             heavyCard.Controls.Add(heavyList);
             NativeMethods.ApplyDarkScrollbar(heavyList);
+            DarkScroll.Attach(heavyList);
 
             // ---- Карточка: Адаптивный профиль питания + VRAM Defrag ----
             int smartCardY = heavyCard.Bottom + 12;

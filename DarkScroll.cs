@@ -9,6 +9,7 @@ namespace DeepTools
     // Кастомный тёмный скроллбар вместо нативного (у нативного виден «контур»
     // трека, который не убрать штатно). Оверлей-полоса живёт в родителе панели
     // (не скроллится вместе с контентом), нативную полосу прячем через ShowScrollBar.
+    // Фикс: плавный скролл без залипания на медленном колесе + подходит под все темы
     public class DarkScroll : Control
     {
         [DllImport("user32.dll")]
@@ -18,6 +19,7 @@ namespace DeepTools
         private readonly ScrollableControl target;
         private bool dragging;
         private int dragGrabY;
+        private int wheelAccum = 0;
 
         // Прячем нативную вертикальную полосу, перехватывая сообщения окна панели
         private class NativeHider : NativeWindow
@@ -40,6 +42,23 @@ namespace DeepTools
 
         public static DarkScroll Attach(ScrollableControl panel)
         {
+            // не плодить дубликаты если уже есть
+            if (panel.Parent != null)
+            {
+                foreach (Control c in panel.Parent.Controls)
+                {
+                    DarkScroll ds = c as DarkScroll;
+                    if (ds != null && ds.target == panel) return ds;
+                }
+            }
+            else
+            {
+                foreach (Control c in panel.Controls)
+                {
+                    DarkScroll ds = c as DarkScroll;
+                    if (ds != null && ds.target == panel) return ds;
+                }
+            }
             return new DarkScroll(panel);
         }
 
@@ -57,7 +76,8 @@ namespace DeepTools
             target.LocationChanged += (s, e) => Reposition();
             target.VisibleChanged += (s, e) => { Visible = target.Visible; Reposition(); };
             target.Layout += (s, e) => Reposition();
-            target.Scroll += (s, e) => Invalidate();
+            target.Scroll += (s, e) => { Reposition(); Invalidate(); };
+            target.MouseWheel += OnTargetWheel;
 
             if (target.IsHandleCreated) AttachHider();
             target.HandleCreated += (s, e) => AttachHider();
@@ -81,7 +101,6 @@ namespace DeepTools
             Reposition();
         }
 
-        // PLACEHOLDER_REST
         private void Reposition()
         {
             if (target.Parent == null || Parent != target.Parent) return;
@@ -98,12 +117,25 @@ namespace DeepTools
         {
             var vs = target.VerticalScroll;
             int track = Height;
-            long max = vs.Maximum + 1; if (max < 1) max = 1;
-            thumbH = (int)Math.Max(28, (long)track * vs.LargeChange / max);
-            if (thumbH > track) thumbH = track;
+            // float-точный расчёт чтобы на медленном скролле не "залипало"
+            double max = (double)vs.Maximum + 1; if (max < 1) max = 1;
+            double th = Math.Max(28, (double)track * vs.LargeChange / max);
+            if (th > track) th = track;
+            thumbH = (int)Math.Round(th);
             int scrollable = vs.Maximum - vs.LargeChange + 1; if (scrollable < 1) scrollable = 1;
-            int span = track - thumbH;
-            thumbY = (int)((long)span * vs.Value / scrollable);
+            int span = track - thumbH; if (span < 1) span = 1;
+            // Берём актуальное значение прокрутки: VerticalScroll.Value более точен чем AutoScrollPosition
+            // но на некоторых конфигурациях Value лагает — fallback на AutoScrollPosition
+            int val = vs.Value;
+            try
+            {
+                int autoVal = -target.AutoScrollPosition.Y;
+                // если расхождение большое — берём autoVal (он точнее при инерции)
+                if (Math.Abs(autoVal - val) > 2 && autoVal >= 0 && autoVal <= scrollable)
+                    val = autoVal;
+            }
+            catch { }
+            thumbY = (int)Math.Round((double)span * val / scrollable);
             if (thumbY < 0) thumbY = 0;
             if (thumbY > span) thumbY = span;
         }
@@ -112,19 +144,26 @@ namespace DeepTools
         {
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             int ty, th; GetThumb(out ty, out th);
-            using (var tb = new SolidBrush(Theme.Lerp(Theme.BgColor, Theme.TextDim, 0.06f)))
+            // трек — полупрозрачный, виден на всех темах (светлая/тёмная/neon/rust/graphite)
+            using (var tb = new SolidBrush(Color.FromArgb(60, Theme.BorderColor)))
                 g.FillRectangle(tb, Width / 2 - 1, 0, 2, Height);
             var r = new Rectangle(1, ty, Width - 2, th);
+            // thumb — адаптивный: на светлой теме темнее, на тёмной светлее
+            Color thumbCol = dragging ? Theme.Accent : (Theme.IsLight ? Color.FromArgb(140, 110, 120, 140) : Color.FromArgb(160, 140, 150, 175));
+            // если акцент слишком близок к фону — добавляем контраст
+            if (!dragging && !Theme.IsLight)
+                thumbCol = Theme.Lerp(Theme.BgColor, Theme.TextDim, 0.55f);
             using (var path = Theme.RoundedRect(r, (Width - 2) / 2))
-            using (var b = new SolidBrush(dragging ? Theme.TextDim : Theme.Lerp(Theme.BgColor, Theme.TextDim, 0.5f)))
+            using (var b = new SolidBrush(thumbCol))
                 g.FillPath(b, path);
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
             int ty, th; GetThumb(out ty, out th);
-            if (e.Y >= ty && e.Y <= ty + th) { dragging = true; dragGrabY = e.Y - ty; }
+            if (e.Y >= ty && e.Y <= ty + th) { dragging = true; dragGrabY = e.Y - ty; Capture = true; }
             else SetFromThumbY(e.Y - th / 2, th);
             Invalidate();
         }
@@ -136,16 +175,48 @@ namespace DeepTools
             SetFromThumbY(e.Y - dragGrabY, th);
         }
 
-        protected override void OnMouseUp(MouseEventArgs e) { dragging = false; Invalidate(); }
+        protected override void OnMouseUp(MouseEventArgs e) { dragging = false; Capture = false; Invalidate(); }
 
+        // Колесо над самим скроллбаром
         protected override void OnMouseWheel(MouseEventArgs e)
         {
+            HandleWheel(e.Delta);
+            ((HandledMouseEventArgs)e).Handled = true;
+        }
+
+        // Колесо над целью — главный фикс залипания: накапливаем дельту,
+        // чтобы медленный скролл (delta 20-60) не терялся через Math.Sign
+        private void OnTargetWheel(object sender, MouseEventArgs e)
+        {
+            HandleWheel(e.Delta);
+            // не handled — пусть и панель тоже скроллится, но мы уже синхронизировали
+            Reposition();
+            Invalidate();
+        }
+
+        private void HandleWheel(int delta)
+        {
+            wheelAccum += delta;
+            int lines = SystemInformation.MouseWheelScrollLines;
+            if (lines <= 0) lines = 3;
+            // 120 = WHEEL_DELTA
+            int steps = wheelAccum / 120;
+            if (steps == 0) return;
+            wheelAccum -= steps * 120;
+            // шаг прокрутки — пропорционально SmallChange/LargeChange
+            int smallStep = Math.Max(20, target.VerticalScroll.SmallChange);
+            // если SmallChange не задан — берём 40
+            if (smallStep < 5) smallStep = 40;
+            int move = steps * smallStep * lines / 3;
+            // инвертируем: колесо вверх = delta +, скролл вверх = value -
             var vs = target.VerticalScroll;
             int mx = vs.Maximum - vs.LargeChange + 1; if (mx < 0) mx = 0;
-            int val = vs.Value - Math.Sign(e.Delta) * 60;
-            if (val < 0) val = 0; if (val > mx) val = mx;
-            try { target.AutoScrollPosition = new Point(0, val); } catch { }
+            int val = vs.Value - move;
+            if (val < vs.Minimum) val = vs.Minimum;
+            if (val > mx) val = mx;
+            try { target.AutoScrollPosition = new Point(-target.AutoScrollPosition.X, val); } catch { }
             Reposition();
+            Invalidate();
         }
 
         private void SetFromThumbY(int thumbY, int thumbH)
@@ -154,9 +225,17 @@ namespace DeepTools
             int span = Height - thumbH; if (span < 1) span = 1;
             if (thumbY < 0) thumbY = 0; if (thumbY > span) thumbY = span;
             int scrollable = vs.Maximum - vs.LargeChange + 1; if (scrollable < 1) scrollable = 1;
-            int val = (int)((long)thumbY * scrollable / span);
-            try { target.AutoScrollPosition = new Point(0, val); } catch { }
+            // float-точный перевод
+            int val = (int)Math.Round((double)thumbY * scrollable / span);
+            try { target.AutoScrollPosition = new Point(-target.AutoScrollPosition.X, val); } catch { }
             Reposition();
+            Invalidate();
+        }
+
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            try { target.MouseWheel -= OnTargetWheel; } catch { }
+            base.OnHandleDestroyed(e);
         }
     }
 }

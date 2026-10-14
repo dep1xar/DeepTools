@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -356,6 +356,7 @@ namespace DeepTools
             };
             card.Controls.Add(list);
             NativeMethods.ApplyDarkScrollbar(list);
+            DarkScroll.Attach(list);
 
             // Низ окна: чистка статистики от не-игр и список игнорируемых
             purgeBtn = new RoundedButton
@@ -699,6 +700,7 @@ namespace DeepTools
             };
             card.Controls.Add(list);
             NativeMethods.ApplyDarkScrollbar(list);
+            DarkScroll.Attach(list);
 
             var resetBtn = new RoundedButton
             {
@@ -806,3 +808,4 @@ namespace DeepTools
         }
     }
 }
+

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -51,6 +51,7 @@ namespace DeepTools
             };
             Controls.Add(list);
             NativeMethods.ApplyDarkScrollbar(list);
+            DarkScroll.Attach(list);
 
             foreach (Win11Tweaks.Tweak t in Win11Tweaks.All())
                 list.Controls.Add(MakeRow(t));
@@ -92,3 +93,4 @@ namespace DeepTools
         }
     }
 }
+

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Drawing;
@@ -141,6 +141,7 @@ namespace DeepTools
             };
             card.Controls.Add(list);
             NativeMethods.ApplyDarkScrollbar(list);
+            DarkScroll.Attach(list);
 
             statusLabel = new Label
             {

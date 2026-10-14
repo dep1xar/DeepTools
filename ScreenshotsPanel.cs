@@ -134,6 +134,7 @@ namespace DeepTools
             };
             Controls.Add(gallery);
             NativeMethods.ApplyDarkScrollbar(gallery);
+            DarkScroll.Attach(gallery);
         }
 
         public void SetHotkeyDisplay(string text)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -389,6 +389,7 @@ namespace DeepTools
             };
             card.Controls.Add(list);
             NativeMethods.ApplyDarkScrollbar(list);
+            DarkScroll.Attach(list);
 
             string[] levelTag = { "", Lang.T("мягко", "light"), Lang.T("средне", "medium"), Lang.T("жёстко", "aggressive") };
             for (int i = 0; i < tweaks.Count; i++)
@@ -562,4 +563,5 @@ namespace DeepTools
         }
     }
 }
+
 
