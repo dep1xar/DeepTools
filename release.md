@@ -58,6 +58,20 @@
 - `GameTweaksPanel.cs` — `StatusPill` теперь использует `TextRenderer.DrawText` (ClearType) вместо `Graphics.DrawString` (пиксельный GDI+), `ClearTypeGridFit` на фоне
 - Результат: на масштабах 125%/150%/175% текст, галочки `✓`/`✕`, смайлики и скругления — чёткие, без размытия
 
+### 🎨 Скроллбар — единый, как в SmartCleanup
+
+- `DarkScroll.cs` — переработан, исправлено «залипание» ползунка при медленной прокрутке:
+  - **Причина бага:** позиция ползунка читалась из `VerticalScroll.Value`, а у AutoScroll-панелей это значение обновляется рывками — страница едет, а ползунок стоит. Теперь позиция берётся из `AutoScrollPosition` (всегда отражает реальное смещение) + float-точный пересчёт вместо целочисленного деления
+  - **Убрана двойная прокрутка:** колесо над панелью больше не перехватывается — панель скроллится сама, полоса лишь успевает перерисоваться по событию `Scroll`
+  - Аккумулятор `WHEEL_DELTA` для колеса над самой полосой: «медленное» колесо (дельта < 120) больше не теряется
+  - Подходит под все темы: трек `BorderColor@55`, ползунок `Lerp(BgColor, TextDim)` с усилением при наведении, `Accent` при перетаскивании
+  - Фон заливается цветом панели (`OnPaintBackground`) — нет мусора на скруглениях при перерисовке
+  - `HighQuality` + `AntiAlias`, клик по треку скроллит и сразу тащит, hover-подсветка
+  - Реестр живых полос (`live`) вместо поиска по `Controls` — дубликаты не плодятся, даже если `Attach` вызван до появления `Parent`; корректная отписка в `HandleDestroyed`
+- Все панели теперь используют `DarkScroll.Attach(...)` вместо сырого системного скролла:
+  - `SmartCleanupPanel`, `NetworkPanel` (уже было) + `GameBoosterPanel`, `MainForm` (Settings), `BsodForm`, `DebloatForm`, `FirewallBlockForm`, `GameTime`, `ServicesPanel`, `ScreenshotsPanel`, `StartupPanel`, `SystemInfoPanel`, `RecycleBinForm`, `MacroForm`, `TelemetryForm`, `Win11TweaksForm`
+  - `ListBox`-формы (`UninstallerForm`, `ClipboardManager`) — только `ApplyDarkScrollbar`: `ListBox` не `ScrollableControl`, `DarkScroll` к ним не применим
+
 ### 📦 Версия
 
 - `AssemblyInfo.cs`: `2.1.0.0` → `2.1.1.0`
