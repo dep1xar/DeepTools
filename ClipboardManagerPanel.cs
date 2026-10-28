@@ -8,7 +8,7 @@ namespace DeepTools
     public class ClipboardManagerPanel : Panel
     {
         private ClipboardManager clipboardManager;
-        private ListBox historyListBox;
+        private ClipboardHistoryView historyView;
         private TextBox searchBox;
         private Label statusLabel;
         private PictureBox preview;
@@ -17,6 +17,10 @@ namespace DeepTools
         // работают Восстановить/Удалить, чтобы индексы не разъезжались
         private System.Collections.Generic.List<ClipboardEntry> displayed =
             new System.Collections.Generic.List<ClipboardEntry>();
+
+        // Пока идёт программное обновление списка - не реагируем на SelectionChanged,
+        // иначе превью перерисовывается на каждый Refresh
+        private bool suppressSelection;
 
         public ClipboardManagerPanel()
         {
@@ -70,20 +74,14 @@ namespace DeepTools
             // Карточка с историей
             var card = Theme.MakeCard(this, new Point(24, 110), new Size(712, 460));
 
-            historyListBox = new ListBox
+            historyView = new ClipboardHistoryView
             {
                 Location = new Point(12, 12),
-                Size = new Size(508, 380),
-                BackColor = Theme.SidebarColor,
-                ForeColor = Theme.TextMain,
-                Font = new Font("Segoe UI", 9.5F),
-                BorderStyle = BorderStyle.None,
-                SelectionMode = SelectionMode.One
+                Size = new Size(508, 380)
             };
-            historyListBox.DoubleClick += (s, e) => RestoreSelected();
-            historyListBox.SelectedIndexChanged += (s, e) => UpdatePreview();
-            card.Controls.Add(historyListBox);
-            NativeMethods.ApplyDarkScrollbar(historyListBox);
+            historyView.SelectionChanged += (s, e) => { if (!suppressSelection) UpdatePreview(); };
+            historyView.ItemActivated += (s, e) => RestoreSelected();
+            card.Controls.Add(historyView);
 
             preview = new PictureBox
             {
@@ -200,50 +198,51 @@ namespace DeepTools
             statusLabel.Text = Lang.T("Найдено: ", "Found: ") + displayed.Count.ToString();
         }
 
-        // Единственное место, которое наполняет ListBox из displayed - индексы всегда совпадают
+        // Единственное место, которое наполняет список из displayed - индексы всегда совпадают
         private void FillListBox()
         {
-            historyListBox.Items.Clear();
-            foreach (var entry in displayed)
-            {
-                string icon = entry.IsPinned ? "📌 " : "";
-                string typeIcon = entry.Type == "text" ? "📄 " : "🖼️ ";
-                string timeStr = entry.Timestamp.ToString("HH:mm:ss");
-                historyListBox.Items.Add(icon + typeIcon + entry.DisplayText + " [" + timeStr + "]");
-            }
+            if (historyView == null) return;
+            suppressSelection = true;
+            try { historyView.SetItems(displayed); }
+            finally { suppressSelection = false; }
+            UpdatePreview();
         }
 
         private void RestoreSelected()
         {
-            int idx = historyListBox.SelectedIndex;
-            if (idx < 0 || idx >= displayed.Count)
+            ClipboardEntry entry = historyView == null ? null : historyView.SelectedItem;
+            if (entry == null)
             {
                 DTDialog.Show(Lang.T("Выбери элемент из истории", "Select an item from history"), Lang.T("Буфер обмена", "Clipboard"));
                 return;
             }
 
-            clipboardManager.RestoreEntry(displayed[idx].Id);
+            clipboardManager.RestoreEntry(entry.Id);
             statusLabel.Text = Lang.T("✓ Восстановлено в буфер обмена", "✓ Restored to clipboard");
         }
 
         private void DeleteSelected()
         {
-            int idx = historyListBox.SelectedIndex;
-            if (idx < 0 || idx >= displayed.Count) return;
+            ClipboardEntry entry = historyView == null ? null : historyView.SelectedItem;
+            if (entry == null) return;
 
-            clipboardManager.RemoveEntry(displayed[idx].Id);
+            clipboardManager.RemoveEntry(entry.Id);
             statusLabel.Text = Lang.T("✓ Удалено из истории", "✓ Deleted from history");
         }
 
         // Показывает превью для выбранной картинки, иначе очищает область
         private void UpdatePreview()
         {
+            if (preview == null) return;
             if (preview.Image != null) { preview.Image.Dispose(); preview.Image = null; }
 
-            int idx = historyListBox.SelectedIndex;
-            if (idx < 0 || idx >= displayed.Count) return;
+            ClipboardEntry entry = historyView == null ? null : historyView.SelectedItem;
+            if (entry == null)
+            {
+                previewLabel.Text = Lang.T("Превью картинки", "Image preview");
+                return;
+            }
 
-            var entry = displayed[idx];
             if (entry.Type == "image" && System.IO.File.Exists(entry.Content))
             {
                 try
@@ -262,10 +261,10 @@ namespace DeepTools
 
         private void PinSelected()
         {
-            int idx = historyListBox.SelectedIndex;
-            if (idx < 0 || idx >= displayed.Count) return;
+            ClipboardEntry entry = historyView == null ? null : historyView.SelectedItem;
+            if (entry == null) return;
 
-            clipboardManager.PinEntry(displayed[idx].Id);
+            clipboardManager.PinEntry(entry.Id);
             statusLabel.Text = Lang.T("✓ Закрепление изменено", "✓ Pin toggled");
         }
 

@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 
@@ -21,8 +22,9 @@ namespace DeepTools
             {
                 if (Type == "image") return Lang.T("[Изображение]", "[Image]");
                 if (Content == null) return "";
-                string preview = Content.Length > 50 ? Content.Substring(0, 50) + "..." : Content;
-                return preview.Replace("\n", " ").Replace("\r", "");
+                string flat = Content.Replace("\r", "").Replace("\n", " ").Replace("\t", " ");
+                if (flat.Length > 80) flat = flat.Substring(0, 80) + "...";
+                return flat;
             }
         }
     }
@@ -33,6 +35,9 @@ namespace DeepTools
         private string lastClipboard = "";
         private Timer monitoringTimer;
         private int maxHistorySize = 100;
+
+        // Слушатель WM_CLIPBOARDUPDATE: обновление приходит сразу, а не по таймеру
+        private ClipboardWatcher watcher;
 
         public event EventHandler HistoryChanged;
 
@@ -45,12 +50,33 @@ namespace DeepTools
 
         public void Start()
         {
+            // Основной путь - мгновенное уведомление от Windows
+            try
+            {
+                watcher = new ClipboardWatcher(this);
+                watcher.Install();
+            }
+            catch { watcher = null; }
+
+            // Таймер оставляем как страховку: если слушатель не установился
+            // (или сообщение потерялось), история всё равно подхватит копирование
             monitoringTimer.Start();
         }
 
         public void Stop()
         {
             monitoringTimer.Stop();
+            if (watcher != null)
+            {
+                watcher.Uninstall();
+                watcher = null;
+            }
+        }
+
+        // Дёргается из окна-слушателя на UI-потоке
+        internal void OnClipboardChanged()
+        {
+            MonitorClipboard();
         }
 
         private void MonitorClipboard()
@@ -60,9 +86,23 @@ namespace DeepTools
                 IDataObject data = Clipboard.GetDataObject();
                 if (data == null) return;
 
+                // Кириллица: CF_TEXT (DataFormats.Text) - это ANSI. Если брать его,
+                // русские буквы вне системной кодовой страницы превращаются в "?".
+                // Сначала пробуем UnicodeText, ANSI - только как резерв
+                if (data.GetDataPresent(DataFormats.UnicodeText))
+                {
+                    string text = data.GetData(DataFormats.UnicodeText) as string;
+                    if (!string.IsNullOrEmpty(text) && text != lastClipboard)
+                    {
+                        lastClipboard = text;
+                        AddEntry(text, "text");
+                    }
+                    return;
+                }
+
                 if (data.GetDataPresent(DataFormats.Text))
                 {
-                    string text = (string)data.GetData(DataFormats.Text);
+                    string text = data.GetData(DataFormats.Text) as string;
                     if (!string.IsNullOrEmpty(text) && text != lastClipboard)
                     {
                         lastClipboard = text;
@@ -157,7 +197,11 @@ namespace DeepTools
 
         public List<ClipboardEntry> Search(string query)
         {
-            return history.Where(e => e.Content.ToLower().Contains(query.ToLower())).ToList();
+            if (string.IsNullOrEmpty(query)) return GetHistory();
+            // OrdinalIgnoreCase - корректно работает и с кириллицей, без ToLower()
+            return history
+                .Where(e => e.Content != null && e.Content.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
+                .ToList();
         }
 
         public void PinEntry(string id)
@@ -216,9 +260,53 @@ namespace DeepTools
             }
             else if (!string.IsNullOrEmpty(entry.Content))
             {
-                Clipboard.SetText(entry.Content);
+                // UnicodeText, чтобы кириллица не превращалась в "?" при вставке
+                Clipboard.SetText(entry.Content, TextDataFormat.UnicodeText);
+            }
+
+            // Чтобы слушатель буфера не добавил восстановленное как новую запись
+            if (entry.Type != "image") lastClipboard = entry.Content;
+        }
+
+        // Слушатель WM_CLIPBOARDUPDATE. Обычный опрос раз в секунду давал
+        // заметную задержку: скопировал - а в истории появилось через раз.
+        private class ClipboardWatcher : NativeWindow
+        {
+            private const int WM_CLIPBOARDUPDATE = 0x031D;
+            private readonly ClipboardManager owner;
+            private bool installed;
+
+            public ClipboardWatcher(ClipboardManager owner) { this.owner = owner; }
+
+            public void Install()
+            {
+                CreateHandle(new CreateParams());
+                if (AddClipboardFormatListener(Handle)) installed = true;
+            }
+
+            public void Uninstall()
+            {
+                try { if (installed) RemoveClipboardFormatListener(Handle); } catch { }
+                installed = false;
+                try { DestroyHandle(); } catch { }
+            }
+
+            protected override void WndProc(ref Message m)
+            {
+                if (m.Msg == WM_CLIPBOARDUPDATE && owner != null)
+                {
+                    try { owner.OnClipboardChanged(); } catch { }
+                    return;
+                }
+                base.WndProc(ref m);
             }
         }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool AddClipboardFormatListener(IntPtr hwnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
 
         // Файл истории в AppData. Строка: id|pinned|type|ticks|base64(content).
         // Контент кодируем в base64 - в буфер попадает многострочный текст с любыми
