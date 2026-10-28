@@ -60,17 +60,46 @@
 
 ### 🎨 Скроллбар — единый, как в SmartCleanup
 
-- `DarkScroll.cs` — переработан, исправлено «залипание» ползунка при медленной прокрутке:
-  - **Причина бага:** позиция ползунка читалась из `VerticalScroll.Value`, а у AutoScroll-панелей это значение обновляется рывками — страница едет, а ползунок стоит. Теперь позиция берётся из `AutoScrollPosition` (всегда отражает реальное смещение) + float-точный пересчёт вместо целочисленного деления
-  - **Убрана двойная прокрутка:** колесо над панелью больше не перехватывается — панель скроллится сама, полоса лишь успевает перерисоваться по событию `Scroll`
+- `DarkScroll.cs` — переработан, устранён рассинхрон ползунка с содержимым:
+  - **Настоящая причина:** ползунок перерисовывался асинхронно (`Invalidate` по событию `Scroll`), а панель — своим `WM_PAINT`. Два контрола попадали в разные кадры, поэтому ползунок то отставал, то убегал вперёд
+  - **Решение:** хук на окне панели (`NativeWindow`) ловит `WM_PAINT` **после** отрисовки содержимого и тут же синхронно перерисовывает ползунок (`Invalidate` + `Update`). Порядок жёсткий: контент → ползунок, всегда один кадр
+  - Позиция читается из `AutoScrollPosition` (у AutoScroll-панелей `VerticalScroll.Value` обновляется рывками) + float-точный пересчёт вместо целочисленного деления
+  - Перерисовка только при реальном изменении позиции ползунка — нет лишней работы на каждом кадре
   - Аккумулятор `WHEEL_DELTA` для колеса над самой полосой: «медленное» колесо (дельта < 120) больше не теряется
   - Подходит под все темы: трек `BorderColor@55`, ползунок `Lerp(BgColor, TextDim)` с усилением при наведении, `Accent` при перетаскивании
   - Фон заливается цветом панели (`OnPaintBackground`) — нет мусора на скруглениях при перерисовке
-  - `HighQuality` + `AntiAlias`, клик по треку скроллит и сразу тащит, hover-подсветка
+  - Клик по треку скроллит и сразу тащит; drag не срывается, если кнопку отпустили вне полосы (`OnMouseCaptureChanged`)
   - Реестр живых полос (`live`) вместо поиска по `Controls` — дубликаты не плодятся, даже если `Attach` вызван до появления `Parent`; корректная отписка в `HandleDestroyed`
-- Все панели теперь используют `DarkScroll.Attach(...)` вместо сырого системного скролла:
-  - `SmartCleanupPanel`, `NetworkPanel` (уже было) + `GameBoosterPanel`, `MainForm` (Settings), `BsodForm`, `DebloatForm`, `FirewallBlockForm`, `GameTime`, `ServicesPanel`, `ScreenshotsPanel`, `StartupPanel`, `SystemInfoPanel`, `RecycleBinForm`, `MacroForm`, `TelemetryForm`, `Win11TweaksForm`
+- `SmoothScroll.cs` — плавная прокрутка колесом с инерцией: дельты копятся в цель, панель доезжает с затуханием (τ = 75 мс, 60 тиков/с). Колесо ловится фильтром сообщений, поэтому плавность работает и когда курсор над карточкой/тумблером внутри панели. Контролы со своим колесом (`ListBox`, `TextBox`, `ComboBox`, `TreeView`, `WebBrowser` и т.п.) не перехватываются
+- Все панели используют `DarkScroll.Attach(...)` вместо сырого системного скролла:
+  - `SmartCleanupPanel`, `NetworkPanel` + `GameBoosterPanel`, `MainForm` (Settings), `BsodForm`, `DebloatForm`, `FirewallBlockForm`, `GameTime`, `ServicesPanel`, `ScreenshotsPanel`, `StartupPanel`, `SystemInfoPanel`, `RecycleBinForm`, `MacroForm`, `TelemetryForm`, `Win11TweaksForm`
   - `ListBox`-формы (`UninstallerForm`, `ClipboardManager`) — только `ApplyDarkScrollbar`: `ListBox` не `ScrollableControl`, `DarkScroll` к ним не применим
+
+### 🧹 Полное удаление Яндекс.Браузера (новое)
+
+`YandexCleaner.cs` + `YandexCleanerForm.cs`. Кнопка **🧹 Удалить Яндекс** в SmartCleanup → карточка «Системные остатки и Windows 11».
+
+Штатный деинсталлятор Яндекс.Браузера оставляет профиль и кэш в `AppData`, поэтому обычного «Удалить программу» недостаточно. Здесь собирается и сносится всё:
+
+| Что | Где ищется |
+|---|---|
+| Процессы | `browser.exe` (основной), `browser_proxy.exe`, `yandexbrowser.exe`, `ybrowser.exe`, `yandexbrowserupdate.exe`, `yupdate.exe`, `service_update.exe` |
+| Папки | `%LOCALAPPDATA%\Yandex\YandexBrowser`, `%LOCALAPPDATA%\YandexBrowser`, `%LOCALAPPDATA%\Programs\Yandex\YandexBrowser`, `%APPDATA%\Yandex\YandexBrowser`, `%APPDATA%\YandexBrowser`, `%PROGRAMFILES%\Yandex\YandexBrowser`, `%PROGRAMFILES(X86)%\Yandex\YandexBrowser`, `%PROGRAMDATA%\Yandex\YandexBrowser` |
+| Реестр | `HKCU/HKLM\Software\Yandex\YandexBrowser`, `HKLM\Software\Wow6432Node\Yandex\YandexBrowser`, `HKCU\Software\Classes\yandexbrowser`, записи в `Uninstall` (по `DisplayName`) |
+| Автозагрузка | значения `Run` в HKCU/HKLM/Wow6432Node, где имя или данные содержат `yandex` |
+| Задачи | `%WINDIR%\System32\Tasks` — по имени, удаление через `schtasks /Delete /F` |
+| Службы | `HKLM\SYSTEM\CurrentControlSet\Services` — по имени, `sc stop` + `sc delete` |
+| Ярлыки | Рабочий стол, общий Рабочий стол, меню «Пуск» (`.lnk` по имени) |
+
+Порядок удаления: процессы → задачи → службы → реестр → папки → ярлыки (процессы первыми, иначе файлы заняты и папка не удалится).
+
+- Флажок **«Заодно остальные продукты Яндекса»** — добавляет `Software\Yandex` целиком и папки `Yandex` (Диск, Мессенджер и т.п.). По умолчанию выключен, чтобы не снести лишнее
+- Вложенные папки не дублируются: родитель поглощает детей (сортировка по длине пути), иначе размер считался бы дважды
+- `browser.exe` — слишком общее имя, поэтому процесс добивается только если путь реально в папке Яндекса; PID сверяется с именем процесса перед `Kill` (PID мог достаться другому процессу)
+- Удаление папок: сброс атрибутов «только чтение», 3 попытки, затем fallback `rd /s /q`
+- После удаления список пересканируется: если что-то осталось — честно показывается «Не всё удалилось: осталось N», иначе «Яндекс удалён полностью ✓»
+
+Проверено на искусственных следах (папки + ключ реестра + запись автозагрузки): сканер находит всё, дедуп работает, `ForceDelete` сносит дерево с read-only файлами и идемпотентен при повторном вызове.
 
 ### 📦 Версия
 

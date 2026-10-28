@@ -8,55 +8,88 @@ using System.Windows.Forms;
 namespace DeepTools
 {
     // Кастомный тёмный скроллбар вместо нативного (у нативного виден «контур»
-    // трека, который не убрать штатно, а на светлых темах он вообще выбивается).
+    // трека, который не убрать штатно, а на светлых темах он выбивается).
     //
     // Оверлей-полоса живёт в родителе панели (не скроллится вместе с контентом),
     // нативную полосу прячем через ShowScrollBar.
     //
-    // Позиция ползунка берётся из AutoScrollPosition, а НЕ из VerticalScroll.Value:
-    // у AutoScroll-панелей Value обновляется рывками и на медленном колесе
-    // «залипает» — страница едет, а ползунок стоит. AutoScrollPosition всегда
-    // отражает реальное смещение, поэтому ползунок ходит плавно.
+    // Синхронизация с содержимым. Раньше ползунок перерисовывался асинхронно
+    // (Invalidate по событию Scroll), а панель — своим WM_PAINT. Два контрола
+    // попадали в разные кадры, и ползунок то отставал, то убегал вперёд.
+    //
+    // Теперь порядок жёсткий: хук на окне панели ловит WM_PAINT уже ПОСЛЕ того,
+    // как содержимое отрисовано, и здесь же синхронно (Update) перерисовывает
+    // ползунок. Оба всегда в одном кадре. Позицию берём из AutoScrollPosition:
+    // VerticalScroll.Value у AutoScroll-панелей обновляется рывками.
     public class DarkScroll : Control
     {
         [DllImport("user32.dll")]
         private static extern int ShowScrollBar(IntPtr hWnd, int wBar, bool bShow);
         private const int SB_VERT = 1;
-        private const int WHEEL_DELTA = 120;
+
+        private const int WM_NCCALCSIZE = 0x0083;
+        private const int WM_NCPAINT = 0x0085;
+        private const int WM_SIZE = 0x0005;
+        private const int WM_PAINT = 0x000F;
+        private const int WM_HSCROLL = 0x0114;
+        private const int WM_VSCROLL = 0x0115;
+        private const int WM_MOUSEWHEEL = 0x020A;
 
         // Реестр живых полос: Attach зовётся до того, как панель получит Parent,
         // поэтому поиск по Controls ненадёжен — ведём учёт сами
         private static readonly List<DarkScroll> live = new List<DarkScroll>();
 
         private readonly ScrollableControl target;
+        private readonly NativeHider hider;
         private bool dragging;
         private bool hovered;
+        private bool syncing;
         private int dragGrabY;
-        private int wheelAccum;
         private Rectangle lastBounds;
+        private int lastThumbY = -1;
+        private int lastThumbH = -1;
 
-        // Прячем нативную вертикальную полосу, перехватывая сообщения окна панели
+        // Хук на окно панели: прячет нативную полосу и синхронизирует ползунок
+        // с содержимым в одном кадре
         private class NativeHider : NativeWindow
         {
+            private readonly DarkScroll owner;
             private bool guard;
+
+            public NativeHider(DarkScroll owner) { this.owner = owner; }
+
             protected override void WndProc(ref Message m)
             {
                 base.WndProc(ref m);
-                // WM_NCCALCSIZE / WM_NCPAINT / WM_SIZE
-                if (!guard && (m.Msg == 0x83 || m.Msg == 0x85 || m.Msg == 0x05))
+                if (guard) return;
+
+                int msg = m.Msg;
+
+                if (msg == WM_NCCALCSIZE || msg == WM_NCPAINT || msg == WM_SIZE)
                 {
                     guard = true;
                     try { ShowScrollBar(Handle, SB_VERT, false); } catch { }
+                    guard = false;
+                    return;
+                }
+
+                // Содержимое уже нарисовано — ставим ползунок на место синхронно
+                if (msg == WM_PAINT || msg == WM_VSCROLL || msg == WM_HSCROLL || msg == WM_MOUSEWHEEL)
+                {
+                    if (owner == null) return;
+                    guard = true;
+                    try { owner.SyncNow(); } catch { }
                     guard = false;
                 }
             }
         }
 
-        private readonly NativeHider hider = new NativeHider();
-
         public static DarkScroll Attach(ScrollableControl panel)
         {
             if (panel == null) return null;
+            // Заодно подключаем панель к плавной прокрутке: колесо едет с
+            // инерцией, а полоса следует за AutoScrollPosition кадр в кадр
+            SmoothScroll.Attach(panel);
             for (int i = 0; i < live.Count; i++)
             {
                 DarkScroll ds = live[i];
@@ -68,6 +101,7 @@ namespace DeepTools
         private DarkScroll(ScrollableControl panel)
         {
             target = panel;
+            hider = new NativeHider(this);
             Width = 10;
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint |
                      ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
@@ -81,9 +115,6 @@ namespace DeepTools
             target.LocationChanged += OnTargetLayoutChanged;
             target.VisibleChanged += OnTargetVisibleChanged;
             target.Layout += OnTargetLayoutChanged;
-            // Scroll — единственный источник правды для перерисовки ползунка.
-            // Колесо мы НЕ перехватываем: панель скроллится сама, нам нужно лишь
-            // успевать перерисовывать ползунок (перехват давал двойную прокрутку).
             target.Scroll += OnTargetScroll;
             target.MouseEnter += OnTargetMouseEnter;
             target.MouseLeave += OnTargetMouseLeave;
@@ -94,7 +125,11 @@ namespace DeepTools
 
         private void AttachHider()
         {
-            try { hider.AssignHandle(target.Handle); ShowScrollBar(target.Handle, SB_VERT, false); }
+            try
+            {
+                hider.AssignHandle(target.Handle);
+                ShowScrollBar(target.Handle, SB_VERT, false);
+            }
             catch { }
         }
 
@@ -102,7 +137,7 @@ namespace DeepTools
         private void OnTargetParentChanged(object sender, EventArgs e) { HookParent(); }
         private void OnTargetLayoutChanged(object sender, EventArgs e) { Reposition(); }
         private void OnTargetVisibleChanged(object sender, EventArgs e) { Visible = target.Visible; Reposition(); }
-        private void OnTargetScroll(object sender, ScrollEventArgs e) { Reposition(); Invalidate(); }
+        private void OnTargetScroll(object sender, ScrollEventArgs e) { SyncNow(); }
         private void OnTargetMouseEnter(object sender, EventArgs e) { hovered = true; Invalidate(); }
         private void OnTargetMouseLeave(object sender, EventArgs e) { hovered = false; Invalidate(); }
 
@@ -135,7 +170,31 @@ namespace DeepTools
                 Bounds = bounds;
                 BringToFront();
             }
-            Invalidate();
+        }
+
+        // Пересчёт и НЕМЕДЛЕННАЯ перерисовка. Вызывается из хука окна панели
+        // сразу после её отрисовки — поэтому ползунок и содержимое не расходятся
+        private void SyncNow()
+        {
+            if (syncing || IsDisposed) return;
+            syncing = true;
+            try
+            {
+                Reposition();
+                if (!Visible) return;
+
+                int ty, th;
+                GetThumb(out ty, out th);
+                if (ty != lastThumbY || th != lastThumbH)
+                {
+                    lastThumbY = ty;
+                    lastThumbH = th;
+                    Invalidate();
+                    Update(); // синхронно, без ожидания следующего WM_PAINT
+                }
+            }
+            catch { }
+            finally { syncing = false; }
         }
 
         // Реальное смещение прокрутки: у AutoScroll-панелей истина здесь,
@@ -181,8 +240,7 @@ namespace DeepTools
         private Color ThumbColor()
         {
             if (dragging) return Theme.Accent;
-            // Подходит под все темы: на светлой — темнее, на тёмных — светлее.
-            // При наведении чуть контрастнее, чтобы полоса читалась
+            // Подходит под все темы: на светлой — темнее, на тёмных — светлее
             float k = (hovered || IsMouseOver) ? 0.72f : 0.5f;
             return Theme.Lerp(Theme.BgColor, Theme.TextDim, k);
         }
@@ -209,6 +267,8 @@ namespace DeepTools
 
             int ty, th;
             GetThumb(out ty, out th);
+            lastThumbY = ty;
+            lastThumbH = th;
 
             // Трек: полупрозрачный, читается и на светлой, и на тёмной теме
             using (var tb = new SolidBrush(Color.FromArgb(55, Theme.BorderColor)))
@@ -226,6 +286,9 @@ namespace DeepTools
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
+            // Пользователь взял ползунок - прекращаем доезд, дальше ведёт мышь
+            SmoothScroll.Stop(target);
+
             int ty, th;
             GetThumb(out ty, out th);
             if (e.Y >= ty && e.Y <= ty + th)
@@ -252,6 +315,9 @@ namespace DeepTools
                 Invalidate(); // hover-подсветка
                 return;
             }
+            // Кнопку отпустили вне полосы - перетаскивание кончилось
+            if ((Control.MouseButtons & MouseButtons.Left) == 0) { EndDrag(); return; }
+
             int ty, th;
             GetThumb(out ty, out th);
             SetFromThumbY(e.Y - dragGrabY, th);
@@ -259,39 +325,35 @@ namespace DeepTools
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
+            EndDrag();
+        }
+
+        // Захват может пропасть сам (другое окно, подсказка): пока кнопка нажата,
+        // ползунок обязан продолжать ехать за мышью, а не «останавливаться»
+        protected override void OnMouseCaptureChanged(EventArgs e)
+        {
+            if (!Capture && dragging && (Control.MouseButtons & MouseButtons.Left) != 0)
+            {
+                try { Capture = true; } catch { }
+            }
+            base.OnMouseCaptureChanged(e);
+        }
+
+        private void EndDrag()
+        {
+            if (!dragging && !Capture) return;
             dragging = false;
-            Capture = false;
+            try { Capture = false; } catch { }
             Invalidate();
         }
 
-        // Колесо над самой полосой. Накапливаем дельту: «медленное» колесо
-        // (дельта меньше 120) через Math.Sign терялось целиком
+        // Колесо над самой полосой. Отдаём плавной прокрутке, чтобы полоса и
+        // содержимое ехали одинаково мягко и не расходились
         protected override void OnMouseWheel(MouseEventArgs e)
         {
-            HandleWheel(e.Delta);
+            SmoothScroll.ScrollBy(target, e.Delta);
             HandledMouseEventArgs h = e as HandledMouseEventArgs;
             if (h != null) h.Handled = true;
-        }
-
-        private void HandleWheel(int delta)
-        {
-            wheelAccum += delta;
-            int steps = wheelAccum / WHEEL_DELTA;
-            if (steps == 0) return;
-            wheelAccum -= steps * WHEEL_DELTA;
-
-            int lines = SystemInformation.MouseWheelScrollLines;
-            if (lines <= 0) lines = 3;
-
-            ScrollProperties vs = target.VerticalScroll;
-            int mx = vs.Maximum - vs.LargeChange + 1; if (mx < 0) mx = 0;
-            int step = (vs.SmallChange > 0 ? vs.SmallChange : 40) * lines;
-            if (step < 10) step = 40;
-
-            int val = ScrollOffset(vs, mx) - steps * step;
-            if (val < 0) val = 0;
-            if (val > mx) val = mx;
-            SetScrollValue(val);
         }
 
         private void SetFromThumbY(int thumbY, int thumbH)
@@ -314,8 +376,9 @@ namespace DeepTools
                 target.AutoScrollPosition = new Point(x, val);
             }
             catch { }
-            Reposition();
-            Invalidate();
+            // Ползунок тянет пользователь - плавная прокрутка подхватывает позицию
+            SmoothScroll.SyncFromTarget(target);
+            SyncNow();
         }
 
         protected override void OnHandleDestroyed(EventArgs e)

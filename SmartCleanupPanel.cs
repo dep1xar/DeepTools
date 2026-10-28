@@ -469,7 +469,7 @@ namespace DeepTools
         // Карточка тяжёлых системных остатков + твиков Windows 11
         private void BuildSystemExtrasUi(int y)
         {
-            var card = Theme.MakeCard(this, new Point(24, y), new Size(650, 96));
+            var card = Theme.MakeCard(this, new Point(24, y), new Size(650, 140));
 
             var title = new Label
             {
@@ -540,6 +540,30 @@ namespace DeepTools
             };
             tweaksBtn.Click += (s, e) => { using (var f = new Win11TweaksForm()) f.ShowDialog(FindForm()); };
             card.Controls.Add(tweaksBtn);
+
+            // Полное удаление Яндекс.Браузера: штатный деинсталлятор оставляет
+            // профиль в AppData, задачи и ключи — добираем всё разом
+            var yandexBtn = new RoundedButton
+            {
+                Text = Lang.T("🧹 Удалить Яндекс", "🧹 Remove Yandex"),
+                ButtonColor = Theme.Danger, HoverColor = Theme.DangerHover, TextColor = Theme.BgColor,
+                Location = new Point(16, 96), Size = new Size(180, 30)
+            };
+            yandexBtn.Click += (s, e) => { using (var f = new YandexCleanerForm()) f.ShowDialog(FindForm()); };
+            card.Controls.Add(yandexBtn);
+
+            var yandexHint = new Label
+            {
+                Text = Lang.T("Полное удаление Яндекс.Браузера: процессы, папки, реестр, задачи, ярлыки",
+                              "Full Yandex Browser removal: processes, folders, registry, tasks, shortcuts"),
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(206, 103),
+                Size = new Size(428, 16),
+                AutoEllipsis = true
+            };
+            card.Controls.Add(yandexHint);
         }
 
         // Запуск долгой очистки в фоне с блокировкой кнопки и отчётом в statusLabel
