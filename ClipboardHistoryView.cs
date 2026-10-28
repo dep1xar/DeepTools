@@ -10,12 +10,17 @@ namespace DeepTools
     //
     // Почему не ListBox: у него системный скроллбар, к которому нельзя
     // прицепить общий DarkScroll (ListBox не ScrollableControl), и он рисует
-    // текст своими средствами. Здесь строки рисуем сами на внутренней
-    // «простыне» нужной высоты - панель получает настоящий AutoScroll,
-    // а сверху работает тот же DarkScroll, что и во всех остальных разделах.
+    // текст своими средствами.
+    //
+    // Почему без дочерней панели-«простыни»: диапазон прокрутки задаётся
+    // через AutoScrollMinSize, а строки рисуются прямо на панели со сдвигом
+    // на AutoScrollPosition. Раньше внутри лежала панель, которой на каждой
+    // раскладке присваивались новые Bounds - а это сбрасывает
+    // AutoScrollPosition в 0. Отсюда было «листнул, и сразу вернуло наверх»,
+    // плюс петля: появление/исчезновение полосы меняло ClientSize, снова
+    // вызывало раскладку и снова сбрасывало прокрутку.
     public class ClipboardHistoryView : Panel
     {
-        private readonly Panel canvas;
         private List<ClipboardEntry> items = new List<ClipboardEntry>();
         private readonly int rowHeight = 48;
         private int selectedIndex = -1;
@@ -30,15 +35,9 @@ namespace DeepTools
             BackColor = Theme.SidebarColor;
             AutoScroll = true;
             DoubleBuffered = true;
-
-            canvas = new Panel();
-            canvas.BackColor = Theme.SidebarColor;
-            canvas.Paint += OnCanvasPaint;
-            canvas.MouseDown += OnCanvasMouseDown;
-            canvas.MouseMove += OnCanvasMouseMove;
-            canvas.MouseLeave += OnCanvasMouseLeave;
-            canvas.MouseDoubleClick += OnCanvasDoubleClick;
-            Controls.Add(canvas);
+            TabStop = true;
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.UserPaint | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
 
             NativeMethods.ApplyDarkScrollbar(this);
             DarkScroll.Attach(this);
@@ -73,8 +72,8 @@ namespace DeepTools
             }
             selectedId = selectedIndex >= 0 ? items[selectedIndex].Id : null;
 
-            LayoutCanvas();
-            canvas.Invalidate();
+            UpdateScrollRange();
+            Invalidate();
             if (SelectionChanged != null) SelectionChanged(this, EventArgs.Empty);
         }
 
@@ -83,28 +82,47 @@ namespace DeepTools
             if (selectedIndex == -1) return;
             selectedIndex = -1;
             selectedId = null;
-            canvas.Invalidate();
+            Invalidate();
             if (SelectionChanged != null) SelectionChanged(this, EventArgs.Empty);
+        }
+
+        // Диапазон прокрутки. Позицию сохраняем: смена AutoScrollMinSize может
+        // сбросить её, а пользователь в этот момент читает середину списка
+        private void UpdateScrollRange()
+        {
+            int keep = -AutoScrollPosition.Y;
+            int height = items.Count == 0 ? 0 : items.Count * rowHeight;
+
+            var size = new Size(0, height);
+            if (AutoScrollMinSize != size) AutoScrollMinSize = size;
+
+            if (keep > 0)
+            {
+                try { AutoScrollPosition = new Point(0, keep); } catch { }
+            }
         }
 
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            LayoutCanvas();
-            canvas.Invalidate();
+            // Никаких Bounds у детей и никакого сброса прокрутки - только перерисовка
+            Invalidate();
         }
 
-        private void LayoutCanvas()
+        // Смещение содержимого: AutoScrollPosition отрицательный при прокрутке
+        private int ScrollY
         {
-            int w = Math.Max(1, ClientSize.Width);
-            int h = items.Count == 0
-                ? Math.Max(1, ClientSize.Height)
-                : Math.Max(1, items.Count * rowHeight);
-            canvas.Bounds = new Rectangle(0, 0, w, h);
+            get
+            {
+                int v = -AutoScrollPosition.Y;
+                return v < 0 ? 0 : v;
+            }
         }
 
-        private void OnCanvasPaint(object sender, PaintEventArgs e)
+        protected override void OnPaint(PaintEventArgs e)
         {
+            base.OnPaint(e);
+
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
@@ -118,20 +136,28 @@ namespace DeepTools
                 {
                     SizeF sz = g.MeasureString(msg, f);
                     g.DrawString(msg, f, b,
-                        Math.Max(0, (canvas.Width - sz.Width) / 2f),
-                        Math.Max(0, (canvas.Height - sz.Height) / 2f));
+                        Math.Max(0, (ClientSize.Width - sz.Width) / 2f),
+                        Math.Max(0, (ClientSize.Height - sz.Height) / 2f));
                 }
                 return;
             }
 
-            int w = canvas.Width;
+            int scroll = ScrollY;
+            int width = ClientSize.Width;
+
             using (var titleFont = new Font("Segoe UI", 9.5F))
             using (var metaFont = new Font("Segoe UI", 8F))
             {
-                for (int i = 0; i < items.Count; i++)
+                // Рисуем только то, что реально попало в видимую область -
+                // на длинной истории это экономит время
+                int first = Math.Max(0, scroll / rowHeight);
+                int last = Math.Min(items.Count - 1, (scroll + ClientSize.Height) / rowHeight);
+
+                for (int i = first; i <= last; i++)
                 {
                     ClipboardEntry it = items[i];
-                    var row = new Rectangle(6, i * rowHeight + 2, w - 12, rowHeight - 4);
+                    int y = i * rowHeight - scroll;
+                    var row = new Rectangle(6, y + 2, width - 12, rowHeight - 4);
                     bool sel = i == selectedIndex;
                     bool hov = i == hoverIndex;
 
@@ -144,10 +170,9 @@ namespace DeepTools
 
                     // Маркер типа записи
                     Color mark = it.Type == "image" ? Theme.Warning : Theme.Accent;
-                    int markTop = row.Y + 10;
                     int markHeight = Math.Max(4, row.Height - 20);
                     using (var b = new SolidBrush(mark))
-                    using (var path = Theme.RoundedRect(new Rectangle(row.X + 6, markTop, 4, markHeight), 2))
+                    using (var path = Theme.RoundedRect(new Rectangle(row.X + 6, row.Y + 10, 4, markHeight), 2))
                         g.FillPath(b, path);
 
                     int textLeft = row.X + 18;
@@ -170,55 +195,127 @@ namespace DeepTools
             }
         }
 
-        private int IndexAt(int y)
+        // Координата мыши -> индекс строки (с учётом прокрутки)
+        private int IndexAt(int mouseY)
         {
             if (items.Count == 0) return -1;
-            int i = y / rowHeight;
+            int contentY = mouseY + ScrollY;
+            int i = contentY / rowHeight;
             if (i < 0 || i >= items.Count) return -1;
             return i;
         }
 
-        private void OnCanvasMouseDown(object sender, MouseEventArgs e)
+        protected override void OnMouseDown(MouseEventArgs e)
         {
+            base.OnMouseDown(e);
             if (e.Button != MouseButtons.Left) return;
+
+            // Клавиатурная навигация работает только когда список в фокусе
+            try { if (!Focused) Focus(); } catch { }
+
             int i = IndexAt(e.Y);
             if (i < 0) return;
 
             selectedIndex = i;
             selectedId = items[i].Id;
-            canvas.Invalidate();
+            Invalidate();
             if (SelectionChanged != null) SelectionChanged(this, EventArgs.Empty);
         }
 
-        private void OnCanvasMouseMove(object sender, MouseEventArgs e)
+        protected override void OnMouseMove(MouseEventArgs e)
         {
+            base.OnMouseMove(e);
             int i = IndexAt(e.Y);
             if (i != hoverIndex)
             {
                 hoverIndex = i;
-                canvas.Invalidate();
+                Invalidate();
             }
         }
 
-        private void OnCanvasMouseLeave(object sender, EventArgs e)
+        protected override void OnMouseLeave(EventArgs e)
         {
+            base.OnMouseLeave(e);
             if (hoverIndex != -1)
             {
                 hoverIndex = -1;
-                canvas.Invalidate();
+                Invalidate();
             }
         }
 
-        private void OnCanvasDoubleClick(object sender, MouseEventArgs e)
+        protected override void OnMouseDoubleClick(MouseEventArgs e)
         {
+            base.OnMouseDoubleClick(e);
             int i = IndexAt(e.Y);
             if (i < 0) return;
 
             selectedIndex = i;
             selectedId = items[i].Id;
-            canvas.Invalidate();
+            Invalidate();
             if (SelectionChanged != null) SelectionChanged(this, EventArgs.Empty);
             if (ItemActivated != null) ItemActivated(this, EventArgs.Empty);
+        }
+
+        // Клавиатура: стрелки и Enter работают, когда список в фокусе
+        protected override bool IsInputKey(Keys keyData)
+        {
+            if (keyData == Keys.Up || keyData == Keys.Down || keyData == Keys.PageUp ||
+                keyData == Keys.PageDown || keyData == Keys.Enter || keyData == Keys.Home ||
+                keyData == Keys.End)
+                return true;
+            return base.IsInputKey(keyData);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (items.Count == 0) return;
+
+            int i = selectedIndex;
+            switch (e.KeyCode)
+            {
+                case Keys.Up: i = i <= 0 ? 0 : i - 1; break;
+                case Keys.Down: i = i < 0 ? 0 : Math.Min(items.Count - 1, i + 1); break;
+                case Keys.PageUp: i = Math.Max(0, (i < 0 ? 0 : i) - PageRows()); break;
+                case Keys.PageDown: i = Math.Min(items.Count - 1, (i < 0 ? 0 : i) + PageRows()); break;
+                case Keys.Home: i = 0; break;
+                case Keys.End: i = items.Count - 1; break;
+                case Keys.Enter:
+                    if (ItemActivated != null) ItemActivated(this, EventArgs.Empty);
+                    e.Handled = true;
+                    return;
+                default: return;
+            }
+
+            selectedIndex = i;
+            selectedId = items[i].Id;
+            EnsureVisible(i);
+            Invalidate();
+            if (SelectionChanged != null) SelectionChanged(this, EventArgs.Empty);
+            e.Handled = true;
+        }
+
+        private int PageRows()
+        {
+            return Math.Max(1, ClientSize.Height / rowHeight);
+        }
+
+        // Прокрутить так, чтобы строка была видна
+        private void EnsureVisible(int index)
+        {
+            int scroll = ScrollY;
+            int top = index * rowHeight;
+            int bottom = top + rowHeight;
+            int view = ClientSize.Height;
+
+            if (top < scroll)
+            {
+                try { AutoScrollPosition = new Point(0, Math.Max(0, top)); } catch { }
+            }
+            else if (bottom > scroll + view)
+            {
+                try { AutoScrollPosition = new Point(0, Math.Max(0, bottom - view + 2)); } catch { }
+            }
         }
     }
 }
