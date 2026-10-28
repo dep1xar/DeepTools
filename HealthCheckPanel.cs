@@ -791,6 +791,17 @@ namespace DeepTools
             }
         }
 
+        // Кэши для медленных источников. Раньше WMI-запрос к ACPI-датчику и
+        // обход дисков шли прямо в UI-поток каждые 2 секунды: WMI мог думать
+        // сотни миллисекунд, и интерфейс заметно подтормаживал (особенно когда
+        // NVML недоступен - у не-NVIDIA карт). Теперь опрос идёт в фоне, а
+        // панель берёт последнее значение
+        private string cachedDiskUsage;
+        private DateTime cachedDiskUsageAt = DateTime.MinValue;
+        private volatile int acpiTempCached = -1;      // -1 = данных нет
+        private DateTime acpiTempAt = DateTime.MinValue;
+        private int acpiQueryRunning;
+
         private float GetCpuPercent()
         {
             if (cpuCounter == null) return 0;
@@ -812,6 +823,13 @@ namespace DeepTools
 
         private string GetDiskUsage()
         {
+            // Обход дисков кэшируем на 30 сек: обращение к уснувшему HDD может
+            // подвесить UI-поток на сотни миллисекунд
+            if (cachedDiskUsage != null && (DateTime.UtcNow - cachedDiskUsageAt).TotalSeconds < 30)
+                return cachedDiskUsage;
+            cachedDiskUsageAt = DateTime.UtcNow;
+
+            string result = Lang.T("н/д", "n/a");
             try
             {
                 foreach (DriveInfo drive in DriveInfo.GetDrives())
@@ -819,14 +837,17 @@ namespace DeepTools
                     if (drive.IsReady && drive.DriveType == DriveType.Fixed)
                     {
                         double usedPercent = (double)(drive.TotalSize - drive.TotalFreeSpace) * 100 / drive.TotalSize;
-                        return string.Format("{0} {1:0}%", drive.Name.Replace("\\", ""), usedPercent);
+                        result = string.Format("{0} {1:0}%", drive.Name.Replace("\\", ""), usedPercent);
+                        break;
                     }
                 }
             }
             catch
             {
             }
-            return Lang.T("н/д", "n/a");
+
+            cachedDiskUsage = result;
+            return result;
         }
 
         private string GetGpuUsage()
@@ -837,30 +858,54 @@ namespace DeepTools
 
         private string GetTempDisplay()
         {
-            // Сначала видеокарта через NVML (как у Afterburner)
+            // Сначала видеокарта через NVML (как у Afterburner) - это быстро
             int gpuTemp = NvmlGpu.GetTemperature();
             if (gpuTemp >= 0) return gpuTemp + "°C";
 
-            // Запасной вариант: ACPI-датчик материнки (есть не на всех системах)
-            try
-            {
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher(
-                    "root\\WMI", "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature");
+            // Запасной вариант: ACPI-датчик материнки (есть не на всех системах).
+            // WMI-запрос уводим в фон и кэшируем на 30 сек - в UI-потоке он
+            // подвешивал интерфейс на каждом тике
+            RefreshAcpiTempIfStale();
+            int t = acpiTempCached;
+            return t > 0 ? t + "°C" : Lang.T("н/д", "n/a");
+        }
 
-                foreach (ManagementObject obj in searcher.Get())
+        private void RefreshAcpiTempIfStale()
+        {
+            if ((DateTime.UtcNow - acpiTempAt).TotalSeconds < 30) return;
+            if (System.Threading.Interlocked.CompareExchange(ref acpiQueryRunning, 1, 0) != 0) return;
+            acpiTempAt = DateTime.UtcNow;
+
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                int found = -1;
+                try
                 {
-                    double tenthsOfKelvin = Convert.ToDouble(obj["CurrentTemperature"]);
-                    double celsius = (tenthsOfKelvin / 10.0) - 273.15;
-                    if (celsius > 0 && celsius < 150)
+                    using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(
+                        "root\\WMI", "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature"))
+                    using (ManagementObjectCollection results = searcher.Get())
                     {
-                        return string.Format("{0:0}°C", celsius);
+                        foreach (ManagementObject obj in results)
+                        {
+                            try
+                            {
+                                double tenthsOfKelvin = Convert.ToDouble(obj["CurrentTemperature"]);
+                                double celsius = (tenthsOfKelvin / 10.0) - 273.15;
+                                if (celsius > 0 && celsius < 150)
+                                {
+                                    found = (int)Math.Round(celsius);
+                                    break;
+                                }
+                            }
+                            catch { }
+                        }
                     }
                 }
-            }
-            catch
-            {
-            }
-            return Lang.T("н/д", "n/a");
+                catch { }
+
+                acpiTempCached = found;
+                System.Threading.Interlocked.Exchange(ref acpiQueryRunning, 0);
+            });
         }
     }
 }

@@ -15,8 +15,6 @@ namespace DeepTools
 
         private int rangeIndex = 1;   // по умолчанию час
         private Panel dragBar;
-        private Point dragStart;
-        private bool dragging;
 
         private RoundedButton[] rangeBtns;
         private Label periodLabel;
@@ -63,12 +61,9 @@ namespace DeepTools
         private void BuildUi()
         {
             dragBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Theme.BgColor };
-            dragBar.MouseDown += (s, e) => { dragging = true; dragStart = new Point(e.X, e.Y); };
-            dragBar.MouseMove += (s, e) =>
-            {
-                if (dragging) Location = new Point(Location.X + e.X - dragStart.X, Location.Y + e.Y - dragStart.Y);
-            };
-            dragBar.MouseUp += (s, e) => { dragging = false; };
+            // Перетаскивание за шапку: точка захвата считается от курсора, а не от
+            // уезжающего вместе с окном контрола - окно едет ровно под мышью
+            WindowDrag.Attach(dragBar, this);
             Controls.Add(dragBar);
 
             var titleLbl = new Label

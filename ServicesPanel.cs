@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -206,15 +206,31 @@ namespace DeepTools
 
         private string QueryServiceStartType(string serviceName, out bool isEnabled)
         {
+            // Тип запуска читаем из реестра, а не через "sc.exe qc": на каждую
+            // строку запускался отдельный процесс, и построение списка служб
+            // занимало больше полусекунды (а переключение тумблера - два процесса).
+            // HKLM\SYSTEM\CurrentControlSet\Services\<имя>\Start: 4 = отключена
             isEnabled = true;
-            string output = RunSc("qc " + serviceName);
-            if (output == null)
+            int start = -1;
+            try
             {
-                isEnabled = false;
-                return Lang.T("не найдена", "not found");
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Services\" + serviceName))
+                {
+                    if (key == null)
+                    {
+                        isEnabled = false;
+                        return Lang.T("не найдена", "not found");
+                    }
+                    object value = key.GetValue("Start");
+                    if (value != null) start = Convert.ToInt32(value);
+                }
+            }
+            catch
+            {
             }
 
-            if (output.IndexOf("DISABLED", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (start == 4)
             {
                 isEnabled = false;
                 return Lang.T("Отключена", "Disabled");

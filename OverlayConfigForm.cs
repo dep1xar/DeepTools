@@ -16,8 +16,6 @@ namespace DeepTools
         private RoundedButton[] cornerButtons = new RoundedButton[4];
         private RoundedButton[] sizeButtons = new RoundedButton[3];
 
-        private Point dragStart;
-        private bool draggingForm = false;
 
         public OverlayConfigForm()
         {
@@ -51,11 +49,9 @@ namespace DeepTools
         private void BuildUi()
         {
             var titleBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Theme.BgColor };
-            titleBar.MouseDown += (s2, e) => { draggingForm = true; dragStart = new Point(e.X, e.Y); };
-            titleBar.MouseMove += (s2, e) => {
-                if (draggingForm) Location = new Point(Location.X + e.X - dragStart.X, Location.Y + e.Y - dragStart.Y);
-            };
-            titleBar.MouseUp += (s2, e) => { draggingForm = false; };
+            // Перетаскивание за шапку: точка захвата считается от курсора, а не от
+            // уезжающего вместе с окном контрола - окно едет ровно под мышью
+            WindowDrag.Attach(titleBar, this);
             Controls.Add(titleBar);
 
             var titleLbl = new Label

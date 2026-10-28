@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -60,11 +61,38 @@ namespace DeepTools
     }
 
     // Базовый класс для кастомных контролов на прозрачном фоне.
-    // Вместо WS_EX_TRANSPARENT (даёт артефакты на скруглённых краях при перерисовке)
-    // контрол сам "допрашивает" родителя нарисовать то, что должно быть видно за ним,
-    // и только потом рисует себя поверх - это надёжнее и не мажет углы.
+    //
+    // WS_EX_TRANSPARENT не используем: он даёт артефакты на скруглённых краях.
+    // Вместо этого контрол рисует у себя то, что находится под ним.
+    //
+    // Раньше он каждый раз просил родителя перерисоваться целиком
+    // (InvokePaintBackground + InvokePaint на каждый кадр). Это была основная
+    // цена всех анимаций: один тикающий тумблер перерисовывал всю карточку под
+    // собой, а карточка с десятком таких контролов - десяток раз за кадр.
+    //
+    // Теперь фон родителя рендерится один раз в общий кэш (один на родителя) и
+    // раздаётся всем его прозрачным детям готовым битмапом. Кэш сбрасывается
+    // только когда родитель действительно перерисовался, поменял размер, цвет
+    // фона или фоновую картинку.
     public abstract class TransparentControl : Control
     {
+        private sealed class Backdrop
+        {
+            public Bitmap Bmp;
+            public Size Size;
+            public bool Dirty = true;
+            public int RenderDepth;      // > 0 пока рендерим: события Paint родителя игнорируем
+            public int Users;
+            public PaintEventHandler PaintHandler;
+            public EventHandler ChangedHandler;
+        }
+
+        // Один кэш фона на родителя: общий для всех его прозрачных детей
+        private static readonly Dictionary<Control, Backdrop> backdrops =
+            new Dictionary<Control, Backdrop>();
+
+        private Control backdropOwner;
+
         protected TransparentControl()
         {
             SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.OptimizedDoubleBuffer |
@@ -72,26 +100,238 @@ namespace DeepTools
             BackColor = Color.Transparent;
         }
 
+        protected override void OnParentChanged(EventArgs e)
+        {
+            base.OnParentChanged(e);
+            AttachBackdrop();
+        }
+
+        // --- кэш фона родителя -------------------------------------------------
+
+        private void AttachBackdrop()
+        {
+            if (backdropOwner == Parent) return;
+            DetachBackdrop();
+            if (Parent == null) return;
+
+            Control owner = Parent;
+            backdropOwner = owner;
+
+            lock (backdrops)
+            {
+                Backdrop b;
+                if (backdrops.TryGetValue(owner, out b))
+                {
+                    b.Users++;
+                    return;
+                }
+
+                b = new Backdrop();
+                b.Users = 1;
+                b.PaintHandler = (s, e) => InvalidateBackdrop((Control)s);
+                b.ChangedHandler = (s, e) => InvalidateBackdrop((Control)s);
+                backdrops[owner] = b;
+                owner.Paint += b.PaintHandler;
+                owner.SizeChanged += b.ChangedHandler;
+                owner.BackColorChanged += b.ChangedHandler;
+                owner.BackgroundImageChanged += b.ChangedHandler;
+            }
+        }
+
+        private void DetachBackdrop()
+        {
+            Control owner = backdropOwner;
+            backdropOwner = null;
+            if (owner == null) return;
+
+            Backdrop b;
+            lock (backdrops)
+            {
+                if (!backdrops.TryGetValue(owner, out b)) return;
+                b.Users--;
+                if (b.Users > 0) return;
+                backdrops.Remove(owner);
+            }
+
+            owner.Paint -= b.PaintHandler;
+            owner.SizeChanged -= b.ChangedHandler;
+            owner.BackColorChanged -= b.ChangedHandler;
+            owner.BackgroundImageChanged -= b.ChangedHandler;
+            if (b.Bmp != null) { b.Bmp.Dispose(); b.Bmp = null; }
+        }
+
+        // Фон родителя изменился: снимок устарел, всех его прозрачных детей
+        // нужно перерисовать (сам родитель уже перерисовывается сам)
+        private static void InvalidateBackdrop(Control parent)
+        {
+            lock (backdrops)
+            {
+                Backdrop b;
+                if (!backdrops.TryGetValue(parent, out b)) return;
+                if (b.RenderDepth > 0) return;   // это наша же отрисовка кэша
+                b.Dirty = true;
+            }
+
+            for (int i = 0; i < parent.Controls.Count; i++)
+            {
+                var tc = parent.Controls[i] as TransparentControl;
+                if (tc != null && tc.IsHandleCreated) tc.Invalidate();
+            }
+        }
+
+        // Снимок фона родителя целиком. Рисуем в него через InvokePaint* - так
+        // родитель отдаёт и свой BackColor, и всё, что рисует в Paint (карточки,
+        // скругления, hover-подсветки)
+        private Bitmap GetBackdrop()
+        {
+            Control p = Parent;
+            if (p == null || p.Width <= 0 || p.Height <= 0) return null;
+
+            Backdrop b;
+            lock (backdrops)
+            {
+                if (!backdrops.TryGetValue(p, out b)) return null;
+                if (!b.Dirty && b.Bmp != null && b.Size == p.ClientSize) return b.Bmp;
+            }
+
+            lock (backdrops)
+            {
+                if (b.Bmp == null || b.Size != p.ClientSize)
+                {
+                    if (b.Bmp != null) b.Bmp.Dispose();
+                    try
+                    {
+                        b.Bmp = new Bitmap(p.ClientSize.Width, p.ClientSize.Height,
+                                           System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                    }
+                    catch { b.Bmp = null; }
+                    b.Size = p.ClientSize;
+                }
+                b.RenderDepth++;
+            }
+
+            try
+            {
+                if (b.Bmp == null) return null;
+                using (Graphics g = Graphics.FromImage(b.Bmp))
+                {
+                    var pe = new PaintEventArgs(g, new Rectangle(Point.Empty, p.ClientSize));
+                    InvokePaintBackground(p, pe);
+                    InvokePaint(p, pe);
+                }
+                b.Dirty = false;
+                return b.Bmp;
+            }
+            catch
+            {
+                return null;
+            }
+            finally
+            {
+                lock (backdrops) { b.RenderDepth--; }
+            }
+        }
+
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            if (Parent != null)
-            {
-                e.Graphics.TranslateTransform(-Left, -Top);
-                PaintEventArgs pe = new PaintEventArgs(e.Graphics, Parent.ClientRectangle);
-                try
-                {
-                    InvokePaintBackground(Parent, pe);
-                    InvokePaint(Parent, pe);
-                }
-                finally
-                {
-                    e.Graphics.TranslateTransform(Left, Top);
-                }
-            }
-            else
+            if (Parent == null)
             {
                 base.OnPaintBackground(e);
+                return;
             }
+
+            Bitmap bmp = GetBackdrop();
+            if (bmp != null)
+            {
+                // Переносим из кэша ровно свою область. Контрол может быть
+                // прокручен за край родителя - тогда берём только видимую часть,
+                // остальное всё равно обрезано родителем
+                int dx = Left < 0 ? -Left : 0;
+                int dy = Top < 0 ? -Top : 0;
+                int sx = Left + dx, sy = Top + dy;
+                int w = Math.Min(Width - dx, bmp.Width - sx);
+                int h = Math.Min(Height - dy, bmp.Height - sy);
+                if (w > 0 && h > 0)
+                {
+                    e.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
+                    e.Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+                    e.Graphics.DrawImage(bmp, new Rectangle(dx, dy, w, h), sx, sy, w, h, GraphicsUnit.Pixel);
+                    return;
+                }
+            }
+
+            // Страховка (кэш не создался): прежний путь - просим родителя
+            // нарисоваться прямо в наш контекст
+            e.Graphics.TranslateTransform(-Left, -Top);
+            PaintEventArgs fallback = new PaintEventArgs(e.Graphics, Parent.ClientRectangle);
+            try
+            {
+                InvokePaintBackground(Parent, fallback);
+                InvokePaint(Parent, fallback);
+            }
+            finally
+            {
+                e.Graphics.TranslateTransform(Left, Top);
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) DetachBackdrop();
+            base.Dispose(disposing);
+        }
+    }
+
+    // Плавное перетаскивание окна без рамки за любой его элемент (шапку).
+    //
+    // Раньше в каждом окне было так:
+    //     Location = new Point(Location.X + e.X - dragStart.X, ...)
+    // Координаты MouseMove берутся ОТНОСИТЕЛЬНО перетаскиваемого контрола, а он
+    // уезжает вместе с окном. Поэтому окно норовило «догнать» курсор рывками и
+    // отставало от него. Здесь точка захвата считается от курсора в экранных
+    // координатах, поэтому окно едет ровно под мышью.
+    public static class WindowDrag
+    {
+        public static void Attach(Control handle, Form form)
+        {
+            Attach(handle, form, null);
+        }
+
+        public static void Attach(Control handle, Form form, Action onDragEnd)
+        {
+            if (handle == null || form == null) return;
+
+            bool dragging = false;
+            Point grab = Point.Empty;   // где курсор внутри окна в момент захвата
+
+            handle.MouseDown += (s, e) => {
+                if (e.Button != MouseButtons.Left) return;
+                Point p = Cursor.Position;
+                grab = new Point(p.X - form.Left, p.Y - form.Top);
+                dragging = true;
+                try { handle.Capture = true; } catch { }
+            };
+
+            handle.MouseMove += (s, e) => {
+                if (!dragging) return;
+                Point p = Cursor.Position;
+                form.Location = new Point(p.X - grab.X, p.Y - grab.Y);
+            };
+
+            MouseEventHandler stop = (s, e) => {
+                if (!dragging) return;
+                dragging = false;
+                try { handle.Capture = false; } catch { }
+                if (onDragEnd != null) onDragEnd();
+            };
+
+            handle.MouseUp += stop;
+            handle.MouseCaptureChanged += (s, e) => {
+                if (handle.Capture) return;
+                if (!dragging) return;
+                dragging = false;
+                if (onDragEnd != null) onDragEnd();
+            };
         }
     }
 
@@ -102,6 +342,8 @@ namespace DeepTools
         public event EventHandler CheckedChanged;
 
         private readonly System.Windows.Forms.Timer animTimer;
+        private readonly System.Diagnostics.Stopwatch animClock = System.Diagnostics.Stopwatch.StartNew();
+        private long animLastMs;
         private float anim = 0f; // 0 = выкл, 1 = вкл (визуальное положение)
 
         public bool Checked
@@ -129,15 +371,33 @@ namespace DeepTools
 
         private void StartAnim()
         {
+            animLastMs = animClock.ElapsedMilliseconds;
             if (!animTimer.Enabled) animTimer.Start();
         }
 
         private void AnimStep()
         {
+            long now = animClock.ElapsedMilliseconds;
+            float dt = (now - animLastMs) / 1000f;
+            animLastMs = now;
+            if (dt < 0.001f) dt = 0.001f;
+            if (dt > 0.1f) dt = 0.1f;   // после подвисания не прыгаем, а доезжаем
+
             float target = _checked ? 1f : 0f;
             float d = target - anim;
-            if (Math.Abs(d) < 0.03f) { anim = target; animTimer.Stop(); }
-            else anim += d * 0.35f;
+            if (Math.Abs(d) < 0.004f)
+            {
+                // Доезжаем ровно в цель: раньше порог 0.03 давал заметный
+                // «щелчок» пимпочки в самом конце
+                anim = target;
+                animTimer.Stop();
+            }
+            else
+            {
+                // Сглаживание привязано ко времени, а не к числу кадров:
+                // одинаково плавно и на 60, и на 144 Гц, без рывков от дрожания таймера
+                anim += d * (1f - (float)Math.Exp(-dt / 0.055f));
+            }
             Invalidate();
         }
 
@@ -185,49 +445,158 @@ namespace DeepTools
         }
     }
 
-    // Слайдер
+    // Слайдер.
+    // Значение остаётся целым (его читают как есть), а положение пимпочки
+    // считается во float и рисуется без ступенек. Перетаскивание захватывает
+    // мышь: раньше, если курсор уходил за пределы контрола, OnMouseUp не
+    // приходил и слайдер «залипал» в режиме перетаскивания. Программно
+    // заданное значение пимпочка доезжает плавно, а не прыгает.
     public class NeonSlider : TransparentControl
     {
         public int Minimum = 0;
         public int Maximum = 100;
         private int _value = 50;
+
         public int Value
         {
             get { return _value; }
-            set { _value = Math.Max(Minimum, Math.Min(Maximum, value)); Invalidate(); }
+            set
+            {
+                int v = Math.Max(Minimum, Math.Min(Maximum, value));
+                if (v == _value) return;
+                _value = v;
+                if (dragging || !IsHandleCreated) visRatio = RatioOf(_value);
+                else StartGlide();
+                Invalidate();
+            }
         }
+
         public event EventHandler ValueChanged;
-        private bool dragging = false;
+
+        private bool dragging;
+        private bool hovered;
+        private int grabDx;             // смещение курсора внутри пимпочки
+        private float visRatio = 0.5f;  // визуальное положение пимпочки (0..1)
+
+        private readonly System.Windows.Forms.Timer glideTimer;
+        private readonly System.Diagnostics.Stopwatch glideClock = System.Diagnostics.Stopwatch.StartNew();
+        private long glideLastMs;
 
         public NeonSlider()
         {
             Height = 24;
             Cursor = Cursors.Hand;
+            visRatio = RatioOf(_value);
+            glideTimer = new System.Windows.Forms.Timer { Interval = 15 };
+            glideTimer.Tick += (s, e) => GlideStep();
+        }
+
+        private float RatioOf(int value)
+        {
+            int span = Maximum - Minimum;
+            if (span <= 0) return 0f;
+            float r = (float)(value - Minimum) / span;
+            return r < 0f ? 0f : (r > 1f ? 1f : r);
+        }
+
+        private int Pad { get { return Width < 24 ? 2 : 8; } }
+        private float TrackSpan { get { int s = Width - Pad * 2; return s < 1 ? 1 : s; } }
+        private float ThumbX(float ratio) { return Pad + ratio * TrackSpan; }
+
+        // Пимпочка едет к программно заданному значению, а не прыгает
+        private void StartGlide()
+        {
+            if (glideTimer.Enabled) return;
+            glideLastMs = glideClock.ElapsedMilliseconds;
+            glideTimer.Start();
+        }
+
+        private void GlideStep()
+        {
+            long now = glideClock.ElapsedMilliseconds;
+            float dt = (now - glideLastMs) / 1000f;
+            glideLastMs = now;
+            if (dt < 0.001f) dt = 0.001f;
+            if (dt > 0.1f) dt = 0.1f;
+
+            float target = RatioOf(_value);
+            float d = target - visRatio;
+            if (Math.Abs(d) < 0.002f) { visRatio = target; glideTimer.Stop(); }
+            else visRatio += d * (1f - (float)Math.Exp(-dt / 0.06f));
+            Invalidate();
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
+            if (e.Button != MouseButtons.Left) { base.OnMouseDown(e); return; }
+            glideTimer.Stop();
             dragging = true;
+            try { Capture = true; } catch { }
+
+            // Взяли пимпочку за неё саму - она не прыгает под курсор
+            float tx = ThumbX(visRatio);
+            grabDx = Math.Abs(e.X - tx) <= 12 ? (int)Math.Round(e.X - tx) : 0;
             UpdateFromMouse(e.X);
+            base.OnMouseDown(e);
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            if (dragging) UpdateFromMouse(e.X);
+            if (dragging)
+            {
+                // Кнопку могли отпустить вне контрола - тогда перетаскивание кончилось
+                if ((Control.MouseButtons & MouseButtons.Left) == 0) dragging = false;
+                else UpdateFromMouse(e.X);
+            }
+            else if (!hovered) { hovered = true; Invalidate(); }
+            base.OnMouseMove(e);
         }
+
+        protected override void OnMouseEnter(EventArgs e) { hovered = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hovered = false; Invalidate(); base.OnMouseLeave(e); }
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
             dragging = false;
+            try { Capture = false; } catch { }
+            Invalidate();
+            base.OnMouseUp(e);
+        }
+
+        // Захват может пропасть сам по себе (подсказка, другое окно, перерисовка).
+        // Пока кнопка физически нажата - перетаскивание продолжается и мы заново
+        // берём мышь, иначе пимпочка «останавливается» на полпути
+        protected override void OnMouseCaptureChanged(EventArgs e)
+        {
+            if (!Capture && dragging)
+            {
+                if ((Control.MouseButtons & MouseButtons.Left) != 0)
+                {
+                    try { Capture = true; } catch { }
+                }
+                else
+                {
+                    dragging = false;
+                    Invalidate();
+                }
+            }
+            base.OnMouseCaptureChanged(e);
         }
 
         private void UpdateFromMouse(int x)
         {
-            int pad = 8;
-            float ratio = (float)(x - pad) / (Width - pad * 2);
-            ratio = Math.Max(0, Math.Min(1, ratio));
-            Value = Minimum + (int)Math.Round(ratio * (Maximum - Minimum));
-            if (ValueChanged != null) ValueChanged(this, EventArgs.Empty);
+            float ratio = (x - grabDx - Pad) / TrackSpan;
+            if (ratio < 0f) ratio = 0f; else if (ratio > 1f) ratio = 1f;
+            visRatio = ratio;   // под курсором рисуем сразу, без инерции
+
+            int span = Maximum - Minimum;
+            int v = Minimum + (int)Math.Round(ratio * span);
+            if (v < Minimum) v = Minimum; else if (v > Maximum) v = Maximum;
+            if (v != _value)
+            {
+                _value = v;
+                if (ValueChanged != null) ValueChanged(this, EventArgs.Empty);
+            }
             Invalidate();
         }
 
@@ -237,27 +606,34 @@ namespace DeepTools
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            int pad = 8;
-            int trackY = Height / 2;
+
+            // Минимум/максимум могли поменять кодом после создания
+            if (!dragging && !glideTimer.Enabled) visRatio = RatioOf(_value);
+
+            int pad = Pad;
+            float trackY = Height / 2f;
+            float thumbX = Math.Max(pad, Math.Min(Width - pad, ThumbX(visRatio)));
 
             using (var trackPen = new Pen(Theme.KeyHover, 4))
             {
+                trackPen.StartCap = LineCap.Round;
+                trackPen.EndCap = LineCap.Round;
                 g.DrawLine(trackPen, pad, trackY, Width - pad, trackY);
             }
 
-            float ratio = (float)(Value - Minimum) / (Maximum - Minimum);
-            int fillX = pad + (int)(ratio * (Width - pad * 2));
-
             using (var fillPen = new Pen(Theme.Accent, 4))
             {
-                g.DrawLine(fillPen, pad, trackY, fillX, trackY);
+                fillPen.StartCap = LineCap.Round;
+                fillPen.EndCap = LineCap.Round;
+                if (thumbX > pad + 0.5f) g.DrawLine(fillPen, pad, trackY, thumbX, trackY);
             }
 
+            float r = (hovered || dragging) ? 8f : 7f;
             using (var thumbBrush = new SolidBrush(Color.White))
             using (var thumbBorder = new Pen(Theme.Accent, 2))
             {
-                g.FillEllipse(thumbBrush, fillX - 7, trackY - 7, 14, 14);
-                g.DrawEllipse(thumbBorder, fillX - 7, trackY - 7, 14, 14);
+                g.FillEllipse(thumbBrush, thumbX - r, trackY - r, r * 2, r * 2);
+                g.DrawEllipse(thumbBorder, thumbX - r, trackY - r, r * 2, r * 2);
             }
         }
     }

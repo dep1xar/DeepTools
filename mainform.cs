@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -9,8 +9,6 @@ namespace DeepTools
     public class MainForm : Form
     {
         private bool isAdmin;
-        private Point dragStart;
-        private bool draggingForm = false;
 
         private Panel sidebar;
         private Panel contentArea;
@@ -101,6 +99,8 @@ namespace DeepTools
 
             Load += (s, e) => ApplyRoundedRegion();
             Load += (s, e) => RegisterHotkeys();
+            // Прогрев разделов: строим их по одному уже после показа окна
+            Shown += (s, e) => WarmUpPanels();
             Shown += (s, e) => {
                 // Первый запуск: короткий мастер знакомства
                 if (AppConfig.GetBool("wizard_pending", false))
@@ -151,6 +151,7 @@ namespace DeepTools
         // Если NVML недоступен (не NVIDIA) - остаётся обычная иконка
         private System.Windows.Forms.Timer trayStatsTimer;
         private Icon lastTrayIcon;
+        private int lastTrayTemp = int.MinValue;
 
         private void StartTrayMonitor()
         {
@@ -168,6 +169,11 @@ namespace DeepTools
                 trayIcon.Text = "DeepTools";
                 return;
             }
+
+            // Значок перерисовываем только когда температура реально изменилась:
+            // раньше каждые 3 секунды создавался новый Bitmap и HICON, и трей мигал
+            if (temp == lastTrayTemp) return;
+            lastTrayTemp = temp;
 
             // Рисуем цифру температуры на значке 16x16
             using (var bmp = new Bitmap(16, 16))
@@ -327,19 +333,19 @@ namespace DeepTools
         {
             if (id == NativeMethods.HOTKEY_ID_CLICKER)
             {
-                panelClicker.ToggleRunning();
+                GetClicker().ToggleRunning();
             }
             else if (id == NativeMethods.HOTKEY_ID_SCREENSHOT)
             {
-                panelScreenshots.CaptureScreen();
+                GetScreenshots().CaptureScreen();
             }
             else if (id == NativeMethods.HOTKEY_ID_OVERLAY)
             {
-                panelBooster.ToggleOverlay();
+                GetBooster().ToggleOverlay();
             }
             else if (id == NativeMethods.HOTKEY_ID_REGION)
             {
-                panelScreenshots.CaptureRegion();
+                GetScreenshots().CaptureRegion();
             }
         }
 
@@ -407,11 +413,10 @@ namespace DeepTools
         private void BuildShell()
         {
             var titleBar = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = Theme.BgColor };
-            titleBar.MouseDown += (s, e) => { draggingForm = true; dragStart = new Point(e.X, e.Y); };
-            titleBar.MouseMove += (s, e) => {
-                if (draggingForm) Location = new Point(Location.X + e.X - dragStart.X, Location.Y + e.Y - dragStart.Y);
-            };
-            titleBar.MouseUp += (s, e) => { draggingForm = false; };
+            // Перетаскивание за шапку: точка захвата считается от курсора, а не от
+            // уезжающего вместе с окном контрола - окно едет ровно под мышью,
+            // без отставания и рывков
+            WindowDrag.Attach(titleBar, this);
 
             var dot = new Panel { Size = new Size(10, 10), Location = new Point(16, 12), BackColor = Color.Transparent };
             dot.Paint += (s, e) => {
@@ -527,16 +532,16 @@ namespace DeepTools
             navHome.Click += (s, e) => ShowPanel(panelHome, navHome);
             navSysInfo.Click += (s, e) => ShowPanel(GetSysInfo(), navSysInfo);
             navCleanup.Click += (s, e) => ShowPanel(GetCleanup(), navCleanup);
-            navBooster.Click += (s, e) => ShowPanel(panelBooster, navBooster);
-            navGameTweaks.Click += (s, e) => ShowPanel(panelGameTweaks, navGameTweaks);
-            navHealth.Click += (s, e) => ShowPanel(panelHealth, navHealth);
+            navBooster.Click += (s, e) => ShowPanel(GetBooster(), navBooster);
+            navGameTweaks.Click += (s, e) => ShowPanel(GetGameTweaks(), navGameTweaks);
+            navHealth.Click += (s, e) => ShowPanel(GetHealth(), navHealth);
             navStartup.Click += (s, e) => ShowPanel(GetStartup(), navStartup);
             navServices.Click += (s, e) => ShowPanel(GetServices(), navServices);
             navVisual.Click += (s, e) => ShowPanel(GetVisual(), navVisual);
-            navClicker.Click += (s, e) => ShowPanel(panelClicker, navClicker);
-            navScreenshots.Click += (s, e) => ShowPanel(panelScreenshots, navScreenshots);
-            navClipboard.Click += (s, e) => ShowPanel(panelClipboard, navClipboard);
-            navNetwork.Click += (s, e) => ShowPanel(panelNetwork, navNetwork);
+            navClicker.Click += (s, e) => ShowPanel(GetClicker(), navClicker);
+            navScreenshots.Click += (s, e) => ShowPanel(GetScreenshots(), navScreenshots);
+            navClipboard.Click += (s, e) => ShowPanel(GetClipboard(), navClipboard);
+            navNetwork.Click += (s, e) => ShowPanel(GetNetwork(), navNetwork);
             navSettings.Click += (s, e) => ShowPanel(panelSettings, navSettings);
 
             contentArea = new Panel { Location = new Point(220, 34), Size = new Size(760, 616), BackColor = Theme.BgColor };
@@ -546,49 +551,104 @@ namespace DeepTools
             panelHome = new HomePanel();
             panelHome.RequestNavigate += key => {
                 if (key == "cleanup") ShowPanel(GetCleanup(), navCleanup);
-                else if (key == "booster") ShowPanel(panelBooster, navBooster);
-                else if (key == "health") ShowPanel(panelHealth, navHealth);
-                else if (key == "clicker") ShowPanel(panelClicker, navClicker);
-                else if (key == "screenshots") ShowPanel(panelScreenshots, navScreenshots);
+                else if (key == "booster") ShowPanel(GetBooster(), navBooster);
+                else if (key == "health") ShowPanel(GetHealth(), navHealth);
+                else if (key == "clicker") ShowPanel(GetClicker(), navClicker);
+                else if (key == "screenshots") ShowPanel(GetScreenshots(), navScreenshots);
                 else if (key == "settings") ShowPanel(panelSettings, navSettings);
             };
-            contentArea.Controls.Add(panelHome);
-            panelHome.Visible = false;
-
-            panelBooster = new GameBoosterPanel();
-            contentArea.Controls.Add(panelBooster);
-            panelBooster.Visible = false;
-
-            panelGameTweaks = new GameTweaksPanel();
-            contentArea.Controls.Add(panelGameTweaks);
-            panelGameTweaks.Visible = false;
-
-            panelHealth = new HealthCheckPanel();
-            contentArea.Controls.Add(panelHealth);
-            panelHealth.Visible = false;
-
-            panelClicker = new ClickerPanel();
-            contentArea.Controls.Add(panelClicker);
-            panelClicker.Visible = false;
-
-            panelScreenshots = new ScreenshotsPanel();
-            panelScreenshots.SetHotkeyDisplay(Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT).ToString());
-            panelScreenshots.RequestHotkeyCapture += (s, e) => {
-                awaitingCaptureId = NativeMethods.HOTKEY_ID_SCREENSHOT;
-                panelScreenshots.SetHotkeyDisplay(Lang.T("Нажми любую клавишу...", "Press any key..."));
-            };
-            contentArea.Controls.Add(panelScreenshots);
-            panelScreenshots.Visible = false;
-
-            panelClipboard = new ClipboardManagerPanel();
-            contentArea.Controls.Add(panelClipboard);
-            panelClipboard.Visible = false;
-
-            panelNetwork = new NetworkPanel();
-            contentArea.Controls.Add(panelNetwork);
-            panelNetwork.Visible = false;
+            RegisterPanel(panelHome);
 
             panelSettings = BuildSettingsPanel();
+        }
+
+        // Все разделы, которые нужно прятать при переключении
+        private readonly System.Collections.Generic.List<Panel> allPanels =
+            new System.Collections.Generic.List<Panel>();
+        private readonly System.Collections.Generic.List<SidebarNavButton> allNavs =
+            new System.Collections.Generic.List<SidebarNavButton>();
+
+        private void RegisterPanel(Panel panel)
+        {
+            panel.Visible = false;
+            contentArea.Controls.Add(panel);
+            allPanels.Add(panel);
+        }
+
+        // Тяжёлые панели строим не в конструкторе окна, а сразу после первого
+        // показа, по одной за сообщение: окно появляется мгновенно, а интерфейс
+        // не «замирает» на секунду, пока собираются сотни контролов.
+        // Порядок - от самых нужных к самым тяжёлым
+        private void WarmUpPanels()
+        {
+            var queue = new System.Collections.Generic.Queue<Action>(new Action[] {
+                () => GetHealth(), () => GetClicker(), () => GetBooster(), () => GetGameTweaks(),
+                () => GetScreenshots(), () => GetNetwork(), () => GetClipboard(), () => GetCleanup(),
+                () => GetStartup(), () => GetServices(), () => GetSysInfo(), () => GetVisual()
+            });
+
+            Action step = null;
+            step = () => {
+                try
+                {
+                    if (IsDisposed || !IsHandleCreated) return;
+                    if (queue.Count > 0)
+                    {
+                        Action build = queue.Dequeue();
+                        try { build(); } catch { }
+                    }
+                    if (queue.Count > 0 && !IsDisposed && IsHandleCreated) BeginInvoke(new Action(step));
+                }
+                catch { }
+            };
+            BeginInvoke(new Action(step));
+        }
+
+        // Разделы создаются при первом обращении: и при клике в сайдбаре, и при
+        // прогреве после старта, и по горячей клавише - всегда один и тот же экземпляр
+        private ClickerPanel GetClicker()
+        {
+            if (panelClicker == null) { panelClicker = new ClickerPanel(); RegisterPanel(panelClicker); }
+            return panelClicker;
+        }
+        private HealthCheckPanel GetHealth()
+        {
+            if (panelHealth == null) { panelHealth = new HealthCheckPanel(); RegisterPanel(panelHealth); }
+            return panelHealth;
+        }
+        private GameBoosterPanel GetBooster()
+        {
+            if (panelBooster == null) { panelBooster = new GameBoosterPanel(); RegisterPanel(panelBooster); }
+            return panelBooster;
+        }
+        private GameTweaksPanel GetGameTweaks()
+        {
+            if (panelGameTweaks == null) { panelGameTweaks = new GameTweaksPanel(); RegisterPanel(panelGameTweaks); }
+            return panelGameTweaks;
+        }
+        private NetworkPanel GetNetwork()
+        {
+            if (panelNetwork == null) { panelNetwork = new NetworkPanel(); RegisterPanel(panelNetwork); }
+            return panelNetwork;
+        }
+        private ClipboardManagerPanel GetClipboard()
+        {
+            if (panelClipboard == null) { panelClipboard = new ClipboardManagerPanel(); RegisterPanel(panelClipboard); }
+            return panelClipboard;
+        }
+        private ScreenshotsPanel GetScreenshots()
+        {
+            if (panelScreenshots == null)
+            {
+                panelScreenshots = new ScreenshotsPanel();
+                panelScreenshots.SetHotkeyDisplay(Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT).ToString());
+                panelScreenshots.RequestHotkeyCapture += (s, e) => {
+                    awaitingCaptureId = NativeMethods.HOTKEY_ID_SCREENSHOT;
+                    panelScreenshots.SetHotkeyDisplay(Lang.T("Нажми любую клавишу...", "Press any key..."));
+                };
+                RegisterPanel(panelScreenshots);
+            }
+            return panelScreenshots;
         }
 
         private SidebarNavButton MakeNavItem(string text, int y)
@@ -599,6 +659,7 @@ namespace DeepTools
                 Size = new Size(196, 33)
             };
             sidebar.Controls.Add(item);
+            allNavs.Add(item);
             return item;
         }
 
@@ -621,27 +682,27 @@ namespace DeepTools
         // старте - так окно показывается заметно быстрее (важно на слабых ПК)
         private Panel GetCleanup()
         {
-            if (panelCleanup == null) { panelCleanup = new SmartCleanupPanel(); contentArea.Controls.Add(panelCleanup); panelCleanup.Visible = false; }
+            if (panelCleanup == null) { panelCleanup = new SmartCleanupPanel(); RegisterPanel(panelCleanup); }
             return panelCleanup;
         }
         private SystemInfoPanel GetSysInfo()
         {
-            if (panelSysInfo == null) { panelSysInfo = new SystemInfoPanel(); contentArea.Controls.Add(panelSysInfo); panelSysInfo.Visible = false; }
+            if (panelSysInfo == null) { panelSysInfo = new SystemInfoPanel(); RegisterPanel(panelSysInfo); }
             return panelSysInfo;
         }
         private StartupPanel GetStartup()
         {
-            if (panelStartup == null) { panelStartup = new StartupPanel(); contentArea.Controls.Add(panelStartup); panelStartup.Visible = false; }
+            if (panelStartup == null) { panelStartup = new StartupPanel(); RegisterPanel(panelStartup); }
             return panelStartup;
         }
         private ServicesPanel GetServices()
         {
-            if (panelServices == null) { panelServices = new ServicesPanel(); contentArea.Controls.Add(panelServices); panelServices.Visible = false; }
+            if (panelServices == null) { panelServices = new ServicesPanel(); RegisterPanel(panelServices); }
             return panelServices;
         }
         private VisualEffectsPanel GetVisual()
         {
-            if (panelVisual == null) { panelVisual = new VisualEffectsPanel(); contentArea.Controls.Add(panelVisual); panelVisual.Visible = false; }
+            if (panelVisual == null) { panelVisual = new VisualEffectsPanel(); RegisterPanel(panelVisual); }
             return panelVisual;
         }
 
@@ -650,11 +711,11 @@ namespace DeepTools
         private void NavigateByKey(string key)
         {
             if (key == "cleanup") ShowPanel(GetCleanup(), navCleanup);
-            else if (key == "booster") ShowPanel(panelBooster, navBooster);
-            else if (key == "gametweaks") ShowPanel(panelGameTweaks, navGameTweaks);
-            else if (key == "health") ShowPanel(panelHealth, navHealth);
-            else if (key == "clicker") ShowPanel(panelClicker, navClicker);
-            else if (key == "screenshots") ShowPanel(panelScreenshots, navScreenshots);
+            else if (key == "booster") ShowPanel(GetBooster(), navBooster);
+            else if (key == "gametweaks") ShowPanel(GetGameTweaks(), navGameTweaks);
+            else if (key == "health") ShowPanel(GetHealth(), navHealth);
+            else if (key == "clicker") ShowPanel(GetClicker(), navClicker);
+            else if (key == "screenshots") ShowPanel(GetScreenshots(), navScreenshots);
             else if (key == "settings") ShowPanel(panelSettings, navSettings);
             else if (key == "services") ShowPanel(GetServices(), navServices);
             else if (key == "startup") ShowPanel(GetStartup(), navStartup);
@@ -662,35 +723,12 @@ namespace DeepTools
 
         private void ShowPanel(Panel panel, SidebarNavButton navItem)
         {
-            panelHome.Visible = false;
-            if (panelCleanup != null) panelCleanup.Visible = false;
-            panelBooster.Visible = false;
-            panelGameTweaks.Visible = false;
-            panelHealth.Visible = false;
-            if (panelSysInfo != null) panelSysInfo.Visible = false;
-            if (panelStartup != null) panelStartup.Visible = false;
-            if (panelServices != null) panelServices.Visible = false;
-            if (panelVisual != null) panelVisual.Visible = false;
-            panelClicker.Visible = false;
-            panelScreenshots.Visible = false;
-            panelClipboard.Visible = false;
-            panelNetwork.Visible = false;
-            panelSettings.Visible = false;
-
-            navHome.SetActive(false);
-            navCleanup.SetActive(false);
-            navBooster.SetActive(false);
-            navGameTweaks.SetActive(false);
-            navHealth.SetActive(false);
-            navSysInfo.SetActive(false);
-            navStartup.SetActive(false);
-            navServices.SetActive(false);
-            navVisual.SetActive(false);
-            navClicker.SetActive(false);
-            navScreenshots.SetActive(false);
-            navClipboard.SetActive(false);
-            navNetwork.SetActive(false);
-            navSettings.SetActive(false);
+            for (int i = 0; i < allPanels.Count; i++)
+            {
+                Panel p = allPanels[i];
+                if (p != null && !p.IsDisposed && p != panel) p.Visible = false;
+            }
+            for (int i = 0; i < allNavs.Count; i++) allNavs[i].SetActive(false);
 
             panel.Visible = true;
             navItem.SetActive(true);
@@ -736,14 +774,16 @@ namespace DeepTools
                 slideTimer.Tick += (s, e) => {
                     if (slidingPanel == null) { slideTimer.Stop(); return; }
                     int left = slidingPanel.Left;
-                    if (left <= 2) { slidingPanel.Left = 0; slideTimer.Stop(); return; }
-                    slidingPanel.Left = left - Math.Max(2, left / 2);
+                    // Затухание с мелким шагом: раньше панель проезжала 22 px за
+                    // 4 кадра и выглядела как рывок, теперь это плавный доезд
+                    if (left <= 1) { slidingPanel.Left = 0; slideTimer.Stop(); return; }
+                    slidingPanel.Left = left - Math.Max(1, left / 3);
                 };
             }
             // Если предыдущая анимация не доиграла - фиксируем прошлую панель
             if (slidingPanel != null && slidingPanel != panel) slidingPanel.Left = 0;
             slidingPanel = panel;
-            panel.Left = 22;
+            panel.Left = 26;
             slideTimer.Start();
         }
 
@@ -761,7 +801,7 @@ namespace DeepTools
         private Panel BuildSettingsPanel()
         {
             var panel = new Panel { Location = new Point(0, 0), Size = new Size(760, 616), BackColor = Theme.BgColor, Visible = false };
-            contentArea.Controls.Add(panel);
+            RegisterPanel(panel);
 
             var titleLbl = new Label
             {

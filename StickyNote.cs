@@ -157,8 +157,6 @@ namespace DeepTools
         private TextBox textBox;
         private Label bellBtn;
         private DateTime reminder = DateTime.MinValue;
-        private Point dragStart;
-        private bool dragging = false;
         private bool suppressSave = true;
 
         public StickyNoteForm(string noteId, string content, Rectangle bounds, DateTime reminderAt)
@@ -174,11 +172,9 @@ namespace DeepTools
             BackColor = NoteBg;
 
             var bar = new Panel { Dock = DockStyle.Top, Height = 24, BackColor = NoteBar };
-            bar.MouseDown += (s, e) => { dragging = true; dragStart = new Point(e.X, e.Y); };
-            bar.MouseMove += (s, e) => {
-                if (dragging) Location = new Point(Location.X + e.X - dragStart.X, Location.Y + e.Y - dragStart.Y);
-            };
-            bar.MouseUp += (s, e) => { dragging = false; SaveNote(); };
+            // Перетаскивание за шапку: точка захвата считается от курсора, а не от
+            // уезжающего вместе с окном контрола - заметка едет ровно под мышью
+            WindowDrag.Attach(bar, this, SaveNote);
             Controls.Add(bar);
 
             var addBtn = new Label

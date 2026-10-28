@@ -11,8 +11,6 @@ namespace DeepTools
     public class WidgetForm : Form
     {
         private System.Windows.Forms.Timer refreshTimer;
-        private Point dragStart;
-        private bool draggingForm = false;
 
         public WidgetForm()
         {
@@ -37,15 +35,12 @@ namespace DeepTools
             }
             Location = new Point(x, y);
 
-            MouseDown += (s, e) => { draggingForm = true; dragStart = new Point(e.X, e.Y); };
-            MouseMove += (s, e) => {
-                if (draggingForm) Location = new Point(Location.X + e.X - dragStart.X, Location.Y + e.Y - dragStart.Y);
-            };
-            MouseUp += (s, e) => {
-                draggingForm = false;
+            // Виджет таскается целиком. Точка захвата считается от курсора, иначе
+            // окно «догоняет» мышь рывками; позиция сохраняется по отпусканию
+            WindowDrag.Attach(this, this, () => {
                 AppConfig.Set("widget_x", Location.X.ToString());
                 AppConfig.Set("widget_y", Location.Y.ToString());
-            };
+            });
 
             Load += (s, e) => ApplyRoundedRegion();
 

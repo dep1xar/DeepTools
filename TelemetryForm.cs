@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -264,8 +264,6 @@ namespace DeepTools
         private RoundedButton revertBtn;
         private bool working;
 
-        private Point dragStart;
-        private bool draggingForm = false;
 
         public TelemetryForm()
         {
@@ -298,11 +296,9 @@ namespace DeepTools
         private void BuildUi()
         {
             var titleBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Theme.BgColor };
-            titleBar.MouseDown += (s, e) => { draggingForm = true; dragStart = new Point(e.X, e.Y); };
-            titleBar.MouseMove += (s, e) => {
-                if (draggingForm) Location = new Point(Location.X + e.X - dragStart.X, Location.Y + e.Y - dragStart.Y);
-            };
-            titleBar.MouseUp += (s, e) => { draggingForm = false; };
+            // Перетаскивание за шапку: точка захвата считается от курсора, а не от
+            // уезжающего вместе с окном контрола - окно едет ровно под мышью
+            WindowDrag.Attach(titleBar, this);
             Controls.Add(titleBar);
 
             var titleLbl = new Label

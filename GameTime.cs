@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -177,9 +177,6 @@ namespace DeepTools
             public int FpsSec;            // сумма длительностей сессий, где FPS был замерен
         }
 
-        private Point dragStart;
-        private bool draggingForm = false;
-
         private FlowLayoutPanel list;
         private Label summaryLabel;
         private RoundedButton purgeBtn;
@@ -217,11 +214,9 @@ namespace DeepTools
         private void BuildUi()
         {
             var titleBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Theme.BgColor };
-            titleBar.MouseDown += (s, e) => { draggingForm = true; dragStart = new Point(e.X, e.Y); };
-            titleBar.MouseMove += (s, e) => {
-                if (draggingForm) Location = new Point(Location.X + e.X - dragStart.X, Location.Y + e.Y - dragStart.Y);
-            };
-            titleBar.MouseUp += (s, e) => { draggingForm = false; };
+            // Перетаскивание за шапку: точка захвата считается от курсора, а не от
+            // уезжающего вместе с окном контрола - окно едет ровно под мышью
+            WindowDrag.Attach(titleBar, this);
             Controls.Add(titleBar);
 
             var titleLbl = new Label
@@ -607,8 +602,6 @@ namespace DeepTools
     // javaw.exe у кого-то это Minecraft, а не «просто Java»
     public class GameIgnoreForm : Form
     {
-        private Point dragStart;
-        private bool dragging;
         private FlowLayoutPanel list;
 
         public GameIgnoreForm()
@@ -641,12 +634,9 @@ namespace DeepTools
         private void BuildUi()
         {
             var titleBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Theme.BgColor };
-            titleBar.MouseDown += (s, e) => { dragging = true; dragStart = new Point(e.X, e.Y); };
-            titleBar.MouseMove += (s, e) =>
-            {
-                if (dragging) Location = new Point(Location.X + e.X - dragStart.X, Location.Y + e.Y - dragStart.Y);
-            };
-            titleBar.MouseUp += (s, e) => { dragging = false; };
+            // Перетаскивание за шапку: точка захвата считается от курсора, а не от
+            // уезжающего вместе с окном контрола - окно едет ровно под мышью
+            WindowDrag.Attach(titleBar, this);
             Controls.Add(titleBar);
 
             var titleLbl = new Label
