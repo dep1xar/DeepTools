@@ -75,15 +75,24 @@ No installer, no dependencies to download — all libraries (including the hardw
 
 You need the **.NET Framework 4.x** SDK (ships with Windows / Visual Studio; the compiler lives at `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
 
-**Easiest way — double-click `build.bat`.** It runs the build and keeps the window open so you can read the result or any error. Make sure you downloaded the **whole repository** (Code → Download ZIP): every `.cs` file and every `.dll` must sit next to `build.ps1`, otherwise the build fails.
+Make sure you downloaded the **whole repository** (Code → Download ZIP): every `.cs` file and every `.dll` must sit next to `build.ps1`, otherwise the build fails.
 
-Or run it yourself from a PowerShell terminal (so the window doesn't close):
+Open a PowerShell window in the project folder and run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File build.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 ```
 
 The script compiles all `.cs` files, embeds the managed DLLs as resources and produces `DeepTools.exe` in the project folder.
+
+The script prints a clearly marked **BUILD OK** or **BUILD FAILED** block at the end, so a problem is never silent:
+
+- **BUILD FAILED: COMPILATION ERROR** — the compiler messages are printed above the banner.
+- **BUILD FAILED: Missing DLL / Missing file** — the repository was unpacked partially.
+- **BUILD OK, but the exe could not be installed** — `DeepTools.exe` was running. Close it (tray icon → Exit) and run the build again.
+
+If `DeepTools.exe` is currently running, the script renames it to `DeepTools_old.exe` and puts the fresh build in place, so you do not have to close the app first.
+
 
 ### System requirements
 
@@ -163,15 +172,24 @@ DeepTools — системный твикер, поэтому он делает 
 
 Нужен **.NET Framework 4.x** SDK (идёт с Windows / Visual Studio; компилятор лежит по пути `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
 
-**Самый простой способ — двойной клик по `build.bat`.** Он запускает сборку и оставляет окно открытым, чтобы можно было прочитать результат или текст ошибки. Убедись, что скачал **весь репозиторий** (Code → Download ZIP): рядом с `build.ps1` должны лежать все `.cs` и все `.dll`, иначе сборка не пройдёт.
+Убедись, что скачал **весь репозиторий** (Code → Download ZIP): рядом с `build.ps1` должны лежать все `.cs` и все `.dll`, иначе сборка не пройдёт.
 
-Или запусти вручную из терминала PowerShell (чтобы окно не закрылось):
+Открой PowerShell в папке проекта и запусти:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File build.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 ```
 
 Скрипт компилирует все `.cs`-файлы, встраивает managed-библиотеки как ресурсы и создаёт `DeepTools.exe` в папке проекта.
+
+В конце всегда печатается заметный блок **BUILD OK** или **BUILD FAILED**, поэтому ошибка не проходит молча:
+
+- **BUILD FAILED: COMPILATION ERROR** — текст ошибок компилятора напечатан над баннером.
+- **BUILD FAILED: Missing DLL / Missing file** — репозиторий распакован не полностью.
+- **BUILD OK, but the exe could not be installed** — `DeepTools.exe` был запущен. Закрой его (трей → Выход) и запусти сборку снова.
+
+Если `DeepTools.exe` сейчас запущен, скрипт переименует его в `DeepTools_old.exe` и подставит свежую сборку, так что закрывать программу заранее не обязательно.
+
 
 ### Системные требования
 

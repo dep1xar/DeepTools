@@ -7,6 +7,11 @@ obj/
 # Собранные исполняемые файлы (кладутся в GitHub Releases, а не в репозиторий)
 DeepTools.exe
 DeepTools_build.exe
+DeepTools_old.exe
+
+# Логи сборки
+build.log
+build.log.err
 
 # Установщики сторонних компонентов
 PawnIO_setup.exe
