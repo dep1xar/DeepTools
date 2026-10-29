@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -16,6 +16,14 @@ namespace DeepTools
         private RoundedButton regionBtn;
         private Label captureHint;
         private FlowLayoutPanel gallery;
+
+        // Защита от повторного входа. Хоткей диспатчится из WndProc главного окна,
+        // а ShowDialog крутит вложенный цикл сообщений - поэтому каждое лишнее
+        // нажатие F6 открывало ЕЩЁ одно полноэкранное окно поверх предыдущего.
+        // Отсюда была стопка оверлеев, чёрный экран (новое окно снимало уже
+        // затемнённый предыдущим экран) и Esc, который закрывал только верхнее.
+        private static bool regionBusy;
+        private static bool screenBusy;
 
         public ScreenshotsPanel()
         {
@@ -151,38 +159,56 @@ namespace DeepTools
         // Скриншот выделенной области с разметкой (стрелки, рамки, текст)
         public void CaptureRegion()
         {
-            using (var form = new RegionCaptureForm())
+            // Один захват за раз - иначе окна копятся стопкой.
+            // Заодно не снимаем экран, пока открыт оверлей выделения:
+            // иначе в кадр попадал сам оверлей (тот самый «чёрный экран»)
+            if (regionBusy || screenBusy) return;
+            regionBusy = true;
+            try
             {
-                if (form.ShowDialog() != DialogResult.OK || form.ResultImage == null) return;
-
-                try
+                using (var form = new RegionCaptureForm())
                 {
-                    if (!Directory.Exists(ScreenshotsFolder)) Directory.CreateDirectory(ScreenshotsFolder);
+                    if (form.ShowDialog() != DialogResult.OK || form.ResultImage == null) return;
 
-                    string fileName = "region_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png";
-                    string fullPath = Path.Combine(ScreenshotsFolder, fileName);
-                    form.ResultImage.Save(fullPath, ImageFormat.Png);
+                    try
+                    {
+                        if (!Directory.Exists(ScreenshotsFolder)) Directory.CreateDirectory(ScreenshotsFolder);
 
-                    bool copied = false;
-                    try { Clipboard.SetImage(form.ResultImage); copied = true; } catch { }
+                        string fileName = "region_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png";
+                        string fullPath = Path.Combine(ScreenshotsFolder, fileName);
+                        form.ResultImage.Save(fullPath, ImageFormat.Png);
 
-                    captureHint.Text = Lang.T("Сохранено: ", "Saved: ") + fileName
-                        + (copied ? Lang.T(" (в буфере - вставляй Ctrl+V)", " (in clipboard - paste with Ctrl+V)") : "");
-                    RefreshGallery();
+                        bool copied = false;
+                        try { Clipboard.SetImage(form.ResultImage); copied = true; } catch { }
+
+                        captureHint.Text = Lang.T("Сохранено: ", "Saved: ") + fileName
+                            + (copied ? Lang.T(" (в буфере - вставляй Ctrl+V)", " (in clipboard - paste with Ctrl+V)") : "");
+                        RefreshGallery();
+                    }
+                    catch (Exception ex)
+                    {
+                        captureHint.Text = Lang.T("Ошибка сохранения: ", "Save error: ") + ex.Message;
+                    }
+                    finally
+                    {
+                        form.ResultImage.Dispose();
+                    }
                 }
-                catch (Exception ex)
-                {
-                    captureHint.Text = Lang.T("Ошибка сохранения: ", "Save error: ") + ex.Message;
-                }
-                finally
-                {
-                    form.ResultImage.Dispose();
-                }
+            }
+            finally
+            {
+                regionBusy = false;
             }
         }
 
         public void CaptureScreen()
         {
+            // Спам хоткея не должен плодить параллельные захваты и сохранения.
+            // Пока открыт оверлей выделения, полный снимок не делаем - в кадр
+            // попал бы сам оверлей
+            if (screenBusy || regionBusy) return;
+            screenBusy = true;
+
             try
             {
                 if (!Directory.Exists(ScreenshotsFolder)) Directory.CreateDirectory(ScreenshotsFolder);
@@ -215,6 +241,7 @@ namespace DeepTools
                     bmp.Dispose();
                 };
                 bw.RunWorkerCompleted += delegate(object s2, System.ComponentModel.RunWorkerCompletedEventArgs e2) {
+                    screenBusy = false;
                     if (IsDisposed) return;
                     captureHint.Text = Lang.T("Сохранено: ", "Saved: ") + fileName
                         + (copied ? Lang.T(" (скопировано в буфер - вставляй Ctrl+V)", " (copied to clipboard - paste with Ctrl+V)") : "");
@@ -225,13 +252,23 @@ namespace DeepTools
             }
             catch (Exception ex)
             {
+                screenBusy = false;
                 captureHint.Text = Lang.T("Ошибка сохранения: ", "Save error: ") + ex.Message;
             }
         }
 
         private void RefreshGallery()
         {
-            gallery.Controls.Clear();
+            // Controls.Clear() не освобождает картинки, а PictureBox не диспозит
+            // свою Image - каждый Image.FromFile держал ещё и файловый handle.
+            // Без явного Dispose хендлы накапливались и интерфейс начинал лагать
+            for (int i = gallery.Controls.Count - 1; i >= 0; i--)
+            {
+                Control item = gallery.Controls[i];
+                gallery.Controls.RemoveAt(i);
+                DisposeThumbnails(item);
+                item.Dispose();
+            }
 
             if (!Directory.Exists(ScreenshotsFolder)) return;
 
@@ -246,6 +283,23 @@ namespace DeepTools
             }
         }
 
+        // Рекурсивно освобождает картинки превью перед удалением контролов
+        private static void DisposeThumbnails(Control parent)
+        {
+            if (parent == null) return;
+            for (int i = 0; i < parent.Controls.Count; i++)
+            {
+                Control child = parent.Controls[i];
+                PictureBox pb = child as PictureBox;
+                if (pb != null && pb.Image != null)
+                {
+                    try { pb.Image.Dispose(); } catch { }
+                    pb.Image = null;
+                }
+                DisposeThumbnails(child);
+            }
+        }
+
         private Panel MakeThumbnail(string path)
         {
             var item = new Panel { Size = new Size(140, 110), BackColor = Theme.CardColor, Margin = new Padding(6) };
@@ -257,7 +311,17 @@ namespace DeepTools
                 SizeMode = PictureBoxSizeMode.Zoom,
                 Cursor = Cursors.Hand
             };
-            try { pic.Image = Image.FromFile(path); } catch { }
+            // Читаем через поток и сразу снимаем копию: Image.FromFile держит
+            // файл открытым, из-за чего его нельзя было удалить/перезаписать
+            try
+            {
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var tmp = Image.FromStream(fs))
+                {
+                    pic.Image = new Bitmap(tmp);
+                }
+            }
+            catch { }
             pic.Click += (s, e) => {
                 try { Process.Start(path); } catch { }
             };

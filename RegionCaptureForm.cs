@@ -65,6 +65,8 @@ namespace DeepTools
             MouseUp += OnUp;
             MouseDoubleClick += (s, e) => { if (hasSelection) Finish(); };
             KeyDown += OnKey;
+            // Без фокуса окно не получит Esc - забираем его явно
+            Shown += (s, e) => { try { Activate(); Focus(); } catch { } };
 
             textInput = new TextBox
             {
@@ -96,22 +98,32 @@ namespace DeepTools
             base.OnFormClosed(e);
         }
 
-        private void OnKey(object sender, KeyEventArgs e)
+        // Esc и Enter ловим на уровне формы, а не только через KeyDown:
+        // KeyDown не приходит, если фокус на дочернем контроле, и окно
+        // «не закрывалось по Esc». Esc закрывает сразу - раньше первое
+        // нажатие снимало последнюю аннотацию, второе - выделение, и только
+        // третье закрывало окно, из-за чего казалось, что Esc не работает
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            if (e.KeyCode == Keys.Escape)
+            if (keyData == Keys.Escape)
             {
-                if (textInput.Visible) { textInput.Visible = false; return; }
-                if (annotations.Count > 0) { annotations.RemoveAt(annotations.Count - 1); Invalidate(); return; }
-                if (hasSelection) { hasSelection = false; selection = Rectangle.Empty; Invalidate(); return; }
+                if (textInput != null && textInput.Visible) return false; // пусть TextBox сам скроет ввод
                 DialogResult = DialogResult.Cancel;
                 Close();
+                return true;
             }
-            else if (e.KeyCode == Keys.Enter && hasSelection)
+            if (keyData == Keys.Enter)
             {
-                Finish();
+                if (textInput != null && textInput.Visible) return false; // Enter подтвердит текст
+                if (hasSelection) { Finish(); return true; }
             }
-            // Быстрый выбор инструмента с клавиатуры
-            else if (e.KeyCode == Keys.A) SetTool(Tool.Arrow);
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void OnKey(object sender, KeyEventArgs e)
+        {
+            // Esc/Enter обрабатывает ProcessCmdKey; здесь только инструменты
+            if (e.KeyCode == Keys.A) SetTool(Tool.Arrow);
             else if (e.KeyCode == Keys.R) SetTool(Tool.Rect);
             else if (e.KeyCode == Keys.T) SetTool(Tool.Text);
         }
