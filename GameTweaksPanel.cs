@@ -377,35 +377,97 @@ namespace DeepTools
                 }
             });
 
-            list.Add(new TweakDef
+            // PCIe ASPM пишется НЕ через powercfg. У каждой схемы питания своя
+            // копия настройки, а в «Сбалансированной» подгруппы PCIe может не
+            // быть вовсе — тогда setacvalueindex возвращает ошибку и раньше это
+            // выглядело как «нужны права администратора». И значение, записанное
+            // только в текущую схему, пропадало после переключения плана.
+            // Поэтому пишем напрямую в реестр всех схем, а результат проверяем
+            // чтением (а не кодом возврата), и перечитываем активную схему.
+            TweakDef aspm = new TweakDef();
+            aspm.Title = Lang.T("Отключить PCIe LPM (ASPM)", "Disable PCIe LPM (ASPM)");
+            aspm.Desc = Lang.T("Убирает энергосбережение шины: меньше задержки к GPU и NVMe",
+                               "Turns off link power management: lower latency to GPU and NVMe");
+            aspm.IsApplicable = () => ActiveSchemeGuid() != "";
+            aspm.IsApplied = () => AspmOffInScheme(ActiveSchemeGuid());
+            aspm.Apply = () =>
             {
-                Title = Lang.T("Отключить PCIe LPM (ASPM)", "Disable PCIe LPM (ASPM)"),
-                Desc = Lang.T("Убирает энергосбережение шины: меньше задержки к GPU и NVMe",
-                              "Turns off link power management: lower latency to GPU and NVMe"),
-                IsApplicable = () => ActiveSchemeGuid() != "",
-                // Проверяем и питание от сети, и от батареи: раньше смотрели только AC
-                IsApplied = () => AspmValue("ACSettingIndex") == 0 && AspmValue("DCSettingIndex") == 0,
-                Apply = () =>
+                string active = ActiveSchemeGuid();
+                if (active == "")
                 {
-                    string g = ActiveSchemeGuid();
-                    if (g == "") return false;
-                    BackupDword(RegHklm, AspmKey(g), "ACSettingIndex", "gt_aspm_ac");
-                    BackupDword(RegHklm, AspmKey(g), "DCSettingIndex", "gt_aspm_dc");
-                    bool a = RunPowercfg("/setacvalueindex " + g + " SUB_PCIEXPRESS PCIEXPRESS_ASPM 0");
-                    bool b = RunPowercfg("/setdcvalueindex " + g + " SUB_PCIEXPRESS PCIEXPRESS_ASPM 0");
-                    bool c = RunPowercfg("/setactive " + g);
-                    return a && b && c;
-                },
-                Revert = () =>
-                {
-                    string g = ActiveSchemeGuid();
-                    if (g == "") return false;
-                    bool a = RestorePowerIndex(g, "ACSettingIndex", "gt_aspm_ac");
-                    bool b = RestorePowerIndex(g, "DCSettingIndex", "gt_aspm_dc");
-                    RunPowercfg("/setactive " + g);
-                    return a && b;
+                    aspm.LastError = Lang.T("Не удалось определить активную схему питания.",
+                                            "Could not determine the active power scheme.");
+                    return false;
                 }
-            });
+
+                List<string> schemes = AllSchemeGuids();
+                if (schemes.Count == 0) schemes.Add(active);
+
+                // Бэкап по всем схемам: у каждой своё значение
+                AppConfig.Set("gt_aspm_backup", EncodeAspmBackup(schemes));
+
+                // Активную схему пробуем штатным powercfg: если Windows знает
+                // эту настройку, она применится сразу и без хаков
+                RunPowercfg("/setacvalueindex " + active + " SUB_PCIEXPRESS PCIEXPRESS_ASPM 0");
+                RunPowercfg("/setdcvalueindex " + active + " SUB_PCIEXPRESS PCIEXPRESS_ASPM 0");
+
+                // Дальше пишем значение во все схемы напрямую: powercfg
+                // отказывается работать со схемой, в которой подгруппы PCIe нет
+                // (именно это и давало ложное «нужны права администратора»),
+                // а настройка, записанная только в текущую схему, пропадала
+                // после переключения плана питания
+                int written = 0;
+                for (int i = 0; i < schemes.Count; i++)
+                {
+                    string g = schemes[i];
+                    if (!SchemeExists(g)) continue;
+                    bool ac = SetAspmDword(g, "ACSettingIndex", 0);
+                    bool dc = SetAspmDword(g, "DCSettingIndex", 0);
+                    if (ac || dc) written++;
+                }
+
+                // Перечитать настройки активной схемы
+                RunPowercfg("/setactive " + active);
+
+                if (written == 0)
+                {
+                    aspm.LastError = Lang.T("Нет доступа к реестру схем питания. Запусти DeepTools от имени администратора.",
+                                            "No access to the power scheme registry. Run DeepTools as administrator.");
+                    return false;
+                }
+
+                if (!AspmOffInScheme(active))
+                {
+                    aspm.LastError = Lang.T("Значение записано, но Windows не применила его к активной схеме.",
+                                            "The value was written but Windows did not apply it to the active scheme.");
+                    return false;
+                }
+                return true;
+            };
+            aspm.Revert = () =>
+            {
+                if (RestoreAspmBackup())
+                {
+                    string act = ActiveSchemeGuid();
+                    if (act != "") RunPowercfg("/setactive " + act);
+                    return true;
+                }
+
+                // Бэкапа нет (например, значение ставила прошлая версия) —
+                // убираем наше значение и возвращаем поведение Windows по умолчанию
+                bool ok = true;
+                List<string> all = AllSchemeGuids();
+                for (int i = 0; i < all.Count; i++)
+                {
+                    if (!SchemeExists(all[i])) continue;
+                    ok &= DelRegValue(RegHklm, AspmKey(all[i]), "ACSettingIndex");
+                    ok &= DelRegValue(RegHklm, AspmKey(all[i]), "DCSettingIndex");
+                }
+                string active2 = ActiveSchemeGuid();
+                if (active2 != "") RunPowercfg("/setactive " + active2);
+                return ok;
+            };
+            list.Add(aspm);
 
             list.Add(new TweakDef
             {
@@ -575,13 +637,30 @@ namespace DeepTools
                 working = true;
                 bool ok;
                 try { ok = applied ? def.Revert() : def.Apply(); }
-                catch { ok = false; }
+                catch (Exception ex) { ok = false; def.LastError = ex.Message; }
                 working = false;
 
                 if (!ok)
                 {
-                    DTDialog.Show(Lang.T("Не удалось применить (нужны права администратора?)",
-                                         "Failed to apply (administrator rights needed?)"), "DeepTools");
+                    // Показываем настоящую причину, а не «нужны права админа»:
+                    // у разных твиков она разная (нет настройки в схеме питания,
+                    // служба отсутствует, значение не применилось и т.д.)
+                    string reason = def.LastError;
+                    if (string.IsNullOrEmpty(reason))
+                    {
+                        reason = Lang.T("Не удалось применить твик. Проверь права администратора.",
+                                        "Failed to apply the tweak. Check administrator rights.");
+                    }
+                    // Если процесс правда запущен без прав - так и скажем, это
+                    // самая частая причина, но далеко не единственная
+                    if (!Program.IsRunningAsAdmin())
+                    {
+                        reason += Environment.NewLine + Environment.NewLine
+                            + Lang.T("DeepTools запущен БЕЗ прав администратора — поэтому изменение и не прошло.",
+                                     "DeepTools is NOT running as administrator, which is why the change failed.");
+                    }
+                    DTDialog.Show(reason, "DeepTools");
+                    def.LastError = null;
                 }
 
                 RefreshStatus();
@@ -677,6 +756,9 @@ namespace DeepTools
             public Func<bool> IsApplied = () => false;
             public Func<bool> Apply = () => false;
             public Func<bool> Revert = () => false;
+            // Причина последней неудачи: карточка показывает её вместо
+            // общего «нужны права администратора?»
+            public string LastError;
         }
 
         // ---- Реестр / система ----
@@ -815,6 +897,97 @@ namespace DeepTools
             string g = ActiveSchemeGuid();
             if (g == "") return null;
             return RegDword(RegHklm, AspmKey(g), name);
+        }
+
+        // Все GUID-ы схем питания из реестра: ASPM нужно ставить в каждую,
+        // иначе после смены плана твик «отваливается»
+        private static List<string> AllSchemeGuids()
+        {
+            var result = new List<string>();
+            try
+            {
+                using (var k = RegHklm.OpenSubKey(PowerSchemesKey))
+                {
+                    if (k == null) return result;
+                    string[] names = k.GetSubKeyNames();
+                    for (int i = 0; i < names.Length; i++)
+                    {
+                        Guid parsed;
+                        if (Guid.TryParse(names[i], out parsed))
+                            result.Add(names[i].ToLowerInvariant());
+                    }
+                }
+            }
+            catch { }
+            return result;
+        }
+
+        // «ASPM выключен» для конкретной схемы. На десктопе DC-значения может
+        // не быть вовсе — тогда достаточно AC, иначе карточка никогда не зеленела
+        private static bool AspmOffInScheme(string schemeGuid)
+        {
+            if (string.IsNullOrEmpty(schemeGuid)) return false;
+            int? ac = RegDword(RegHklm, AspmKey(schemeGuid), "ACSettingIndex");
+            if (ac != 0) return false;
+            int? dc = RegDword(RegHklm, AspmKey(schemeGuid), "DCSettingIndex");
+            return !dc.HasValue || dc.Value == 0;
+        }
+
+        private static bool SetAspmDword(string schemeGuid, string name, int value)
+        {
+            try
+            {
+                using (var k = RegHklm.CreateSubKey(AspmKey(schemeGuid)))
+                {
+                    if (k == null) return false;
+                    k.SetValue(name, value, RegistryValueKind.DWord);
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        // Бэкап: "guid|ac|dc;guid|ac|dc", где ac/dc — число или "n" (значения не было)
+        private static string EncodeAspmBackup(List<string> schemes)
+        {
+            var parts = new List<string>();
+            for (int i = 0; i < schemes.Count; i++)
+            {
+                string g = schemes[i];
+                int? ac = RegDword(RegHklm, AspmKey(g), "ACSettingIndex");
+                int? dc = RegDword(RegHklm, AspmKey(g), "DCSettingIndex");
+                parts.Add(g + "|" + (ac.HasValue ? ac.Value.ToString() : "n")
+                             + "|" + (dc.HasValue ? dc.Value.ToString() : "n"));
+            }
+            return string.Join(";", parts.ToArray());
+        }
+
+        private static bool RestoreAspmBackup()
+        {
+            string raw = AppConfig.Get("gt_aspm_backup", "");
+            if (string.IsNullOrEmpty(raw)) return false;
+
+            bool ok = true;
+            string[] entries = raw.Split(';');
+            for (int i = 0; i < entries.Length; i++)
+            {
+                string[] f = entries[i].Split('|');
+                if (f.Length < 3) continue;
+                string g = f[0];
+                if (string.IsNullOrEmpty(g)) continue;
+                ok &= RestoreAspmValue(g, "ACSettingIndex", f[1]);
+                ok &= RestoreAspmValue(g, "DCSettingIndex", f[2]);
+            }
+            AppConfig.Set("gt_aspm_backup", "");
+            return ok;
+        }
+
+        private static bool RestoreAspmValue(string schemeGuid, string name, string saved)
+        {
+            if (saved == "n") return DelRegValue(RegHklm, AspmKey(schemeGuid), name);
+            int v;
+            if (!int.TryParse(saved, out v)) return false;
+            return SetAspmDword(schemeGuid, name, v);
         }
 
         // Возврат индекса питания: 0 = ASPM выключен (наш твик), поэтому обычное
