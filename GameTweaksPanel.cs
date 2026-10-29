@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -377,19 +378,23 @@ namespace DeepTools
                 }
             });
 
-            // PCIe ASPM пишется НЕ через powercfg. У каждой схемы питания своя
-            // копия настройки, а в «Сбалансированной» подгруппы PCIe может не
-            // быть вовсе — тогда setacvalueindex возвращает ошибку и раньше это
-            // выглядело как «нужны права администратора». И значение, записанное
-            // только в текущую схему, пропадало после переключения плана.
-            // Поэтому пишем напрямую в реестр всех схем, а результат проверяем
-            // чтением (а не кодом возврата), и перечитываем активную схему.
+            // PCIe ASPM. Три причины, почему прошлый вариант не работал вживую:
+            //  1) настройка хранится ОТДЕЛЬНО в каждой схеме питания, а писали
+            //     только в активную -> после смены плана твик пропадал;
+            //  2) алиас PCIEXPRESS_ASPM на этой системе не существует (реальный
+            //     псевдоним - ASPM), поэтому powercfg отвечал «Неправильные
+            //     параметры», и это выглядело как «нужны права администратора»;
+            //  3) писать в реестр схем нельзя: у BUILTIN\Администраторы там
+            //     только ReadKey, ключи принадлежат SYSTEM.
+            // Рабочий путь - powercfg с ЯВНЫМИ GUID подгруппы и настройки:
+            // он ходит через службу питания и работает для любой схемы, даже
+            // если в реестре записи для неё ещё нет.
             TweakDef aspm = new TweakDef();
             aspm.Title = Lang.T("Отключить PCIe LPM (ASPM)", "Disable PCIe LPM (ASPM)");
             aspm.Desc = Lang.T("Убирает энергосбережение шины: меньше задержки к GPU и NVMe",
                                "Turns off link power management: lower latency to GPU and NVMe");
             aspm.IsApplicable = () => ActiveSchemeGuid() != "";
-            aspm.IsApplied = () => AspmOffInScheme(ActiveSchemeGuid());
+            aspm.IsApplied = () => AspmIsOff(ActiveSchemeGuid());
             aspm.Apply = () =>
             {
                 string active = ActiveSchemeGuid();
@@ -403,68 +408,83 @@ namespace DeepTools
                 List<string> schemes = AllSchemeGuids();
                 if (schemes.Count == 0) schemes.Add(active);
 
-                // Бэкап по всем схемам: у каждой своё значение
-                AppConfig.Set("gt_aspm_backup", EncodeAspmBackup(schemes));
+                // Бэкап эффективных значений: powercfg показывает их даже когда
+                // в реестре для схемы записи нет
+                var backup = new List<string>();
+                for (int i = 0; i < schemes.Count; i++)
+                {
+                    int[] v = QueryAspmValues(schemes[i]);
+                    backup.Add(schemes[i] + "|" + (v == null ? "n" : v[0] + "|" + v[1]));
+                }
+                AppConfig.Set("gt_aspm_backup", string.Join(";", backup.ToArray()));
 
-                // Активную схему пробуем штатным powercfg: если Windows знает
-                // эту настройку, она применится сразу и без хаков
-                RunPowercfg("/setacvalueindex " + active + " SUB_PCIEXPRESS PCIEXPRESS_ASPM 0");
-                RunPowercfg("/setdcvalueindex " + active + " SUB_PCIEXPRESS PCIEXPRESS_ASPM 0");
-
-                // Дальше пишем значение во все схемы напрямую: powercfg
-                // отказывается работать со схемой, в которой подгруппы PCIe нет
-                // (именно это и давало ложное «нужны права администратора»),
-                // а настройка, записанная только в текущую схему, пропадала
-                // после переключения плана питания
-                int written = 0;
+                int changed = 0, failed = 0;
                 for (int i = 0; i < schemes.Count; i++)
                 {
                     string g = schemes[i];
                     if (!SchemeExists(g)) continue;
-                    bool ac = SetAspmDword(g, "ACSettingIndex", 0);
-                    bool dc = SetAspmDword(g, "DCSettingIndex", 0);
-                    if (ac || dc) written++;
+                    // Уже выключено - не дёргаем powercfg зря (каждый вызов это процесс)
+                    if (AspmOffInRegistry(g)) continue;
+                    if (SetAspmScheme(g, 0, 0)) changed++; else failed++;
                 }
 
-                // Перечитать настройки активной схемы
                 RunPowercfg("/setactive " + active);
 
-                if (written == 0)
+                if (changed == 0 && failed == 0) return true; // уже везде выключено
+                if (changed == 0)
                 {
-                    aspm.LastError = Lang.T("Нет доступа к реестру схем питания. Запусти DeepTools от имени администратора.",
-                                            "No access to the power scheme registry. Run DeepTools as administrator.");
+                    aspm.LastError = Lang.T("powercfg не смог изменить настройку ни в одной схеме питания.",
+                                            "powercfg failed to change the setting in any power scheme.");
                     return false;
                 }
 
-                if (!AspmOffInScheme(active))
+                // Проверяем фактическое состояние, а не код возврата
+                if (!AspmIsOff(active))
                 {
-                    aspm.LastError = Lang.T("Значение записано, но Windows не применила его к активной схеме.",
-                                            "The value was written but Windows did not apply it to the active scheme.");
+                    aspm.LastError = Lang.T("powercfg сообщил об успехе, но активная схема осталась с включённым ASPM.",
+                                            "powercfg reported success, but the active scheme still has ASPM enabled.");
                     return false;
                 }
                 return true;
             };
             aspm.Revert = () =>
             {
-                if (RestoreAspmBackup())
+                string raw = AppConfig.Get("gt_aspm_backup", "");
+                bool ok = true;
+                bool any = false;
+
+                if (!string.IsNullOrEmpty(raw))
                 {
-                    string act = ActiveSchemeGuid();
-                    if (act != "") RunPowercfg("/setactive " + act);
-                    return true;
+                    string[] entries = raw.Split(';');
+                    for (int i = 0; i < entries.Length; i++)
+                    {
+                        string[] f = entries[i].Split('|');
+                        if (f.Length < 3) continue;
+                        if (f[1] == "n" || f[2] == "n") continue;
+                        int ac, dc;
+                        if (!int.TryParse(f[1], out ac)) continue;
+                        if (!int.TryParse(f[2], out dc)) continue;
+                        any = true;
+                        if (!SetAspmScheme(f[0], ac, dc)) ok = false;
+                    }
                 }
 
-                // Бэкапа нет (например, значение ставила прошлая версия) —
-                // убираем наше значение и возвращаем поведение Windows по умолчанию
-                bool ok = true;
-                List<string> all = AllSchemeGuids();
-                for (int i = 0; i < all.Count; i++)
+                // Бэкапа нет - возвращаем «умеренную экономию» Windows по умолчанию
+                if (!any)
                 {
-                    if (!SchemeExists(all[i])) continue;
-                    ok &= DelRegValue(RegHklm, AspmKey(all[i]), "ACSettingIndex");
-                    ok &= DelRegValue(RegHklm, AspmKey(all[i]), "DCSettingIndex");
+                    List<string> all = AllSchemeGuids();
+                    for (int i = 0; i < all.Count; i++)
+                    {
+                        if (!SchemeExists(all[i])) continue;
+                        if (AspmOffInRegistry(all[i]))
+                        {
+                            if (!SetAspmScheme(all[i], 1, 2)) ok = false;
+                        }
+                    }
                 }
-                string active2 = ActiveSchemeGuid();
-                if (active2 != "") RunPowercfg("/setactive " + active2);
+
+                string act = ActiveSchemeGuid();
+                if (act != "") RunPowercfg("/setactive " + act);
                 return ok;
             };
             list.Add(aspm);
@@ -885,18 +905,13 @@ namespace DeepTools
         }
 
         // Схема -> подгруппа PCI Express -> настройка «Link State Power Management»
-        private const string PcieSub = @"501a4d13-42af-4429-9fd1-a8218c268e20\ee12f906-d277-404b-b6da-e5fa1a576df5";
+        private const string PcieSubGroupGuid = "501a4d13-42af-4429-9fd1-a8218c268e20";
+        private const string AspmSettingGuid = "ee12f906-d277-404b-b6da-e5fa1a576df5";
+        private const string PcieSub = PcieSubGroupGuid + @"\" + AspmSettingGuid;
 
         private static string AspmKey(string schemeGuid)
         {
             return PowerSchemesKey + "\\" + schemeGuid + "\\" + PcieSub;
-        }
-
-        private static int? AspmValue(string name)
-        {
-            string g = ActiveSchemeGuid();
-            if (g == "") return null;
-            return RegDword(RegHklm, AspmKey(g), name);
         }
 
         // Все GUID-ы схем питания из реестра: ASPM нужно ставить в каждую,
@@ -922,9 +937,9 @@ namespace DeepTools
             return result;
         }
 
-        // «ASPM выключен» для конкретной схемы. На десктопе DC-значения может
-        // не быть вовсе — тогда достаточно AC, иначе карточка никогда не зеленела
-        private static bool AspmOffInScheme(string schemeGuid)
+        // Быстрая проверка по реестру (чтение разрешено даже без прав записи).
+        // Ключа может не быть - тогда не знаем, нужен powercfg
+        private static bool AspmOffInRegistry(string schemeGuid)
         {
             if (string.IsNullOrEmpty(schemeGuid)) return false;
             int? ac = RegDword(RegHklm, AspmKey(schemeGuid), "ACSettingIndex");
@@ -933,61 +948,98 @@ namespace DeepTools
             return !dc.HasValue || dc.Value == 0;
         }
 
-        private static bool SetAspmDword(string schemeGuid, string name, int value)
+        // Итоговое «ASPM выключен» для схемы: сначала дешёвое чтение реестра,
+        // и только если записи нет - спрашиваем powercfg (эффективное значение)
+        private static bool AspmIsOff(string schemeGuid)
         {
+            if (string.IsNullOrEmpty(schemeGuid)) return false;
+            if (RegDword(RegHklm, AspmKey(schemeGuid), "ACSettingIndex").HasValue)
+                return AspmOffInRegistry(schemeGuid);
+
+            int[] v = QueryAspmValues(schemeGuid);
+            return v != null && v[0] == 0;
+        }
+
+        private static bool RunPowercfgOut(string args, out string output, out int exitCode)
+        {
+            output = "";
+            exitCode = -1;
             try
             {
-                using (var k = RegHklm.CreateSubKey(AspmKey(schemeGuid)))
+                var psi = new ProcessStartInfo("powercfg.exe", args)
                 {
-                    if (k == null) return false;
-                    k.SetValue(name, value, RegistryValueKind.DWord);
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                using (var p = Process.Start(psi))
+                {
+                    if (p == null) return false;
+                    output = p.StandardOutput.ReadToEnd();
+                    string err = p.StandardError.ReadToEnd();
+                    if (!string.IsNullOrEmpty(err)) output += "\n" + err;
+                    if (!p.WaitForExit(10000)) { try { p.Kill(); } catch { } return false; }
+                    exitCode = p.ExitCode;
+                    return true;
                 }
-                return true;
             }
             catch { return false; }
         }
 
-        // Бэкап: "guid|ac|dc;guid|ac|dc", где ac/dc — число или "n" (значения не было)
-        private static string EncodeAspmBackup(List<string> schemes)
+        // Эффективные значения ASPM для схемы: [AC, DC]. null - узнать не удалось.
+        // Парсим шестнадцатеричные индексы из вывода powercfg: строки локализованы,
+        // а порядок (сеть, батарея) стабилен
+        private static Dictionary<string, int[]> aspmCache = new Dictionary<string, int[]>();
+        private static Dictionary<string, DateTime> aspmCacheTime = new Dictionary<string, DateTime>();
+
+        private static int[] QueryAspmValues(string schemeGuid)
         {
-            var parts = new List<string>();
-            for (int i = 0; i < schemes.Count; i++)
+            if (string.IsNullOrEmpty(schemeGuid)) return null;
+
+            // Кэш на пару секунд: карточки обновляют статус по таймеру, а каждый
+            // вызов powercfg - это отдельный процесс
+            DateTime when;
+            if (aspmCacheTime.TryGetValue(schemeGuid, out when) && (DateTime.UtcNow - when).TotalSeconds < 5)
             {
-                string g = schemes[i];
-                int? ac = RegDword(RegHklm, AspmKey(g), "ACSettingIndex");
-                int? dc = RegDword(RegHklm, AspmKey(g), "DCSettingIndex");
-                parts.Add(g + "|" + (ac.HasValue ? ac.Value.ToString() : "n")
-                             + "|" + (dc.HasValue ? dc.Value.ToString() : "n"));
+                int[] cached;
+                if (aspmCache.TryGetValue(schemeGuid, out cached)) return cached;
             }
-            return string.Join(";", parts.ToArray());
+
+            string output;
+            int code;
+            if (!RunPowercfgOut("/query " + schemeGuid + " " + PcieSubGroupGuid + " " + AspmSettingGuid,
+                                out output, out code) || code != 0)
+                return null;
+
+            var found = new List<int>();
+            foreach (Match m in Regex.Matches(output, @"0x([0-9a-fA-F]{8})"))
+            {
+                try { found.Add(Convert.ToInt32(m.Groups[1].Value, 16)); } catch { }
+                if (found.Count == 2) break;
+            }
+
+            int[] result = found.Count < 2 ? null : new int[] { found[0], found[1] };
+            try
+            {
+                aspmCache[schemeGuid] = result;
+                aspmCacheTime[schemeGuid] = DateTime.UtcNow;
+            }
+            catch { }
+            return result;
         }
 
-        private static bool RestoreAspmBackup()
+        // Запись ASPM для схемы через powercfg с ЯВНЫМИ GUID: алиас
+        // PCIEXPRESS_ASPM существует не на всех системах, а прямой
+        // доступ к реестру схем закрыт даже администратору
+        private static bool SetAspmScheme(string schemeGuid, int ac, int dc)
         {
-            string raw = AppConfig.Get("gt_aspm_backup", "");
-            if (string.IsNullOrEmpty(raw)) return false;
-
-            bool ok = true;
-            string[] entries = raw.Split(';');
-            for (int i = 0; i < entries.Length; i++)
-            {
-                string[] f = entries[i].Split('|');
-                if (f.Length < 3) continue;
-                string g = f[0];
-                if (string.IsNullOrEmpty(g)) continue;
-                ok &= RestoreAspmValue(g, "ACSettingIndex", f[1]);
-                ok &= RestoreAspmValue(g, "DCSettingIndex", f[2]);
-            }
-            AppConfig.Set("gt_aspm_backup", "");
+            if (string.IsNullOrEmpty(schemeGuid)) return false;
+            bool ok = RunPowercfg("/setacvalueindex " + schemeGuid + " " + PcieSubGroupGuid + " " + AspmSettingGuid + " " + ac);
+            RunPowercfg("/setdcvalueindex " + schemeGuid + " " + PcieSubGroupGuid + " " + AspmSettingGuid + " " + dc);
+            // Кэш проверять заново - значения изменились
+            try { aspmCacheTime.Remove(schemeGuid); aspmCache.Remove(schemeGuid); } catch { }
             return ok;
-        }
-
-        private static bool RestoreAspmValue(string schemeGuid, string name, string saved)
-        {
-            if (saved == "n") return DelRegValue(RegHklm, AspmKey(schemeGuid), name);
-            int v;
-            if (!int.TryParse(saved, out v)) return false;
-            return SetAspmDword(schemeGuid, name, v);
         }
 
         // Возврат индекса питания: 0 = ASPM выключен (наш твик), поэтому обычное
@@ -1004,7 +1056,7 @@ namespace DeepTools
             }
             bool ac = name == "ACSettingIndex";
             return RunPowercfg((ac ? "/setacvalueindex " : "/setdcvalueindex ") + schemeGuid +
-                               " SUB_PCIEXPRESS PCIEXPRESS_ASPM " + v);
+                               " " + PcieSubGroupGuid + " " + AspmSettingGuid + " " + v);
         }
 
         private static bool RunPowercfg(string args)
