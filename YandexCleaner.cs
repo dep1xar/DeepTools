@@ -108,6 +108,11 @@ namespace DeepTools
             Report(progress, Lang.T("Проверяем ярлыки…", "Checking shortcuts…"));
             CollectShortcuts(items);
 
+            // 7. Поисковая система Яндекса в других браузерах и оболочке Windows.
+            // Штатный деинсталлятор её не убирает, поэтому чистим отдельно.
+            Report(progress, Lang.T("Проверяем поисковые системы браузеров…", "Checking browser search engines…"));
+            BrowserSearchCleaner.Scan(items);
+
             Report(progress, Lang.T("Готово", "Done"));
             return items;
         }
@@ -237,6 +242,15 @@ namespace DeepTools
             AddKey(items, RegistryHive.LocalMachine, @"Software\Wow6432Node\Yandex\YandexBrowser");
             AddKey(items, RegistryHive.CurrentUser, @"Software\Classes\yandexbrowser");
 
+            // Регистрация браузера как клиента Windows и обработчиков ссылок.
+            // Только YandexBrowser*: чужие продукты Яндекса не трогаем.
+            AddKey(items, RegistryHive.CurrentUser, @"Software\Clients\StartMenuInternet\YandexBrowser");
+            AddKey(items, RegistryHive.LocalMachine, @"Software\Clients\StartMenuInternet\YandexBrowser");
+            AddKey(items, RegistryHive.LocalMachine, @"Software\Wow6432Node\Clients\StartMenuInternet\YandexBrowser");
+            CollectYandexClasses(items);
+            CollectRegisteredApps(items);
+            CollectAppPaths(items);
+
             if (includeOtherProducts)
             {
                 AddKey(items, RegistryHive.CurrentUser, @"Software\Yandex");
@@ -361,6 +375,129 @@ namespace DeepTools
                             ValueName = names[i],
                             Size = 0
                         });
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private static void CollectYandexClasses(List<YandexItem> items)
+        {
+            CollectYandexClasses(items, RegistryHive.CurrentUser, @"Software\Classes");
+            CollectYandexClasses(items, RegistryHive.LocalMachine, @"Software\Classes");
+            CollectYandexClasses(items, RegistryHive.LocalMachine, @"Software\Wow6432Node\Classes");
+        }
+
+        private static void CollectYandexClasses(List<YandexItem> items, RegistryHive hive, string baseSub)
+        {
+            RegistryKey root = OpenBase(hive);
+            if (root == null) return;
+            try
+            {
+                using (RegistryKey classes = root.OpenSubKey(baseSub))
+                {
+                    if (classes == null) return;
+                    string[] names = classes.GetSubKeyNames();
+                    for (int i = 0; i < names.Length; i++)
+                    {
+                        string name = names[i];
+                        if (name.Equals("yandexbrowser", StringComparison.OrdinalIgnoreCase) ||
+                            name.StartsWith("YandexBrowser", StringComparison.OrdinalIgnoreCase))
+                        {
+                            AddKey(items, hive, baseSub + @"\" + name);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private static void CollectRegisteredApps(List<YandexItem> items)
+        {
+            CollectRegisteredApps(items, RegistryHive.CurrentUser, @"Software\RegisteredApplications");
+            CollectRegisteredApps(items, RegistryHive.LocalMachine, @"Software\RegisteredApplications");
+            CollectRegisteredApps(items, RegistryHive.LocalMachine, @"Software\Wow6432Node\RegisteredApplications");
+        }
+
+        private static void CollectRegisteredApps(List<YandexItem> items, RegistryHive hive, string subKey)
+        {
+            RegistryKey root = OpenBase(hive);
+            if (root == null) return;
+            try
+            {
+                using (RegistryKey key = root.OpenSubKey(subKey))
+                {
+                    if (key == null) return;
+                    string[] names = key.GetValueNames();
+                    for (int i = 0; i < names.Length; i++)
+                    {
+                        string name = names[i];
+                        if (!LooksLikeYandex(name) ||
+                            name.IndexOf("browser", StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                        items.Add(new YandexItem
+                        {
+                            Kind = "runvalue",
+                            Title = HiveName(hive) + @"\" + subKey + @"  →  " + name,
+                            Hive = hive,
+                            SubKey = subKey,
+                            ValueName = name,
+                            Size = 0
+                        });
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private static void CollectAppPaths(List<YandexItem> items)
+        {
+            CollectAppPaths(items, RegistryHive.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\App Paths");
+            CollectAppPaths(items, RegistryHive.LocalMachine, @"Software\Microsoft\Windows\CurrentVersion\App Paths");
+            CollectAppPaths(items, RegistryHive.LocalMachine, @"Software\Wow6432Node\Microsoft\Windows\CurrentVersion\App Paths");
+        }
+
+        private static void CollectAppPaths(List<YandexItem> items, RegistryHive hive, string baseSub)
+        {
+            RegistryKey root = OpenBase(hive);
+            if (root == null) return;
+            try
+            {
+                using (RegistryKey paths = root.OpenSubKey(baseSub))
+                {
+                    if (paths == null) return;
+                    string[] names = paths.GetSubKeyNames();
+                    for (int i = 0; i < names.Length; i++)
+                    {
+                        try
+                        {
+                            using (RegistryKey app = paths.OpenSubKey(names[i]))
+                            {
+                                if (app == null) continue;
+                                string exe = app.GetValue("") as string;
+                                string nameLower = names[i].ToLowerInvariant();
+                                string exeLower = (exe ?? "").ToLowerInvariant();
+
+                                // Только Yandex Browser, а не Диск/Музыка/другие
+                                // продукты Яндекса: они не входят в эту очистку.
+                                bool browserEntry = nameLower.IndexOf("browser", StringComparison.Ordinal) >= 0 ||
+                                                    exeLower.IndexOf("yandexbrowser", StringComparison.Ordinal) >= 0 ||
+                                                    exeLower.IndexOf(@"\yandex\yandexbrowser", StringComparison.Ordinal) >= 0 ||
+                                                    exeLower.IndexOf("/yandex/yandexbrowser", StringComparison.Ordinal) >= 0;
+                                if (!browserEntry) continue;
+                                if (!LooksLikeYandex(names[i]) && !LooksLikeYandex(exe)) continue;
+
+                                items.Add(new YandexItem
+                                {
+                                    Kind = "registry",
+                                    Title = HiveName(hive) + @"\" + baseSub + @"\" + names[i],
+                                    Hive = hive,
+                                    SubKey = baseSub + @"\" + names[i],
+                                    Size = 0
+                                });
+                            }
+                        }
+                        catch { }
                     }
                 }
             }
@@ -513,7 +650,23 @@ namespace DeepTools
                 }
             }
 
-            // 5. Папки и ярлыки
+            // 5. Поисковая система Яндекса в других браузерах и оболочке Windows
+            for (int i = 0; i < items.Count; i++)
+            {
+                YandexItem it = items[i];
+                if (it.Kind == "search")
+                {
+                    Report(progress, Lang.T("Убираем поиск Яндекса: ", "Removing Yandex search: ") + it.Title);
+                    BrowserSearchCleaner.Remove(it);
+                }
+                else if (it.Kind == "searchscope" || it.Kind == "userchoice")
+                {
+                    Report(progress, Lang.T("Удаляем привязку: ", "Removing binding: ") + it.Title);
+                    DeleteKeyTree(it);
+                }
+            }
+
+            // 6. Папки и ярлыки
             for (int i = 0; i < items.Count; i++)
             {
                 YandexItem it = items[i];

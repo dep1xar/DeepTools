@@ -554,8 +554,8 @@ namespace DeepTools
 
             var yandexHint = new Label
             {
-                Text = Lang.T("Полное удаление Яндекс.Браузера: процессы, папки, реестр, задачи, ярлыки",
-                              "Full Yandex Browser removal: processes, folders, registry, tasks, shortcuts"),
+                Text = Lang.T("Полное удаление Яндекса: процессы, папки, реестр, задачи, ярлыки, поиск в других браузерах",
+                              "Full Yandex removal: processes, folders, registry, tasks, shortcuts, search in other browsers"),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8F),

@@ -1,0 +1,17 @@
+name = "deeptools-telemetry"
+main = "src/index.js"
+compatibility_date = "2026-11-07"
+workers_dev = true
+preview_urls = false
+
+# The public online counter and the stats viewer use the same Worker.
+# DT_VIEW_TOKEN is stored as a Wrangler secret, not in this file.
+# DT_ADMIN_TOKEN is optional and only needed for /api/v1/admin/errors.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "deeptools-telemetry"
+database_id = "c97591fc-2d33-485d-b8a0-9baf8ba8ae8e"
+
+[triggers]
+crons = ["17 3 * * *"]

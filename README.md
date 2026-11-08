@@ -5,7 +5,7 @@
 **Smart tweaker, cleaner and monitoring tool for Windows — in one app.**
 **Умный твикер, чистильщик и монитор для Windows — всё в одном.**
 
-[![Version](https://img.shields.io/badge/version-2.1.1-blue)](https://github.com/dep1xar/DeepTools/releases)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue)](https://github.com/dep1xar/DeepTools/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D6)](#)
 [![.NET](https://img.shields.io/badge/.NET%20Framework-4.x-512BD4)](#)
 
@@ -54,6 +54,22 @@ A card grid of per-feature game tweaks: HAGS, Game Mode, fullscreen optimization
 - **Desktop Widget** — compact always-on-top CPU/RAM/temperature panel.
 - **RGB Reactive** — connects to OpenRGB to drive your lighting based on live sensor data: colour shifts from cool to hot as CPU/GPU temperature rises, pulses faster under heavy load, and flashes red when FPS drops below your threshold. Works with any OpenRGB-compatible device.
 
+### Online counter & anonymous telemetry
+
+The main window shows a small live counter: **“Using DeepTools now: N”**. It requests only the public `/api/v1/online` endpoint, which returns the number of active sessions. Nothing else is exposed to regular users.
+
+The full community dashboard (launches, errors, versions, countries) is a **separate program, `DeepToolsStats.exe`**, built for the author and trusted helpers. It does not send telemetry. If the server sets `DT_VIEW_TOKEN`, the full `/api/v1/stats` endpoint requires that token, which is embedded into the viewer build. A token inside a distributed exe is not a cryptographic secret — it stops casual access, not a determined person.
+
+**Anonymous telemetry is enabled by default.** It sends a random installation ID, app version, Windows version/build, interface language, event type and — for errors only — a short hashed signature made from the module, exception type and HRESULT. It does **not** send IP addresses (the server does not store them), names, file paths, clipboard contents, search queries or the exception message/stack.
+
+On first launch DeepTools asks you to accept [PRIVACY.md](PRIVACY.md) with a mandatory checkbox; without it the app does not start. Telemetry is enabled by default and controlled by the toggle in **Settings → Anonymous telemetry**; you can also set `telemetry_enabled=0` in `%APPDATA%\DeepTools\config.txt`. If the stats server is not configured, the counter shows “—”. Self-hosting guide: [server/README.md](server/README.md).
+
+> Release builds get the server address at compile time: `build.ps1 -TelemetryUrl "https://stats.example.com"`. The separate viewer build also takes `-StatsToken "…"`. Without these parameters the public build ships with no endpoint and sends nothing.
+
+### Yandex removal
+
+The **Remove Yandex** button (SmartCleanup) now also removes the Yandex search provider that Yandex Browser leaves behind in **Chrome, Edge, Brave, Vivaldi, Opera, Chromium, Firefox and Internet Explorer**, plus Windows URL/file associations. Close those browsers first so their settings files and `Web Data` databases can be updated; DeepTools creates `.deeptools.bak` backups and removes only Yandex-related entries.
+
 ### Global hotkeys
 
 | Key | Action |
@@ -67,7 +83,7 @@ A card grid of per-feature game tweaks: HAGS, Game Mode, fullscreen optimization
 
 1. Go to the [Releases](https://github.com/dep1xar/DeepTools/releases) page.
 2. Download the latest `DeepTools.exe`.
-3. Run it. Approve the UAC prompt when Windows asks for administrator rights.
+3. Run it. On first launch pick the interface language and accept the privacy policy; then approve the UAC prompt when Windows asks for administrator rights.
 
 No installer, no dependencies to download — all libraries (including the hardware-sensor engine) are embedded into the single `.exe`.
 
@@ -83,7 +99,17 @@ Open a PowerShell window in the project folder and run:
 powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 ```
 
-The script compiles all `.cs` files, embeds the managed DLLs as resources and produces `DeepTools.exe` in the project folder.
+The script compiles all `.cs` files, embeds the managed DLLs as resources and produces `DeepTools.exe` in the project folder. It also builds the separate viewer `DeepToolsStats.exe` (no admin rights, no telemetry).
+
+For a release build, pass the telemetry endpoint and — for the viewer only — the view token:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1 `
+    -TelemetryUrl "https://stats.example.com" `
+    -StatsToken "your-view-token"
+```
+
+The values are written to the generated `BuildSecrets.g.cs` (gitignored) and embedded into the exes. Without parameters the build still works, but telemetry stays disabled and the counter shows “—”.
 
 The script prints a clearly marked **BUILD OK** or **BUILD FAILED** block at the end, so a problem is never silent:
 
@@ -151,6 +177,22 @@ DeepTools — системный твикер, поэтому он делает 
 - **Виджет на рабочий стол** — компактная плашка CPU/RAM/температуры, всегда поверх окон.
 - **RGB-реакция** — подключается к OpenRGB и управляет подсветкой по живым датчикам: цвет плавно меняется от холодного к горячему по температуре CPU/GPU, пульсирует быстрее под нагрузкой и мигает красным при просадке FPS ниже вашего порога. Работает с любым устройством, поддерживаемым OpenRGB.
 
+### Онлайн-счётчик и анонимная телеметрия
+
+Главное окно показывает небольшой живой счётчик: **«Сейчас пользуются DeepTools: N»**. Он запрашивает только публичный `/api/v1/online`, который возвращает число активных сессий. Больше обычному пользователю ничего не раскрывается.
+
+Полная панель сообщества (запуски, ошибки, версии, страны) — **отдельная программа `DeepToolsStats.exe`** для автора и доверенных помощников. Она не отправляет телеметрию. Если на сервере задан `DT_VIEW_TOKEN`, полный `/api/v1/stats` требует этот токен, и он вшивается в сборку программы просмотра. Токен внутри распространяемого exe — не криптографический секрет: он закрывает случайный доступ, но не защищает от того, кто задался целью.
+
+**Анонимная телеметрия включена по умолчанию.** Она отправляет случайный ID установки, версию программы, версию/сборку Windows, язык интерфейса, тип события и — только для ошибок — короткую хешированную подпись из модуля, типа исключения и HRESULT. Она **не** отправляет IP-адреса (сервер их не хранит), имена, пути к файлам, содержимое буфера обмена, поисковые запросы и текст исключения со стеком.
+
+При первом запуске DeepTools просит принять [PRIVACY.md](PRIVACY.md), поставив обязательную галочку; без неё программа не запускается. Телеметрия включена по умолчанию и управляется тумблером в **Настройки → Анонимная телеметрия**; также можно установить `telemetry_enabled=0` в `%APPDATA%\DeepTools\config.txt`. Если сервер статистики не настроен, счётчик показывает «—». Инструкция по своему серверу: [server/README.md](server/README.md).
+
+> В релизную сборку адрес сервера вшивается при компиляции: `build.ps1 -TelemetryUrl "https://stats.example.com"`. Отдельная сборка панели дополнительно принимает `-StatsToken "…"`. Без этих параметров публичная сборка выходит без эндпоинта и ничего не отправляет.
+
+### Удаление Яндекса
+
+Кнопка **Удалить Яндекс** (SmartCleanup) теперь также убирает поисковую систему Яндекса, которую Яндекс.Браузер оставляет в **Chrome, Edge, Brave, Vivaldi, Opera, Chromium, Firefox и Internet Explorer**, плюс ассоциации ссылок и файлов Windows. Перед удалением закрой эти браузеры, чтобы DeepTools мог обновить их настройки и базы `Web Data`; программа делает резервные копии `.deeptools.bak` и удаляет только записи, связанные с Яндексом.
+
 ### Глобальные горячие клавиши
 
 | Клавиша | Действие |
@@ -164,7 +206,7 @@ DeepTools — системный твикер, поэтому он делает 
 
 1. Открой страницу [Releases](https://github.com/dep1xar/DeepTools/releases).
 2. Скачай свежий `DeepTools.exe`.
-3. Запусти. Подтверди UAC, когда система попросит права администратора.
+3. Запусти. При первом запуске выбери язык и прими политику конфиденциальности, затем подтверди UAC, когда система попросит права администратора.
 
 Без установщика и без докачки зависимостей — все библиотеки (включая движок датчиков) встроены прямо в один `.exe`.
 
@@ -180,7 +222,17 @@ DeepTools — системный твикер, поэтому он делает 
 powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 ```
 
-Скрипт компилирует все `.cs`-файлы, встраивает managed-библиотеки как ресурсы и создаёт `DeepTools.exe` в папке проекта.
+Скрипт компилирует все `.cs`-файлы, встраивает managed-библиотеки как ресурсы и создаёт `DeepTools.exe` в папке проекта. Заодно собирается отдельная панель `DeepToolsStats.exe` (без прав администратора и без отправки телеметрии).
+
+Для релизной сборки передай адрес сервера и — только для панели — ключ просмотра:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1 `
+    -TelemetryUrl "https://stats.example.com" `
+    -StatsToken "your-view-token"
+```
+
+Значения записываются в сгенерированный `BuildSecrets.g.cs` (он в `.gitignore`) и вшиваются в exe. Без параметров сборка тоже работает, но телеметрия остаётся выключенной, а счётчик показывает «—».
 
 В конце всегда печатается заметный блок **BUILD OK** или **BUILD FAILED**, поэтому ошибка не проходит молча:
 
@@ -209,6 +261,6 @@ DeepTools проверяет GitHub Releases при запуске. Когда �
 
 <div align="center">
 
-© 2026 dep1xar · DeepTools v2.1.1
+© 2026 dep1xar · DeepTools v2.2.0
 
 </div>

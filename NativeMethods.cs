@@ -44,6 +44,11 @@ namespace DeepTools
         public static readonly int WM_SHOW_DEEPTOOLS =
             RegisterWindowMessage("DeepTools_ShowExistingInstance_dep1xar");
 
+        // Explorer перезапустился (обновление Windows, падение) - панель задач
+        // рассылает это сообщение. Без него иконка в трее пропадает навсегда.
+        public static readonly int WM_TASKBARCREATED =
+            RegisterWindowMessage("TaskbarCreated");
+
         [DllImport("user32.dll")]
         public static extern bool SetCursorPos(int x, int y);
 

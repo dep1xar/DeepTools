@@ -63,6 +63,10 @@ namespace DeepTools
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Theme.BgColor;
             DoubleBuffered = true;
+            // На 4K/240 Гц мониторах Windows часто включает масштабирование
+            // 125-200%. Без AutoScaleMode окно оставалось бы физически мелким.
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleDimensions = new SizeF(96F, 96F);
 
             try { Icon = AppIcon(); } catch { }
 
@@ -212,6 +216,23 @@ namespace DeepTools
             }
         }
 
+        // Возвращает иконку после перезапуска Explorer. NotifyIcon сам этого
+        // не делает: его значок живёт в панели задач, а она пересоздаётся.
+        private void RestoreTrayIcon()
+        {
+            if (trayIcon == null) return;
+            try
+            {
+                trayIcon.Visible = false;
+                trayIcon.Icon = AppIcon();
+                trayIcon.Text = "DeepTools";
+                trayIcon.Visible = true;
+                lastTrayTemp = int.MinValue;
+                UpdateTrayIcon();
+            }
+            catch { }
+        }
+
         private void SetupTrayIcon()
         {
             trayIcon = new NotifyIcon();
@@ -306,6 +327,13 @@ namespace DeepTools
 
         protected override void WndProc(ref Message m)
         {
+            // Explorer перезапустился - возвращаем иконку в трей
+            if (m.Msg == NativeMethods.WM_TASKBARCREATED)
+            {
+                RestoreTrayIcon();
+                base.WndProc(ref m);
+                return;
+            }
             // Второй запуск DeepTools попросил показать это (уже запущенное) окно
             if (m.Msg == NativeMethods.WM_SHOW_DEEPTOOLS)
             {
@@ -499,29 +527,29 @@ namespace DeepTools
             var divider = new Panel { Location = new Point(16, 86), Size = new Size(188, 1), BackColor = Theme.BorderColor };
             sidebar.Controls.Add(divider);
 
-            // Навигация сгруппирована по смыслу; кнопки чуть компактнее (33px),
+            // Навигация сгруппирована по смыслу; кнопки компактные (30px),
             // чтобы 14 пунктов + 3 заголовка влезли в 616px сайдбара
             navHome = MakeNavItem("⌂   " + Lang.T("Главная", "Home"), 90);
 
             MakeNavGroupLabel(Lang.T("ОПТИМИЗАЦИЯ", "OPTIMIZATION"), 127);
             navCleanup = MakeNavItem("♻   SmartCleanup", 143);
-            navBooster = MakeNavItem("⚡   GameBooster", 175);
-            navGameTweaks = MakeNavItem("✚   " + Lang.T("Игровые твики", "Game tweaks"), 207);
-            navStartup = MakeNavItem("⭯   " + Lang.T("Автозагрузка", "Startup"), 239);
-            navServices = MakeNavItem("⚙   " + Lang.T("Службы", "Services"), 271);
-            navVisual = MakeNavItem("✦   " + Lang.T("Визуальные эффекты", "Visual effects"), 303);
+            navBooster = MakeNavItem("⚡   GameBooster", 173);
+            navGameTweaks = MakeNavItem("✚   " + Lang.T("Игровые твики", "Game tweaks"), 203);
+            navStartup = MakeNavItem("⭯   " + Lang.T("Автозагрузка", "Startup"), 233);
+            navServices = MakeNavItem("⚙   " + Lang.T("Службы", "Services"), 263);
+            navVisual = MakeNavItem("✦   " + Lang.T("Визуальные эффекты", "Visual effects"), 293);
 
-            MakeNavGroupLabel(Lang.T("МОНИТОРИНГ", "MONITORING"), 340);
-            navHealth = MakeNavItem("❤   Health Check", 356);
-            navSysInfo = MakeNavItem("▤   " + Lang.T("Мой ПК", "My PC"), 388);
-            navNetwork = MakeNavItem("⇅   " + Lang.T("Сеть", "Network"), 420);
+            MakeNavGroupLabel(Lang.T("МОНИТОРИНГ", "MONITORING"), 330);
+            navHealth = MakeNavItem("❤   Health Check", 346);
+            navSysInfo = MakeNavItem("▤   " + Lang.T("Мой ПК", "My PC"), 376);
+            navNetwork = MakeNavItem("⇅   " + Lang.T("Сеть", "Network"), 406);
 
-            MakeNavGroupLabel(Lang.T("ИНСТРУМЕНТЫ", "TOOLS"), 457);
-            navClicker = MakeNavItem("⊙   Clicker", 473);
-            navScreenshots = MakeNavItem("▣   " + Lang.T("Скриншоты", "Screenshots"), 505);
-            navClipboard = MakeNavItem("❏   " + Lang.T("Буфер обмена", "Clipboard"), 537);
+            MakeNavGroupLabel(Lang.T("ИНСТРУМЕНТЫ", "TOOLS"), 443);
+            navClicker = MakeNavItem("⊙   Clicker", 459);
+            navScreenshots = MakeNavItem("▣   " + Lang.T("Скриншоты", "Screenshots"), 489);
+            navClipboard = MakeNavItem("❏   " + Lang.T("Буфер обмена", "Clipboard"), 519);
 
-            navSettings = MakeNavItem("⚙   " + Lang.T("Настройки", "Settings"), 578);
+            navSettings = MakeNavItem("⚙   " + Lang.T("Настройки", "Settings"), 550);
 
             // Бегущая акцентная полоска: переезжает к активному пункту при
             // переключении раздела вместо мгновенного скачка
@@ -542,7 +570,7 @@ namespace DeepTools
             navScreenshots.Click += (s, e) => ShowPanel(GetScreenshots(), navScreenshots);
             navClipboard.Click += (s, e) => ShowPanel(GetClipboard(), navClipboard);
             navNetwork.Click += (s, e) => ShowPanel(GetNetwork(), navNetwork);
-            navSettings.Click += (s, e) => ShowPanel(panelSettings, navSettings);
+            navSettings.Click += (s, e) => ShowPanel(GetSettings(), navSettings);
 
             contentArea = new Panel { Location = new Point(220, 34), Size = new Size(760, 616), BackColor = Theme.BgColor };
             EnableDoubleBuffer(contentArea);
@@ -555,11 +583,9 @@ namespace DeepTools
                 else if (key == "health") ShowPanel(GetHealth(), navHealth);
                 else if (key == "clicker") ShowPanel(GetClicker(), navClicker);
                 else if (key == "screenshots") ShowPanel(GetScreenshots(), navScreenshots);
-                else if (key == "settings") ShowPanel(panelSettings, navSettings);
+                else if (key == "settings") ShowPanel(GetSettings(), navSettings);
             };
             RegisterPanel(panelHome);
-
-            panelSettings = BuildSettingsPanel();
         }
 
         // Все разделы, которые нужно прятать при переключении
@@ -575,33 +601,23 @@ namespace DeepTools
             allPanels.Add(panel);
         }
 
-        // Тяжёлые панели строим не в конструкторе окна, а сразу после первого
-        // показа, по одной за сообщение: окно появляется мгновенно, а интерфейс
-        // не «замирает» на секунду, пока собираются сотни контролов.
-        // Порядок - от самых нужных к самым тяжёлым
+        // Тяжёлые панели строим не в конструкторе окна, а после первого кадра.
+        // Health Check нужен всегда: его таймер обновляет CPU/RAM/температуры
+        // для главной страницы и меню трея. Остальные разделы создаются при
+        // первом открытии - так окно появляется без задержки.
         private void WarmUpPanels()
         {
-            var queue = new System.Collections.Generic.Queue<Action>(new Action[] {
-                () => GetHealth(), () => GetClicker(), () => GetBooster(), () => GetGameTweaks(),
-                () => GetScreenshots(), () => GetNetwork(), () => GetClipboard(), () => GetCleanup(),
-                () => GetStartup(), () => GetServices(), () => GetSysInfo(), () => GetVisual()
-            });
-
-            Action step = null;
-            step = () => {
-                try
-                {
-                    if (IsDisposed || !IsHandleCreated) return;
-                    if (queue.Count > 0)
-                    {
-                        Action build = queue.Dequeue();
-                        try { build(); } catch { }
-                    }
-                    if (queue.Count > 0 && !IsDisposed && IsHandleCreated) BeginInvoke(new Action(step));
-                }
-                catch { }
+            // WM_TIMER обрабатывается только после WM_PAINT, поэтому окно
+            // успевает отрисоваться до сборки панели.
+            var timer = new System.Windows.Forms.Timer { Interval = 500 };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+                timer.Dispose();
+                if (IsDisposed || !IsHandleCreated) return;
+                try { GetHealth(); } catch { }
             };
-            BeginInvoke(new Action(step));
+            timer.Start();
         }
 
         // Разделы создаются при первом обращении: и при клике в сайдбаре, и при
@@ -656,7 +672,7 @@ namespace DeepTools
             var item = new SidebarNavButton(text)
             {
                 Location = new Point(12, y),
-                Size = new Size(196, 33)
+                Size = new Size(196, 30)
             };
             sidebar.Controls.Add(item);
             allNavs.Add(item);
@@ -680,6 +696,11 @@ namespace DeepTools
 
         // Ленивое создание тяжёлых панелей: строим при первом открытии, а не на
         // старте - так окно показывается заметно быстрее (важно на слабых ПК)
+        private Panel GetSettings()
+        {
+            if (panelSettings == null) panelSettings = BuildSettingsPanel();
+            return panelSettings;
+        }
         private Panel GetCleanup()
         {
             if (panelCleanup == null) { panelCleanup = new SmartCleanupPanel(); RegisterPanel(panelCleanup); }
@@ -716,7 +737,7 @@ namespace DeepTools
             else if (key == "health") ShowPanel(GetHealth(), navHealth);
             else if (key == "clicker") ShowPanel(GetClicker(), navClicker);
             else if (key == "screenshots") ShowPanel(GetScreenshots(), navScreenshots);
-            else if (key == "settings") ShowPanel(panelSettings, navSettings);
+            else if (key == "settings") ShowPanel(GetSettings(), navSettings);
             else if (key == "services") ShowPanel(GetServices(), navServices);
             else if (key == "startup") ShowPanel(GetStartup(), navStartup);
         }
@@ -1154,6 +1175,55 @@ namespace DeepTools
 
                 hkY += 36;
             }
+
+            // Карточка: анонимная телеметрия и политика конфиденциальности
+            var telCard = Theme.MakeCard(panel, new Point(24, 966), new Size(640, 92));
+
+            var telTitle = new Label
+            {
+                Text = Lang.T("Анонимная телеметрия", "Anonymous telemetry"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(20, 14),
+                AutoSize = true
+            };
+            telCard.Controls.Add(telTitle);
+
+            var telDesc = new Label
+            {
+                Text = Lang.T(
+                    "Отправляет только версию, ОС, язык, случайный ID и подпись ошибки. Без IP, имён и путей.",
+                    "Sends only the version, OS, language, a random ID and an error signature. No IP, names or paths."),
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(20, 38),
+                Size = new Size(470, 18),
+                AutoEllipsis = true
+            };
+            telCard.Controls.Add(telDesc);
+
+            var telToggle = new ToggleSwitch { Location = new Point(580, 14), Checked = Telemetry.Enabled };
+            telToggle.CheckedChanged += (s, e) =>
+            {
+                Telemetry.Enabled = telToggle.Checked;
+                if (telToggle.Checked) Telemetry.Start();
+            };
+            telCard.Controls.Add(telToggle);
+
+            var telPrivacyBtn = new RoundedButton
+            {
+                Text = Lang.T("Политика конфиденциальности", "Privacy policy"),
+                ButtonColor = Theme.InputColor,
+                HoverColor = Theme.KeyHover,
+                TextColor = Theme.TextDim,
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                Location = new Point(20, 58),
+                Size = new Size(210, 24)
+            };
+            telPrivacyBtn.Click += (s, e) => Telemetry.OpenPrivacyPolicy();
+            telCard.Controls.Add(telPrivacyBtn);
 
             return panel;
         }

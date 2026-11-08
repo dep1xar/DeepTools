@@ -98,8 +98,8 @@ namespace DeepTools
             var hint = new Label
             {
                 Text = Lang.T(
-                    "Обычный деинсталлятор оставляет профиль и кэш в AppData. Здесь удаляется всё: процессы (browser.exe), папки, реестр, задачи и ярлыки.",
-                    "The stock uninstaller leaves the profile and cache in AppData. This removes everything: processes (browser.exe), folders, registry, tasks and shortcuts."),
+                    "Обычный деинсталлятор оставляет профиль, кэш и поиск Яндекса в других браузерах. Здесь удаляется всё: процессы (browser.exe), папки, реестр, задачи, ярлыки и поисковые настройки.",
+                    "The stock uninstaller leaves the profile, cache and Yandex search in other browsers. This removes everything: processes (browser.exe), folders, registry, tasks, shortcuts and browser search settings."),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
@@ -298,6 +298,9 @@ namespace DeepTools
                 case "task": return Lang.T("[задача] ", "[task] ");
                 case "service": return Lang.T("[служба] ", "[service] ");
                 case "shortcut": return Lang.T("[ярлык] ", "[shortcut] ");
+                case "search": return Lang.T("[поиск] ", "[search] ");
+                case "searchscope": return Lang.T("[поиск IE] ", "[IE search] ");
+                case "userchoice": return Lang.T("[ассоциация] ", "[association] ");
                 default: return "";
             }
         }
@@ -310,9 +313,9 @@ namespace DeepTools
 
             DialogResult r = DTDialog.Show(
                 Lang.T("Удалить всё найденное (" + items.Count + " объектов)?\n\n" +
-                       "Процессы будут закрыты, папки и записи реестра удалены без возможности отката.",
+                       "Процессы будут закрыты, папки, записи реестра и поисковые настройки браузеров удалены без возможности отката.",
                        "Remove all found items (" + items.Count + ")?\n\n" +
-                       "Processes will be closed, folders and registry entries deleted without undo."),
+                       "Processes will be closed, folders, registry entries and browser search settings deleted without undo."),
                 Lang.T("Полное удаление Яндекса", "Full Yandex removal"),
                 MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
             if (r != DialogResult.Yes) return;

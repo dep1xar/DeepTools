@@ -61,6 +61,12 @@ namespace DeepTools
             }
             Lang.IsEn = savedLang == "en";
 
+            // Первый запуск: без явного согласия с политикой конфиденциальности
+            // программа не стартует и телеметрия не отправляется. Экран согласия
+            // показывается до главного окна и до любых сетевых запросов.
+            if (!PrivacyPolicy.EnsureAccepted())
+                return;
+
             bool isAdmin = IsRunningAsAdmin();
 
             // exe собран с манифестом requireAdministrator, поэтому Windows сама показывает UAC.
@@ -86,14 +92,16 @@ namespace DeepTools
                 return;
             }
 
+            try { Telemetry.Start(); } catch { }
             try { Application.Run(new MainForm(isAdmin)); }
             finally
             {
+                try { Telemetry.Stop(); } catch { }
                 try { if (_singleInstance != null) { _singleInstance.ReleaseMutex(); _singleInstance.Dispose(); _singleInstance = null; } } catch { }
             }
         }
 
-        private static void TryEnableDpiAwareness()
+        internal static void TryEnableDpiAwareness()
         {
             try
             {
@@ -118,6 +126,11 @@ namespace DeepTools
         private static void LogCrash(Exception ex)
         {
             if (ex == null) return;
+
+            // Анонимная телеметрия: модуль + тип исключения + HRESULT.
+            // Текст исключения и стек на сервер не отправляются.
+            try { Telemetry.ReportError("Unhandled", ex); } catch { }
+
             try
             {
                 string dir = System.IO.Path.Combine(

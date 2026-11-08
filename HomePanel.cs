@@ -70,7 +70,10 @@ namespace DeepTools
         private Label ramValue;
         private Label cpuTempValue;
         private Label gpuTempValue;
+        private Label onlineNowLabel;
         private System.Windows.Forms.Timer statsTimer;
+        private System.Windows.Forms.Timer onlineTimer;
+        private bool onlineBusy;
         private WidgetForm widget;
 
         public HomePanel()
@@ -83,6 +86,14 @@ namespace DeepTools
             statsTimer = new System.Windows.Forms.Timer { Interval = 2000 };
             statsTimer.Tick += (s, e) => RefreshStats();
             statsTimer.Start();
+
+            // Счётчик «Сейчас пользуются DeepTools» обновляется раз в 5 минут,
+            // чтобы укладываться в бесплатный лимит запросов Cloudflare.
+            // Запрос лёгкий и не содержит никаких данных о пользователе.
+            onlineTimer = new System.Windows.Forms.Timer { Interval = 300000 };
+            onlineTimer.Tick += (s, e) => RefreshOnlineCount();
+            onlineTimer.Start();
+            HandleCreated += (s, e) => RefreshOnlineCount();
         }
 
         private void BuildUi()
@@ -150,6 +161,22 @@ namespace DeepTools
             var widgetToggle = new ToggleSwitch { Location = new Point(648, 20), Checked = AppConfig.GetBool("widget_visible", false) };
             widgetToggle.CheckedChanged += (s, e) => SetWidgetVisible(widgetToggle.Checked);
             heroCard.Controls.Add(widgetToggle);
+
+            // Для обычного пользователя — только честный счётчик сообщества.
+            // Полная панель с ошибками и версиями живёт в отдельном
+            // DeepToolsStats.exe, который не входит в публичную сборку.
+            onlineNowLabel = new Label
+            {
+                Text = "● " + Lang.T("Сейчас пользуются DeepTools: —", "Using DeepTools now: —"),
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(440, 58),
+                Size = new Size(256, 18),
+                TextAlign = ContentAlignment.MiddleRight,
+                AutoEllipsis = true
+            };
+            heroCard.Controls.Add(onlineNowLabel);
 
             if (AppConfig.GetBool("widget_visible", false)) SetWidgetVisible(true);
 
@@ -395,6 +422,51 @@ namespace DeepTools
             else
             {
                 if (widget != null && !widget.IsDisposed) { widget.Close(); widget = null; }
+            }
+        }
+
+        private void RefreshOnlineCount()
+        {
+            if (onlineBusy) return;
+
+            // Если телеметрия выключена или сервер не настроен, ничего не
+            // запрашиваем и честно показываем прочерк.
+            if (!Telemetry.Enabled || !Telemetry.Configured)
+            {
+                SetOnlineText(-1);
+                return;
+            }
+
+            onlineBusy = true;
+            var worker = new System.ComponentModel.BackgroundWorker();
+            worker.DoWork += (s, e) => e.Result = Telemetry.FetchOnlineCount();
+            worker.RunWorkerCompleted += (s, e) =>
+            {
+                onlineBusy = false;
+                if (IsDisposed) return;
+                int count = e.Error == null && e.Result is int ? (int)e.Result : -1;
+                SetOnlineText(count);
+            };
+            worker.RunWorkerAsync();
+        }
+
+        private void SetOnlineText(int count)
+        {
+            if (onlineNowLabel == null || onlineNowLabel.IsDisposed) return;
+
+            if (count < 0)
+            {
+                onlineNowLabel.Text = "● " + Lang.T(
+                    "Сейчас пользуются DeepTools: —",
+                    "Using DeepTools now: —");
+                onlineNowLabel.ForeColor = Theme.TextDim;
+            }
+            else
+            {
+                onlineNowLabel.Text = "● " + Lang.T(
+                    "Сейчас пользуются DeepTools: ",
+                    "Using DeepTools now: ") + count.ToString("N0");
+                onlineNowLabel.ForeColor = Theme.On;
             }
         }
 

@@ -1,0 +1,12 @@
+name = "deeptools-telemetry"
+pages_build_output_dir = "public"
+compatibility_date = "2026-11-07"
+
+# Тот же API, что у Worker-версии, но на бесплатном домене *.pages.dev.
+# База D1 общая с Worker'ом, поэтому статистика не теряется.
+# Cron-очистка остаётся на Worker'е (deeptools-telemetry).
+
+[[d1_databases]]
+binding = "DB"
+database_name = "deeptools-telemetry"
+database_id = "c97591fc-2d33-485d-b8a0-9baf8ba8ae8e"

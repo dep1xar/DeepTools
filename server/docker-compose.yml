@@ -1,0 +1,15 @@
+services:
+  telemetry:
+    build: .
+    container_name: deeptools-telemetry
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./data:/data
+    environment:
+      DT_DB: /data/telemetry.db
+      DT_TRUST_PROXY: "0"
+      DT_RETENTION_DAYS: "90"
+      # DT_ADMIN_TOKEN: "change-me"
+      # DT_VIEW_TOKEN: "viewer-token"
