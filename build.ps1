@@ -1,20 +1,12 @@
 ﻿# DeepTools build script
 # Usage:  powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
-#         powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1 `
-#             -TelemetryUrl "https://stats.example.com" -StatsToken "viewer-token"
 #
 # Compiles DeepTools.exe from every .cs file in src/ and embeds the
-# managed DLLs as resources. Also builds DeepToolsStats.exe - a small viewer
-# for the full online dashboard. The only requirement is the .NET Framework 4.x
+# managed DLLs as resources. The only requirement is the .NET Framework 4.x
 # compiler that ships with Windows.
 #
 # Every step prints what it is doing, and a failure prints one clearly marked
 # block, so a crash is never silent.
-
-param(
-    [string]$TelemetryUrl = "",
-    [string]$StatsToken = ""
-)
 
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
@@ -43,47 +35,9 @@ if (-not (Test-Path $csc)) {
 }
 
 # ---------------------------------------------------------------------------
-# 2. Build-time secrets
-#    The public DeepTools.exe gets the telemetry URL. The separate
-#    DeepToolsStats.exe also gets the view token, so it can open the full
-#    dashboard when the server requires DT_VIEW_TOKEN.
+# 2. Sources and required files
 # ---------------------------------------------------------------------------
-$url = $TelemetryUrl
-if ($null -eq $url) { $url = "" }
-$url = $url.Trim()
-$token = $StatsToken
-if ($null -eq $token) { $token = "" }
-$token = $token.Trim()
-
-$urlEscaped = $url.Replace('\', '\\').Replace('"', '\"')
-$tokenEscaped = $token.Replace('\', '\\').Replace('"', '\"')
 $srcDir = Join-Path $PSScriptRoot "src"
-$secretsPath = Join-Path $srcDir "BuildSecrets.g.cs"
-@"
-// Сгенерировано build.ps1. Не редактируй вручную.
-namespace DeepTools
-{
-    public static class BuildSecrets
-    {
-        public const string TelemetryUrl = "$urlEscaped";
-#if DT_STATS_VIEWER
-        public const string StatsToken = "$tokenEscaped";
-#else
-        // Публичный DeepTools.exe не должен содержать ключ просмотра:
-        // иначе его можно извлечь из розданного exe и открыть полную панель.
-        public const string StatsToken = "";
-#endif
-    }
-}
-"@ | Set-Content -Path $secretsPath -Encoding UTF8
-
-Write-Host ""
-Write-Host "Telemetry URL: $(if ($url) { $url } else { '(not set)' })" -ForegroundColor DarkGray
-Write-Host "Stats view token: $(if ($token) { 'set' } else { '(not set)' })" -ForegroundColor DarkGray
-
-# ---------------------------------------------------------------------------
-# 3. Sources and required files
-# ---------------------------------------------------------------------------
 if (-not (Test-Path $srcDir)) {
     Fail "Missing src/ folder with the .cs sources."
 }
@@ -106,7 +60,7 @@ foreach ($file in $required) {
 }
 
 # ---------------------------------------------------------------------------
-# 4. Managed DLLs embedded as resources
+# 3. Managed DLLs embedded as resources
 #    DeepTools.Embedded.<Name>.dll, extracted at runtime by EmbeddedAssemblies.cs
 # ---------------------------------------------------------------------------
 $embedDlls = @(
@@ -158,15 +112,8 @@ if (Test-Path (Join-Path $PSScriptRoot "PawnIO_setup.exe")) {
     $resourceArgs += "/resource:$gzPawn,DeepTools.PawnIO_setup.exe.gz"
 }
 
-# The privacy policy is embedded so the consent screen can show the full text
-# even without internet access and without PRIVACY.md next to the exe.
-if (-not (Test-Path (Join-Path $PSScriptRoot "PRIVACY.md"))) {
-    Fail "Missing file: PRIVACY.md"
-}
-$resourceArgs += "/resource:PRIVACY.md,DeepTools.PRIVACY.md"
-
 # ---------------------------------------------------------------------------
-# 5. Compile DeepTools.exe
+# 4. Compile DeepTools.exe
 # ---------------------------------------------------------------------------
 $outExe = "DeepTools_build.exe"
 if (Test-Path $outExe) { Remove-Item $outExe -Force -ErrorAction SilentlyContinue }
@@ -213,55 +160,7 @@ if (-not (Test-Path $outExe)) {
 }
 
 # ---------------------------------------------------------------------------
-# 6. Compile DeepToolsStats.exe
-#    A small viewer for the full online dashboard. It does not send telemetry,
-#    does not need administrator rights and contains the view token (if given).
-#    No embedded sensor DLLs are needed, so it stays small.
-# ---------------------------------------------------------------------------
-$statsOut = "DeepToolsStats_build.exe"
-if (Test-Path $statsOut) { Remove-Item $statsOut -Force -ErrorAction SilentlyContinue }
-
-Write-Host "Compiling DeepToolsStats.exe (viewer)..." -ForegroundColor Cyan
-
-$statsArgs = @(
-    "/nologo",
-    "/target:winexe",
-    "/out:$statsOut",
-    "/win32icon:logo.ico",
-    "/main:DeepTools.StatsViewerProgram",
-    "/define:DT_STATS_VIEWER",
-    "/reference:System.dll",
-    "/reference:System.Drawing.dll",
-    "/reference:System.Windows.Forms.dll",
-    "/reference:System.Core.dll",
-    "/reference:System.Management.dll",
-    "/reference:System.Web.Extensions.dll",
-    "/reference:LibreHardwareMonitorLib.dll",
-    "/resource:PRIVACY.md,DeepTools.PRIVACY.md"
-)
-$statsArgs += "@$sourcesRsp"
-
-$statsCompilerOutput = & $csc $statsArgs 2>&1
-$statsCompilerExit = $LASTEXITCODE
-
-if ($statsCompilerOutput) {
-    foreach ($line in $statsCompilerOutput) {
-        Write-Host "  $line"
-    }
-}
-
-if ($statsCompilerExit -ne 0) {
-    Write-Banner "COMPILATION ERROR in DeepToolsStats.exe (csc exit code $statsCompilerExit)" "Red"
-    Write-Host " The compiler messages are printed above this banner." -ForegroundColor Red
-    exit 1
-}
-
-if (-not (Test-Path $statsOut)) {
-    Fail "csc reported success but $statsOut was not produced."
-}
-
-# ---------------------------------------------------------------------------
-# 7. Install the new exes
+# 5. Install the new exe
 #    A running DeepTools.exe cannot be overwritten, but it CAN be renamed,
 #    so we move it aside instead of reporting a bogus failure.
 # ---------------------------------------------------------------------------
@@ -303,39 +202,7 @@ if (Test-Path $oldExe) {
     Write-Host "Old binary moved to DeepTools_old.exe (delete it after closing DeepTools)." -ForegroundColor Yellow
 }
 
-# ---- Install DeepToolsStats.exe ----
-$statsTarget = Join-Path $PSScriptRoot "DeepToolsStats.exe"
-$statsOld = Join-Path $PSScriptRoot "DeepToolsStats_old.exe"
-
-if (Test-Path $statsOld) { Remove-Item $statsOld -Force -ErrorAction SilentlyContinue }
-
-$statsInstalled = $false
-try {
-    Move-Item $statsOut $statsTarget -Force -ErrorAction Stop
-    $statsInstalled = $true
-} catch {
-    try {
-        Move-Item $statsTarget $statsOld -Force -ErrorAction Stop
-        Move-Item $statsOut $statsTarget -Force -ErrorAction Stop
-        $statsInstalled = $true
-    } catch {
-        $statsInstalled = $false
-    }
-}
-
-if (-not $statsInstalled) {
-    Write-Banner "BUILD OK, but DeepToolsStats.exe could not be installed" "Yellow"
-    Write-Host " The main exe was installed. The viewer binary is: $statsOut" -ForegroundColor Yellow
-    Write-Host " Close DeepToolsStats.exe and run the build again." -ForegroundColor Yellow
-    exit 0
-}
-
-if (Test-Path $statsOld) {
-    Write-Host "Old viewer moved to DeepToolsStats_old.exe (delete it after closing it)." -ForegroundColor Yellow
-}
-
 $ver = (Get-Item $target).VersionInfo.FileVersion
 $sizeKB = [math]::Round((Get-Item $target).Length / 1KB)
-$statsSizeKB = [math]::Round((Get-Item $statsTarget).Length / 1KB)
-Write-Banner "BUILD OK: DeepTools.exe v$ver ($sizeKB KB) + DeepToolsStats.exe ($statsSizeKB KB)" "Green"
+Write-Banner "BUILD OK: DeepTools.exe v$ver ($sizeKB KB)" "Green"
 exit 0

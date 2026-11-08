@@ -33,9 +33,7 @@ jobs:
       - name: Build
         shell: powershell
         run: |
-          # Публичный адрес статистики не секрет: он всё равно вшит в exe.
-          # Ключ просмотра сюда не передаём — DeepToolsStats.exe в CI не публикуется.
-          powershell -ExecutionPolicy Bypass -File build.ps1 -TelemetryUrl "https://deeptools-telemetry.pages.dev"
+          powershell -ExecutionPolicy Bypass -File build.ps1
 
       - name: Show built version
         shell: powershell

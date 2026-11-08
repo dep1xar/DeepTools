@@ -1176,55 +1176,6 @@ namespace DeepTools
                 hkY += 36;
             }
 
-            // Карточка: анонимная телеметрия и политика конфиденциальности
-            var telCard = Theme.MakeCard(panel, new Point(24, 966), new Size(640, 92));
-
-            var telTitle = new Label
-            {
-                Text = Lang.T("Анонимная телеметрия", "Anonymous telemetry"),
-                ForeColor = Theme.TextMain,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                Location = new Point(20, 14),
-                AutoSize = true
-            };
-            telCard.Controls.Add(telTitle);
-
-            var telDesc = new Label
-            {
-                Text = Lang.T(
-                    "Отправляет только версию, ОС, язык, случайный ID и подпись ошибки. Без IP, имён и путей.",
-                    "Sends only the version, OS, language, a random ID and an error signature. No IP, names or paths."),
-                ForeColor = Theme.TextDim,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 8F),
-                Location = new Point(20, 38),
-                Size = new Size(470, 18),
-                AutoEllipsis = true
-            };
-            telCard.Controls.Add(telDesc);
-
-            var telToggle = new ToggleSwitch { Location = new Point(580, 14), Checked = Telemetry.Enabled };
-            telToggle.CheckedChanged += (s, e) =>
-            {
-                Telemetry.Enabled = telToggle.Checked;
-                if (telToggle.Checked) Telemetry.Start();
-            };
-            telCard.Controls.Add(telToggle);
-
-            var telPrivacyBtn = new RoundedButton
-            {
-                Text = Lang.T("Политика конфиденциальности", "Privacy policy"),
-                ButtonColor = Theme.InputColor,
-                HoverColor = Theme.KeyHover,
-                TextColor = Theme.TextDim,
-                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-                Location = new Point(20, 58),
-                Size = new Size(210, 24)
-            };
-            telPrivacyBtn.Click += (s, e) => Telemetry.OpenPrivacyPolicy();
-            telCard.Controls.Add(telPrivacyBtn);
-
             return panel;
         }
 

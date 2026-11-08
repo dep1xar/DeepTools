@@ -1,6 +1,0 @@
-telemetry.db
-telemetry.db-shm
-telemetry.db-wal
-data/
-__pycache__/
-*.pyc

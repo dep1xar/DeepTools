@@ -8,13 +8,6 @@ obj/
 DeepTools.exe
 DeepTools_build.exe
 DeepTools_old.exe
-DeepToolsStats.exe
-DeepToolsStats_build.exe
-DeepToolsStats_old.exe
-
-# Вшитые при сборке адрес сервера и ключ просмотра
-BuildSecrets.g.cs
-src/BuildSecrets.g.cs
 
 # Логи сборки
 build.log
@@ -40,18 +33,3 @@ desktop.ini
 *.deeptools.bak-wal
 *.deeptools.bak-shm
 *.deeptools.tmp
-
-# Локальные данные сервера телеметрии
-server/data/
-server/*.db
-server/*.db-shm
-server/*.db-wal
-server/__pycache__/
-*.pyc
-
-# Локальное состояние Cloudflare Worker/Pages и токен просмотра
-server/worker/.wrangler/
-server/worker/.dev.vars
-server/worker/.stats-token
-server/worker/node_modules/
-server/pages/.wrangler/
