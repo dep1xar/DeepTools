@@ -91,7 +91,7 @@ No installer, no dependencies to download — all libraries (including the hardw
 
 You need the **.NET Framework 4.x** SDK (ships with Windows / Visual Studio; the compiler lives at `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
 
-Make sure you downloaded the **whole repository** (Code → Download ZIP): every `.cs` file and every `.dll` must sit next to `build.ps1`, otherwise the build fails.
+Make sure you downloaded the **whole repository** (Code → Download ZIP): every `.cs` file must be in `src/`, and every `.dll` must sit next to `build.ps1`, otherwise the build fails.
 
 Open a PowerShell window in the project folder and run:
 
@@ -99,7 +99,7 @@ Open a PowerShell window in the project folder and run:
 powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 ```
 
-The script compiles all `.cs` files, embeds the managed DLLs as resources and produces `DeepTools.exe` in the project folder. It also builds the separate viewer `DeepToolsStats.exe` (no admin rights, no telemetry).
+The script compiles all `.cs` files from `src/`, embeds the managed DLLs as resources and produces `DeepTools.exe` in the project folder. It also builds the separate viewer `DeepToolsStats.exe` (no admin rights, no telemetry).
 
 For a release build, pass the telemetry endpoint and — for the viewer only — the view token:
 
@@ -109,7 +109,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1 `
     -StatsToken "your-view-token"
 ```
 
-The values are written to the generated `BuildSecrets.g.cs` (gitignored) and embedded into the exes. Without parameters the build still works, but telemetry stays disabled and the counter shows “—”.
+The values are written to the generated `src/BuildSecrets.g.cs` (gitignored) and embedded into the exes. Without parameters the build still works, but telemetry stays disabled and the counter shows “—”.
 
 The script prints a clearly marked **BUILD OK** or **BUILD FAILED** block at the end, so a problem is never silent:
 
@@ -214,7 +214,7 @@ DeepTools — системный твикер, поэтому он делает 
 
 Нужен **.NET Framework 4.x** SDK (идёт с Windows / Visual Studio; компилятор лежит по пути `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
 
-Убедись, что скачал **весь репозиторий** (Code → Download ZIP): рядом с `build.ps1` должны лежать все `.cs` и все `.dll`, иначе сборка не пройдёт.
+Убедись, что скачал **весь репозиторий** (Code → Download ZIP): все `.cs` должны лежать в `src/`, а все `.dll` — рядом с `build.ps1`, иначе сборка не пройдёт.
 
 Открой PowerShell в папке проекта и запусти:
 
@@ -222,7 +222,7 @@ DeepTools — системный твикер, поэтому он делает 
 powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 ```
 
-Скрипт компилирует все `.cs`-файлы, встраивает managed-библиотеки как ресурсы и создаёт `DeepTools.exe` в папке проекта. Заодно собирается отдельная панель `DeepToolsStats.exe` (без прав администратора и без отправки телеметрии).
+Скрипт компилирует все `.cs`-файлы из `src/`, встраивает managed-библиотеки как ресурсы и создаёт `DeepTools.exe` в папке проекта. Заодно собирается отдельная панель `DeepToolsStats.exe` (без прав администратора и без отправки телеметрии).
 
 Для релизной сборки передай адрес сервера и — только для панели — ключ просмотра:
 
@@ -232,7 +232,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1 `
     -StatsToken "your-view-token"
 ```
 
-Значения записываются в сгенерированный `BuildSecrets.g.cs` (он в `.gitignore`) и вшиваются в exe. Без параметров сборка тоже работает, но телеметрия остаётся выключенной, а счётчик показывает «—».
+Значения записываются в сгенерированный `src/BuildSecrets.g.cs` (он в `.gitignore`) и вшиваются в exe. Без параметров сборка тоже работает, но телеметрия остаётся выключенной, а счётчик показывает «—».
 
 В конце всегда печатается заметный блок **BUILD OK** или **BUILD FAILED**, поэтому ошибка не проходит молча:
 

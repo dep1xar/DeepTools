@@ -14,6 +14,7 @@ DeepToolsStats_old.exe
 
 # Вшитые при сборке адрес сервера и ключ просмотра
 BuildSecrets.g.cs
+src/BuildSecrets.g.cs
 
 # Логи сборки
 build.log

@@ -1,10 +1,8 @@
 name: Build and Release DeepTools
 
-# Когда запускается:
-#  - пуш в основную ветку  -> только сборка (артефакт), без релиза
-#  - пуш ЛЮБОГО тега       -> сборка + релиз на этот тег
-#  - ручной запуск         -> можно пересобрать и выпустить релиз для уже
-#                             существующего тега (выбрать тег в "Use workflow from")
+# Сборка на каждый push в main/master и на pull request.
+# Пуш тега собирает exe и создаёт релиз с простым описанием:
+# хеш коммита и список изменений.
 on:
   push:
     branches: [ main, master ]
@@ -13,25 +11,30 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-# Без contents: write токен по умолчанию только читает репозиторий, и шаг
-# создания релиза падает с 403 "Resource not accessible by integration":
-# сборка проходит, а релиза нет
 permissions:
   contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Нужна история и теги, чтобы собрать список изменений от прошлого релиза.
+          fetch-depth: 0
 
-      - name: Build with build.ps1
+      - name: Build
         shell: powershell
         run: |
           # Публичный адрес статистики не секрет: он всё равно вшит в exe.
-          # Ключ просмотра сюда не передаём — DeepToolsStats.exe в CI не собирается.
+          # Ключ просмотра сюда не передаём — DeepToolsStats.exe в CI не публикуется.
           powershell -ExecutionPolicy Bypass -File build.ps1 -TelemetryUrl "https://deeptools-telemetry.pages.dev"
 
       - name: Show built version
@@ -41,8 +44,6 @@ jobs:
           Write-Host "FileVersion:    $($v.FileVersion)"
           Write-Host "ProductVersion: $($v.ProductVersion)"
 
-      # Защита от «релиз вышел, а внутри старая версия»: если в теге есть номер,
-      # он должен совпадать с версией exe (AssemblyInfo.cs)
       - name: Check version matches tag
         if: startsWith(github.ref, 'refs/tags/')
         shell: powershell
@@ -65,12 +66,29 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "DeepTools-${{ github.ref_name }}"
+          name: "DeepTools-${{ github.run_number }}"
           path: DeepTools.exe
           if-no-files-found: error
 
-      # Релиз создаётся только для тега. Тег с дефисом (v2.1.0-beta) помечаем
-      # как pre-release, чтобы он не стал "Latest" вместо стабильного
+      - name: Prepare plain release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: powershell
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $prev = git describe --tags --abbrev=0 "${tag}^" 2>$null
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($prev)) {
+            $range = $tag
+          } else {
+            $range = "$prev..$tag"
+          }
+
+          $changes = (git log $range --pretty=format:"%h %s") -join "`n"
+          $body = "Commit: ${{ github.sha }}`n`nChanges:`n$changes"
+
+          $path = Join-Path $PWD "release-notes.txt"
+          [IO.File]::WriteAllText($path, $body, [Text.UTF8Encoding]::new($false))
+          Get-Content $path
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -78,8 +96,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: "DeepTools ${{ github.ref_name }}"
+          body_path: release-notes.txt
+          generate_release_notes: false
           files: DeepTools.exe
           fail_on_unmatched_files: true
-          generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           draft: false

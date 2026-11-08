@@ -3,7 +3,7 @@
 #         powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1 `
 #             -TelemetryUrl "https://stats.example.com" -StatsToken "viewer-token"
 #
-# Compiles DeepTools.exe from every .cs file in this folder and embeds the
+# Compiles DeepTools.exe from every .cs file in src/ and embeds the
 # managed DLLs as resources. Also builds DeepToolsStats.exe - a small viewer
 # for the full online dashboard. The only requirement is the .NET Framework 4.x
 # compiler that ships with Windows.
@@ -57,7 +57,8 @@ $token = $token.Trim()
 
 $urlEscaped = $url.Replace('\', '\\').Replace('"', '\"')
 $tokenEscaped = $token.Replace('\', '\\').Replace('"', '\"')
-$secretsPath = Join-Path $PSScriptRoot "BuildSecrets.g.cs"
+$srcDir = Join-Path $PSScriptRoot "src"
+$secretsPath = Join-Path $srcDir "BuildSecrets.g.cs"
 @"
 // Сгенерировано build.ps1. Не редактируй вручную.
 namespace DeepTools
@@ -83,12 +84,21 @@ Write-Host "Stats view token: $(if ($token) { 'set' } else { '(not set)' })" -Fo
 # ---------------------------------------------------------------------------
 # 3. Sources and required files
 # ---------------------------------------------------------------------------
-$sources = @(Get-ChildItem -Path $PSScriptRoot -Filter *.cs | ForEach-Object { $_.Name })
+if (-not (Test-Path $srcDir)) {
+    Fail "Missing src/ folder with the .cs sources."
+}
+$sources = @(Get-ChildItem -Path $srcDir -Filter *.cs | ForEach-Object { $_.FullName })
 if ($sources.Count -eq 0) {
-    Fail "No .cs files found next to build.ps1."
+    Fail "No .cs files found in src/."
 }
 
-$required = @("program.cs", "mainform.cs", "AssemblyInfo.cs", "app.manifest", "logo.ico")
+# Pass the source list through a response file: 96 absolute paths plus the
+# compiler arguments can exceed the Windows command-line limit on CI agents.
+$sourcesRsp = Join-Path $env:TEMP "deeptools_sources.rsp"
+$sourceLines = $sources | ForEach-Object { '"' + $_ + '"' }
+[IO.File]::WriteAllLines($sourcesRsp, $sourceLines, [Text.UTF8Encoding]::new($false))
+
+$required = @("src\program.cs", "src\mainform.cs", "src\AssemblyInfo.cs", "app.manifest", "logo.ico")
 foreach ($file in $required) {
     if (-not (Test-Path (Join-Path $PSScriptRoot $file))) {
         Fail "Missing file: $file"
@@ -180,7 +190,7 @@ $cscArgs = @(
     "/reference:LibreHardwareMonitorLib.dll"
 )
 $cscArgs += $resourceArgs
-$cscArgs += $sources
+$cscArgs += "@$sourcesRsp"
 
 $compilerOutput = & $csc $cscArgs 2>&1
 $compilerExit = $LASTEXITCODE
@@ -229,7 +239,7 @@ $statsArgs = @(
     "/reference:LibreHardwareMonitorLib.dll",
     "/resource:PRIVACY.md,DeepTools.PRIVACY.md"
 )
-$statsArgs += $sources
+$statsArgs += "@$sourcesRsp"
 
 $statsCompilerOutput = & $csc $statsArgs 2>&1
 $statsCompilerExit = $LASTEXITCODE
