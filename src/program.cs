@@ -12,8 +12,12 @@ namespace DeepTools
         // его и одно-экземплярность сломается)
         private static Mutex _singleInstance;
 
+        // Аргумент, с которым процесс запускается после смены темы/языка:
+        // новый экземпляр ждёт, пока старый освободит мьютекс и завершится.
+        private const string RestartFlag = "--restart";
+
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             // Исправление "пиксельного" интерфейса: включаем High DPI и сглаживание
             // SetProcessDPIAware делает приложение DPI-aware - текст и контролы не растягиваются билинейно
@@ -82,8 +86,31 @@ namespace DeepTools
             // Один экземпляр DeepTools. Проверяем здесь, уже ПОСЛЕ возможного
             // перезапуска с правами админа - иначе временный процесс без прав
             // занял бы мьютекс и админский экземпляр решил бы, что он второй.
-            bool createdNew;
-            _singleInstance = new Mutex(true, "DeepTools_SingleInstance_dep1xar", out createdNew);
+            bool createdNew = false;
+            bool restarting = false;
+            foreach (string arg in args)
+            {
+                if (string.Equals(arg, RestartFlag, StringComparison.OrdinalIgnoreCase))
+                {
+                    restarting = true;
+                    break;
+                }
+            }
+
+            // При перезапуске старый процесс ещё несколько мгновений держит
+            // мьютекс. Ждём его завершения, иначе новый экземпляр решит, что
+            // DeepTools уже запущен, и выйдет - приложение просто исчезнет.
+            int attempts = restarting ? 40 : 1; // до 10 секунд
+            for (int attempt = 0; attempt < attempts; attempt++)
+            {
+                _singleInstance = new Mutex(true, "DeepTools_SingleInstance_dep1xar", out createdNew);
+                if (createdNew) break;
+
+                _singleInstance.Dispose();
+                _singleInstance = null;
+                if (attempt + 1 < attempts) Thread.Sleep(250);
+            }
+
             if (!createdNew)
             {
                 // Уже запущено - будим то окно (выйдет из трея) и выходим
@@ -96,8 +123,11 @@ namespace DeepTools
             try { Application.Run(new MainForm(isAdmin)); }
             finally
             {
-                try { Telemetry.Stop(); } catch { }
+                // Сначала отпускаем мьютекс: при перезапуске новый экземпляр
+                // ждёт именно его, а синхронная отправка exit может занимать
+                // несколько секунд и не должна задерживать старт.
                 try { if (_singleInstance != null) { _singleInstance.ReleaseMutex(); _singleInstance.Dispose(); _singleInstance = null; } } catch { }
+                try { Telemetry.Stop(); } catch { }
             }
         }
 
@@ -159,6 +189,28 @@ namespace DeepTools
             WindowsIdentity identity = WindowsIdentity.GetCurrent();
             WindowsPrincipal principal = new WindowsPrincipal(identity);
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
+        }
+
+        // Перезапуск текущего exe после смены темы/языка.
+        // Новый процесс получает --restart и подождёт, пока этот завершится.
+        public static bool TryRestart(out string error)
+        {
+            error = "";
+            try
+            {
+                ProcessStartInfo startInfo = new ProcessStartInfo(Application.ExecutablePath);
+                startInfo.Arguments = RestartFlag;
+                startInfo.UseShellExecute = true;
+                if (!IsRunningAsAdmin())
+                    startInfo.Verb = "runas";
+                Process.Start(startInfo);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
         }
 
         // Перезапуск текущего exe с запросом прав администратора через UAC

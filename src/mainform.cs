@@ -1301,8 +1301,19 @@ namespace DeepTools
                 MessageBoxIcon.Question);
             if (r == DialogResult.Yes)
             {
-                Process.Start(Application.ExecutablePath);
-                ExitApplication();
+                string error;
+                if (Program.TryRestart(out error))
+                {
+                    ExitApplication();
+                }
+                else
+                {
+                    DTDialog.Show(
+                        Lang.T("Не удалось перезапустить DeepTools: ", "Could not restart DeepTools: ") + error,
+                        "DeepTools",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                }
             }
         }
     }
