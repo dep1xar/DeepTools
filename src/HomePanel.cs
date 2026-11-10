@@ -181,7 +181,7 @@ namespace DeepTools
                 Lang.T("Буст игр и Ultimate Performance", "Game boost and Ultimate Performance"), "booster");
             MakeQuickCard(new Point(506, 300), "❤",
                 "Health Check",
-                Lang.T("Датчики, диски, бенчмарк", "Sensors, disks, benchmark"), "health");
+                Lang.T("Датчики и диски", "Sensors and disks"), "health");
             MakeQuickCard(new Point(24, 406), "⚡",
                 Lang.T("Автокликер", "Autoclicker"),
                 Lang.T("Мышь и клавиатура, ", "Mouse and keyboard, ") + Hotkeys.Get(NativeMethods.HOTKEY_ID_CLICKER), "clicker");

@@ -21,8 +21,6 @@ namespace DeepTools
     // Единая точка про глобальные хоткеи: список действий, текущие клавиши,
     // регистрация в Windows и сохранение в конфиг. UI переназначения - карточка
     // «Горячие клавиши» в Настройках (mainform), захват клавиши - в ProcessCmdKey.
-    // Хоткеи макросов (F6/F7 внутри окна макросов) сюда не входят - они живут,
-    // только пока открыто окно MacroForm
     public static class Hotkeys
     {
         // "screenshot_hotkey" - ключ конфига из старых версий, сохранён для совместимости
@@ -157,8 +155,6 @@ namespace DeepTools
         private static readonly HashSet<int> active = new HashSet<int>();
         // Те, что дополнительно заняты в Windows через RegisterHotKey
         private static readonly HashSet<int> viaSystem = new HashSet<int>();
-        // Хоткеи, которые временно заняты другим окном (например, окном макросов)
-        private static readonly HashSet<int> suspended = new HashSet<int>();
         // Когда хук последний раз поймал клавишу: по этой отметке отсекаем дубль
         private static readonly Dictionary<int, int> hookHandled = new Dictionary<int, int>();
 
@@ -186,30 +182,6 @@ namespace DeepTools
         {
             Unhook();
             hookWindow = IntPtr.Zero;
-        }
-
-        // Пока открыто окно макросов, его клавиши заняты: хук не должен слать эти
-        // хоткеи главному окну, а сама клавиша временно снимается с регистрации
-        public static void Suspend(int id, IntPtr ownerHandle)
-        {
-            suspended.Add(id);
-            active.Remove(id);
-            viaSystem.Remove(id);
-            if (ownerHandle != IntPtr.Zero)
-            {
-                try { NativeMethods.UnregisterHotKey(ownerHandle, id); } catch { }
-            }
-        }
-
-        public static void Resume(int id, IntPtr ownerHandle)
-        {
-            suspended.Remove(id);
-            HotkeyDef d = Find(id);
-            if (d == null || d.Current == Keys.None) return;
-            active.Add(id);
-            if (ownerHandle != IntPtr.Zero &&
-                NativeMethods.RegisterHotKey(ownerHandle, id, 0, (uint)d.Current))
-                viaSystem.Add(id);
         }
 
         // Одну и ту же клавишу приносят оба механизма: сначала сообщение хука,
@@ -271,7 +243,7 @@ namespace DeepTools
                         {
                             HotkeyDef d = All[i];
                             if (d.Current == Keys.None || (int)d.Current != vk) continue;
-                            if (active.Contains(d.Id) && !suspended.Contains(d.Id))
+                            if (active.Contains(d.Id))
                             {
                                 hookHandled[d.Id] = Environment.TickCount;
                                 NativeMethods.PostMessage(hookWindow, WM_HOTKEY_HOOK, (IntPtr)d.Id, IntPtr.Zero);

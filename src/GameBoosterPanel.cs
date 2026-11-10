@@ -631,37 +631,14 @@ namespace DeepTools
             };
             smartCard.Controls.Add(vramBtn);
 
-            // ---- Карточка: RGB-реакция ----
-            var rgbCard = Theme.MakeCard(this, new Point(24, smartCard.Bottom + 12), new Size(712, 12 + optRowStep + 8));
-
-            MakeOptRow(rgbCard, 12,
-                Lang.T("RGB-реакция (OpenRGB)", "RGB Reactive (OpenRGB)"),
-                Lang.T("Цвет подсветки следует температуре CPU/GPU, мигает красным при просадке FPS",
-                       "Lighting colour tracks CPU/GPU temp, flashes red on FPS drops"));
-            var rgbToggle = new ToggleSwitch
-            {
-                Location = new Point(646, OptRowToggleY(12)),
-                Checked = AppConfig.GetBool("rgb_reactive", false)
-            };
-            rgbToggle.CheckedChanged += (s, e) => {
-                RgbReactive.Enabled = rgbToggle.Checked;
-                AppConfig.SetBool("rgb_reactive", rgbToggle.Checked);
-                statusLabel.Text = rgbToggle.Checked
-                    ? Lang.T("RGB-реакция включена (нужен OpenRGB с HTTP-сервером)", "RGB Reactive on (requires OpenRGB with HTTP server)")
-                    : Lang.T("RGB-реакция выключена", "RGB Reactive disabled");
-                statusLabel.ForeColor = Theme.On;
-            };
-            rgbCard.Controls.Add(rgbToggle);
-
-            // Строка статуса под последней карточкой — создаётся после rgbCard,
-            // потому что её Y считается от rgbCard.Bottom
+            // Строка статуса под последней карточкой
             statusLabel = new Label
             {
                 Text = "",
                 ForeColor = Theme.Accent,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(24, rgbCard.Bottom + 8),
+                Location = new Point(24, smartCard.Bottom + 8),
                 AutoSize = true
             };
             Controls.Add(statusLabel);

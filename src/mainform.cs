@@ -25,7 +25,6 @@ namespace DeepTools
         private ClickerPanel panelClicker;
         private ScreenshotsPanel panelScreenshots;
         private ClipboardManagerPanel panelClipboard;
-        private NetworkPanel panelNetwork;
         private Panel panelSettings;
 
         private SidebarNavButton navHome;
@@ -40,7 +39,6 @@ namespace DeepTools
         private SidebarNavButton navClicker;
         private SidebarNavButton navScreenshots;
         private SidebarNavButton navClipboard;
-        private SidebarNavButton navNetwork;
         private SidebarNavButton navSettings;
         private Panel navIndicator;
 
@@ -88,13 +86,10 @@ namespace DeepTools
             // Замороженные фоновые процессы обязаны проснуться при выходе из программы
             FormClosed += (s, e) => BackgroundFreezer.ResumeAll();
             // Выключаем новые фоновые сервисы при закрытии
-            FormClosed += (s, e) => LatencySurgeon.Disable();
-            FormClosed += (s, e) => RgbReactive.Enabled = false;
             FormClosed += (s, e) => AdaptivePowerProfile.Enabled = false;
             FormClosed += (s, e) => StandbyCleaner.Enabled = false;
             // Восстанавливаем сохранённые состояния
             if (AppConfig.GetBool("adaptive_power", false))  AdaptivePowerProfile.Enabled = true;
-            if (AppConfig.GetBool("rgb_reactive", false))    RgbReactive.Enabled = true;
             if (AppConfig.GetBool("standby_auto", false))    StandbyCleaner.Enabled = true;
             // Кэш шейдеров: если версия драйвера GPU сменилась - чистим на старте
             // (в фоне, чтобы не тормозить показ окна)
@@ -542,14 +537,13 @@ namespace DeepTools
             MakeNavGroupLabel(Lang.T("МОНИТОРИНГ", "MONITORING"), 330);
             navHealth = MakeNavItem("❤   Health Check", 346);
             navSysInfo = MakeNavItem("▤   " + Lang.T("Мой ПК", "My PC"), 376);
-            navNetwork = MakeNavItem("⇅   " + Lang.T("Сеть", "Network"), 406);
 
-            MakeNavGroupLabel(Lang.T("ИНСТРУМЕНТЫ", "TOOLS"), 443);
-            navClicker = MakeNavItem("⊙   Clicker", 459);
-            navScreenshots = MakeNavItem("▣   " + Lang.T("Скриншоты", "Screenshots"), 489);
-            navClipboard = MakeNavItem("❏   " + Lang.T("Буфер обмена", "Clipboard"), 519);
+            MakeNavGroupLabel(Lang.T("ИНСТРУМЕНТЫ", "TOOLS"), 413);
+            navClicker = MakeNavItem("⊙   Clicker", 429);
+            navScreenshots = MakeNavItem("▣   " + Lang.T("Скриншоты", "Screenshots"), 459);
+            navClipboard = MakeNavItem("❏   " + Lang.T("Буфер обмена", "Clipboard"), 489);
 
-            navSettings = MakeNavItem("⚙   " + Lang.T("Настройки", "Settings"), 550);
+            navSettings = MakeNavItem("⚙   " + Lang.T("Настройки", "Settings"), 520);
 
             // Бегущая акцентная полоска: переезжает к активному пункту при
             // переключении раздела вместо мгновенного скачка
@@ -569,7 +563,6 @@ namespace DeepTools
             navClicker.Click += (s, e) => ShowPanel(GetClicker(), navClicker);
             navScreenshots.Click += (s, e) => ShowPanel(GetScreenshots(), navScreenshots);
             navClipboard.Click += (s, e) => ShowPanel(GetClipboard(), navClipboard);
-            navNetwork.Click += (s, e) => ShowPanel(GetNetwork(), navNetwork);
             navSettings.Click += (s, e) => ShowPanel(GetSettings(), navSettings);
 
             contentArea = new Panel { Location = new Point(220, 34), Size = new Size(760, 616), BackColor = Theme.BgColor };
@@ -641,11 +634,6 @@ namespace DeepTools
         {
             if (panelGameTweaks == null) { panelGameTweaks = new GameTweaksPanel(); RegisterPanel(panelGameTweaks); }
             return panelGameTweaks;
-        }
-        private NetworkPanel GetNetwork()
-        {
-            if (panelNetwork == null) { panelNetwork = new NetworkPanel(); RegisterPanel(panelNetwork); }
-            return panelNetwork;
         }
         private ClipboardManagerPanel GetClipboard()
         {

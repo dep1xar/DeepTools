@@ -5,7 +5,7 @@
 **Smart tweaker, cleaner and monitoring tool for Windows — in one app.**
 **Умный твикер, чистильщик и монитор для Windows — всё в одном.**
 
-[![Version](https://img.shields.io/badge/version-2.2.2-blue)](https://github.com/dep1xar/DeepTools/releases)
+[![Version](https://img.shields.io/badge/version-2.3.0-blue)](https://github.com/dep1xar/DeepTools/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D6)](#)
 [![.NET](https://img.shields.io/badge/.NET%20Framework-4.x-512BD4)](#)
 
@@ -19,14 +19,14 @@
 
 ## English
 
-DeepTools is a lightweight all-in-one utility for Windows 10 and 11. It cleans junk, tunes the system for gaming, watches your temperatures, manages startup and services, removes pre-installed bloat, and bundles a set of handy extras — a clicker, macro recorder, screenshot tool, clipboard manager and desktop sticky notes. One executable, no installer, no background services left behind.
+DeepTools is a lightweight all-in-one utility for Windows 10 and 11. It cleans junk, tunes the system for gaming, watches your temperatures, manages startup and services, removes pre-installed bloat, and bundles a set of handy extras — a clicker, screenshot tool, clipboard manager and desktop sticky notes. One executable, no installer, no background services left behind.
 
 > [!IMPORTANT]
 > DeepTools requires **administrator rights** to change power plans, services and startup entries, and to read hardware sensors. On launch it asks for elevation via the standard Windows UAC prompt.
 
 ### Why it may be flagged by antivirus
 
-DeepTools is a system tweaker, so it does things real malware also does: elevates via UAC, edits the registry and services, sends synthetic input (the clicker/macros) and loads a kernel driver to read CPU/GPU temperatures. Because the release is **not code-signed yet**, some engines (mostly ML/heuristic detections like [Trojan:Win32/Wacatac.B!ml](https://www.microsoft.com/en-us/wdsi/threats/malware-encyclopedia-description?name=Trojan%3AWin32%2FWacatac.B!ml&threatid=2147735505)) may show a false positive. This is expected for this class of software.
+DeepTools is a system tweaker, so it does things real malware also does: elevates via UAC, edits the registry and services, sends synthetic input (the clicker) and loads a kernel driver to read CPU/GPU temperatures. Because the release is **not code-signed yet**, some engines (mostly ML/heuristic detections like [Trojan:Win32/Wacatac.B!ml](https://www.microsoft.com/en-us/wdsi/threats/malware-encyclopedia-description?name=Trojan%3AWin32%2FWacatac.B!ml&threatid=2147735505)) may show a false positive. This is expected for this class of software.
 
 - The full source is in this repository — you can read and build it yourself.
 - You can verify any release on [VirusTotal](https://www.virustotal.com/).
@@ -38,13 +38,11 @@ A card grid of per-feature game tweaks: HAGS, Game Mode, fullscreen optimization
 
 ### Extra tools
 
-- **Macro recorder** — record mouse clicks and key presses with timing, replay with repeats or looping, save/load macros. Hotkeys: **F6** record, **F7** play (while the macro window is open).
 - **Program uninstaller** — lists installed programs and runs their uninstaller, then finds and removes leftover folders.
 - **Sticky notes** — yellow desktop notes that stay on top, live in the tray, and are restored on launch (tray menu → *New note*). Each note has a ⏰ **reminder**: set a time and get a tray notification with the note popping to the front.
 - **Audio switcher** — switch the default playback device (headphones ↔ speakers) in one click from the tray menu.
 - **Power quick actions** — restart straight into BIOS/UEFI, toggle Windows Fast Startup, restart Explorer.
 - **Debloat** — removes pre-installed UWP apps you don't use. Only shows what's actually installed; removal is per-user and always confirmed.
-- **Benchmark** — quick before/after CPU, RAM and disk test. Saves the result so you can see if your tweaks actually helped.
 - **Stress Test** — loads all CPU cores to 100% for 2 minutes and reports peak temperature.
 - **Temperature History** — 24-hour CPU/GPU graph with peak analysis.
 - **Game Time** — tracks your gaming sessions (playtime, average FPS, 1% low, average CPU, peak temps) and reports when you close a game. Works with fullscreen and borderless games. A **Share** button renders a PNG card with your PC spec and top games. A per-game ≡ **FPS history** chart shows average FPS and 1% low across sessions with a trend verdict — so system degradation is visible at a glance. The **≡ Report** button opens frame statistics for the last 30 minutes / hour / 2 hours: average FPS, worst 1% low and **every micro-stutter** (when it happened and how many milliseconds it lasted) on a timeline. Non-games (messengers, browsers, terminals, video editors) are filtered out of the game statistics, and anything already recorded can be removed per game or in one click.
@@ -52,7 +50,6 @@ A card grid of per-feature game tweaks: HAGS, Game Mode, fullscreen optimization
 - **Restore point** — offered automatically before risky tweaks (debloat, service presets, telemetry) so you can always roll back.
 - **Crosshair** — customizable on-screen crosshair overlay (cross, dot, circle, T-shape); settings are remembered.
 - **Desktop Widget** — compact always-on-top CPU/RAM/temperature panel.
-- **RGB Reactive** — connects to OpenRGB to drive your lighting based on live sensor data: colour shifts from cool to hot as CPU/GPU temperature rises, pulses faster under heavy load, and flashes red when FPS drops below your threshold. Works with any OpenRGB-compatible device.
 
 ### Yandex removal
 
@@ -118,14 +115,14 @@ DeepTools checks GitHub Releases on launch. When an update is available, clickin
 
 ## Русский
 
-DeepTools - это лёгкая утилита «всё в одном» для Windows 10 и 11, она чистит мусор, настраивает систему под игры, следит за температурами, позволяет управлять автозагрузкой и службами, удаляет предустановленный хлам и включает набор удобных инструментов: автокликер, запись макросов, скриншотер, менеджер буфера обмена и заметки. Один .exe файл, без установщика и без фоновых служб, остающихся в системе.
+DeepTools - это лёгкая утилита «всё в одном» для Windows 10 и 11, она чистит мусор, настраивает систему под игры, следит за температурами, позволяет управлять автозагрузкой и службами, удаляет предустановленный хлам и включает набор удобных инструментов: автокликер, скриншотер, менеджер буфера обмена и заметки. Один .exe файл, без установщика и без фоновых служб, остающихся в системе.
 
 > [!IMPORTANT]
 > DeepTools нужны **права администратора**, чтобы менять планы питания, службы и автозагрузку, а также читать датчики железа. При запуске программа запрашивает их через стандартное окно UAC.
 
 ### Почему антивирус может ругаться
 
-DeepTools — системный твикер, поэтому он делает то же, что и настоящие вирусы: повышает права через UAC, правит реестр и службы, шлёт синтетический ввод (кликер/макросы) и грузит драйвер ядра для чтения температур CPU/GPU. Так как релиз **пока не подписан сертификатом**, некоторые движки (в основном ML/эвристика вроде [Trojan:Win32/Wacatac.B!ml](https://www.microsoft.com/en-us/wdsi/threats/malware-encyclopedia-description?name=Trojan%3AWin32%2FWacatac.B!ml&threatid=2147735505)) могут дать ложное срабатывание. Для такого класса программ это нормально.
+DeepTools — системный твикер, поэтому он делает то же, что и настоящие вирусы: повышает права через UAC, правит реестр и службы, шлёт синтетический ввод (кликер) и грузит драйвер ядра для чтения температур CPU/GPU. Так как релиз **пока не подписан сертификатом**, некоторые движки (в основном ML/эвристика вроде [Trojan:Win32/Wacatac.B!ml](https://www.microsoft.com/en-us/wdsi/threats/malware-encyclopedia-description?name=Trojan%3AWin32%2FWacatac.B!ml&threatid=2147735505)) могут дать ложное срабатывание. Для такого класса программ это нормально.
 
 - Весь исходный код — в этом репозитории, можно прочитать и собрать самому.
 - Любой релиз можно проверить на [VirusTotal](https://www.virustotal.com/).
@@ -139,13 +136,11 @@ DeepTools — системный твикер, поэтому он делает 
 
 ### Дополнительные инструменты
 
-- **Запись макросов** — запись кликов мыши и нажатий клавиш с таймингами, воспроизведение с повторами или в цикле, сохранение/загрузка. Хоткеи: **F6** запись, **F7** воспроизведение (пока открыто окно макросов).
 - **Деинсталлятор программ** — список установленного и запуск удаления, затем поиск и удаление остаточных папок.
 - **Заметки-стикеры** — жёлтые заметки поверх стола, живут в трее, восстанавливаются при запуске (меню трея → *Новая заметка*). У каждой есть ⏰ **напоминание**: задай время — придёт уведомление из трея, а заметка выпрыгнет наверх.
 - **Переключатель звука** — смена устройства вывода (наушники ↔ колонки) одним кликом из меню трея.
 - **Быстрые действия питания** — перезагрузка прямо в BIOS/UEFI, тумблер быстрого запуска Windows, перезапуск проводника.
 - **Деблоат** — удаляет предустановленные UWP-приложения. Показывает только реально установленное; удаление для текущего пользователя и всегда с подтверждением.
-- **Бенчмарк** — быстрый тест CPU, RAM и диска «до/после». Сохраняет результат, чтобы увидеть реальный прирост.
 - **Стресс-тест** — грузит все ядра CPU на 100% в течение 2 минут и показывает пиковую температуру.
 - **История температур** — график CPU/GPU за 24 часа с разбором пиков.
 - **Время в играх** — считает игровые сессии (время, средний FPS, 1% low, средний CPU, пиковые температуры) и шлёт отчёт при закрытии игры. Работает с полноэкранными и borderless-играми. Кнопка **Поделиться** рендерит PNG-карточку со спекой ПК и топом игр. График ≡ **истории FPS** по каждой игре — средний FPS и 1% low по сессиям с вердиктом тренда: деградация системы видна с одного взгляда. Кнопка **≡ Отчёт** открывает статистику кадров за последние 30 минут / час / 2 часа: средний FPS, худший 1% low и **каждый микрофриз** — когда случился и сколько миллисекунд длился, на таймлайне. Не-игры (мессенджеры, браузеры, терминалы, видеоредакторы) в статистику игр не попадают, а уже записанные сессии можно убрать по одной или одной кнопкой.
@@ -153,7 +148,6 @@ DeepTools — системный твикер, поэтому он делает 
 - **Точка восстановления** — автоматически предлагается перед рискованными твиками (деблоат, пресеты служб, телеметрия), чтобы всегда можно было откатиться.
 - **Прицел** — настраиваемый накладной прицел (крест, точка, круг, T-образный); настройки запоминаются.
 - **Виджет на рабочий стол** — компактная плашка CPU/RAM/температуры, всегда поверх окон.
-- **RGB-реакция** — подключается к OpenRGB и управляет подсветкой по живым датчикам: цвет плавно меняется от холодного к горячему по температуре CPU/GPU, пульсирует быстрее под нагрузкой и мигает красным при просадке FPS ниже вашего порога. Работает с любым устройством, поддерживаемым OpenRGB.
 
 ### Удаление Яндекса
 
@@ -217,6 +211,6 @@ DeepTools проверяет GitHub Releases при запуске. Когда �
 
 <div align="center">
 
-© 2026 dep1xar · DeepTools v2.2.2
+© 2026 dep1xar · DeepTools v2.3.0
 
 </div>

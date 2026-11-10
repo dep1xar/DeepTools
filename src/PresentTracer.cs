@@ -340,7 +340,7 @@ namespace DeepTools
         }
 
         // Максимальный FPS среди всех отслеживаемых процессов прямо сейчас.
-        // Используется AdaptivePowerProfile и RgbReactive, чтобы знать идёт ли игра
+        // Используется AdaptivePowerProfile, чтобы знать идёт ли игра
         // без привязки к конкретному PID
         public static int GetAnyFps()
         {

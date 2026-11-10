@@ -61,7 +61,7 @@ namespace DeepTools
             public int Y;
         }
 
-        // ---- Синтетический ввод (кликер и макросы) ----
+        // ---- Синтетический ввод (кликер) ----
         // Было mouse_event/keybd_event, причём у клавиш скан-код оставался нулевым:
         // игры, которые читают скан-коды (Raw Input, DirectInput), таких нажатий не
         // видят, хотя мышь работает. Теперь всё идёт через SendInput, клавиши - со
@@ -204,8 +204,6 @@ namespace DeepTools
         public const int HOTKEY_ID_SCREENSHOT = 2;
         public const int HOTKEY_ID_OVERLAY = 3;
         public const int HOTKEY_ID_REGION = 4;
-        public const int HOTKEY_ID_MACRO_REC = 5;
-        public const int HOTKEY_ID_MACRO_PLAY = 6;
 
         public static void ClickLeft()
         {

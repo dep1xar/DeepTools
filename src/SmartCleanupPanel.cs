@@ -320,18 +320,6 @@ namespace DeepTools
             };
             Controls.Add(titleLbl);
 
-            var recycleBtn = new RoundedButton
-            {
-                Text = Lang.T("🗑 Корзина (откат)", "🗑 Bin (undo)"),
-                ButtonColor = Theme.KeyColor,
-                HoverColor = Theme.KeyHover,
-                TextColor = Theme.TextMain,
-                Location = new Point(560, 22),
-                Size = new Size(180, 32)
-            };
-            recycleBtn.Click += (s, e) => { using (var f = new RecycleBinForm()) f.ShowDialog(FindForm()); };
-            Controls.Add(recycleBtn);
-
             int y = 70;
             for (int i = 0; i < categories.Count; i++)
             {

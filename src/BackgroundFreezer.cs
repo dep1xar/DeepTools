@@ -60,28 +60,6 @@ namespace DeepTools
             return done;
         }
 
-        // Размораживает один процесс по PID (для LatencySurgeon)
-        public static void ResumeOne(int pid)
-        {
-            lock (frozen)
-            {
-                for (int i = frozen.Count - 1; i >= 0; i--)
-                {
-                    try
-                    {
-                        if (frozen[i].Id == pid)
-                        {
-                            NtResumeProcess(frozen[i].Handle);
-                            frozen[i].Dispose();
-                            frozen.RemoveAt(i);
-                            return;
-                        }
-                    }
-                    catch { }
-                }
-            }
-        }
-
         // Размораживает всё, возвращает сколько процессов разбужено
         public static int ResumeAll()
         {

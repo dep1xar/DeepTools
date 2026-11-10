@@ -175,23 +175,6 @@ namespace DeepTools
             };
             Controls.Add(titleLbl);
 
-            var macrosBtn = new RoundedButton
-            {
-                Text = Lang.T("≡ Макросы", "≡ Macros"),
-                ButtonColor = Theme.KeyColor,
-                HoverColor = Theme.KeyHover,
-                TextColor = Theme.TextMain,
-                Location = new Point(596, 14),
-                Size = new Size(140, 32)
-            };
-            macrosBtn.Click += (s, e) => {
-                using (var f = new MacroForm())
-                {
-                    f.ShowDialog(FindForm());
-                }
-            };
-            Controls.Add(macrosBtn);
-
             var statusCard = Theme.MakeCard(this, new Point(24, 52), new Size(712, 88));
 
             statusDot = new Panel { Size = new Size(14, 14), Location = new Point(20, 17), BackColor = Color.Transparent };

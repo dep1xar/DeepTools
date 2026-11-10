@@ -291,23 +291,6 @@ namespace DeepTools
             };
             Controls.Add(bsodBtn);
 
-            var benchBtn = new RoundedButton
-            {
-                Text = Lang.T("⚡ Бенчмарк", "⚡ Benchmark"),
-                ButtonColor = Theme.KeyColor,
-                HoverColor = Theme.KeyHover,
-                TextColor = Theme.TextMain,
-                Location = new Point(596, 20),
-                Size = new Size(140, 32)
-            };
-            benchBtn.Click += (s, e) => {
-                using (var f = new BenchmarkForm())
-                {
-                    f.ShowDialog(FindForm());
-                }
-            };
-            Controls.Add(benchBtn);
-
             var summaryCard = Theme.MakeCard(this, new Point(24, 60), new Size(712, 100));
 
             AddMetricCard(summaryCard, "CPU", 16, 20, out cpuValueLabel);
