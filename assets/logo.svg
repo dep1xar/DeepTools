@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="DeepTools logo">
+  <defs>
+    <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2EE6A8"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="58" fill="url(#lg)"/>
+  <rect x="14" y="14" width="228" height="228" rx="52" fill="none" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="3"/>
+  <path d="M70 66h58c46 0 76 26 76 62s-30 62-76 62H70V66zm40 36v52h17c24 0 37-9 37-26s-13-26-37-26h-17z" fill="#06121C"/>
+  <path d="M166 42l-31 58h24l-18 50 44-64h-25l21-44z" fill="#FFFFFF"/>
+</svg>

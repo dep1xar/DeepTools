@@ -1,15 +1,16 @@
 <div align="center">
 
-# DeepTools
+<img src="assets/banner.svg" alt="DeepTools — Windows tweaker, cleaner and gaming optimizer" width="100%">
 
 **Smart tweaker, cleaner and monitoring tool for Windows — in one app.**
 **Умный твикер, чистильщик и монитор для Windows — всё в одном.**
 
-[![Version](https://img.shields.io/badge/version-2.3.0-blue)](https://github.com/dep1xar/DeepTools/releases)
+[![Version](https://img.shields.io/badge/version-2.2.2-blue)](https://github.com/dep1xar/DeepTools/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D6)](#)
 [![.NET](https://img.shields.io/badge/.NET%20Framework-4.x-512BD4)](#)
+[![GitHub stars](https://img.shields.io/github/stars/dep1xar/DeepTools?style=flat&color=2EE6A8)](https://github.com/dep1xar/DeepTools/stargazers)
 
-**[English](#english) · [Русский](#русский)**
+**[⬇ Download latest release](https://github.com/dep1xar/DeepTools/releases/latest) · [English](#english) · [Русский](#русский)**
 
 </div>
 
@@ -20,6 +21,15 @@
 ## English
 
 DeepTools is a lightweight all-in-one utility for Windows 10 and 11. It cleans junk, tunes the system for gaming, watches your temperatures, manages startup and services, removes pre-installed bloat, and bundles a set of handy extras — a clicker, screenshot tool, clipboard manager and desktop sticky notes. One executable, no installer, no background services left behind.
+
+| | |
+|---|---|
+| <img src="assets/screenshot-main.png" alt="DeepTools main window" width="470"> | <img src="assets/screenshot-cleanup.png" alt="SmartCleanup" width="470"> |
+| **Main window** — live CPU, RAM and temperatures | **SmartCleanup** — junk, caches and leftovers |
+| <img src="assets/screenshot-booster.png" alt="GameBooster" width="470"> | <img src="assets/screenshot-tweaks.png" alt="Game tweaks" width="470"> |
+| **GameBooster** — power plan, Game DVR, background apps | **Game tweaks** — real system state, one-click revert |
+| <img src="assets/screenshot-health.png" alt="Health Check" width="470"> | <img src="assets/screenshot-clicker.png" alt="Autoclicker" width="470"> |
+| **Health Check** — sensors, SMART, miner guard | **Autoclicker** — mouse or keyboard, configurable rate |
 
 > [!IMPORTANT]
 > DeepTools requires **administrator rights** to change power plans, services and startup entries, and to read hardware sensors. On launch it asks for elevation via the standard Windows UAC prompt.
@@ -117,6 +127,13 @@ DeepTools checks GitHub Releases on launch. When an update is available, clickin
 
 DeepTools - это лёгкая утилита «всё в одном» для Windows 10 и 11, она чистит мусор, настраивает систему под игры, следит за температурами, позволяет управлять автозагрузкой и службами, удаляет предустановленный хлам и включает набор удобных инструментов: автокликер, скриншотер, менеджер буфера обмена и заметки. Один .exe файл, без установщика и без фоновых служб, остающихся в системе.
 
+| | |
+|---|---|
+| <img src="assets/screenshot-main.png" alt="Главное окно DeepTools" width="470"> | <img src="assets/screenshot-booster.png" alt="GameBooster" width="470"> |
+| **Главное окно** — CPU, RAM и температуры в реальном времени | **GameBooster** — план питания, Game DVR, фоновые программы |
+| <img src="assets/screenshot-tweaks.png" alt="Игровые твики" width="470"> | <img src="assets/screenshot-health.png" alt="Health Check" width="470"> |
+| **Игровые твики** — реальное состояние системы, откат в один клик | **Health Check** — датчики, SMART, страж майнеров |
+
 > [!IMPORTANT]
 > DeepTools нужны **права администратора**, чтобы менять планы питания, службы и автозагрузку, а также читать датчики железа. При запуске программа запрашивает их через стандартное окно UAC.
 
@@ -211,6 +228,6 @@ DeepTools проверяет GitHub Releases при запуске. Когда �
 
 <div align="center">
 
-© 2026 dep1xar · DeepTools v2.3.0
+© 2026 dep1xar · DeepTools
 
 </div>
