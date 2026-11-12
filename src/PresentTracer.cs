@@ -146,7 +146,7 @@ namespace DeepTools
             if (System.Threading.Interlocked.Increment(ref refCount) > 1)
             {
                 if (running) return;
-                // refCount > 1 но running == false — состояние гонки, продолжаем инициализацию
+                // refCount > 1 но running == false - состояние гонки, продолжаем инициализацию
             }
             if (running) return;
             if (!exitHooked)

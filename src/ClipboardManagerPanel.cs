@@ -249,7 +249,7 @@ namespace DeepTools
                 {
                     using (var tmp = Image.FromFile(entry.Content))
                         preview.Image = new Bitmap(tmp);
-                    previewLabel.Text = Lang.T("Картинка (двойной клик — в буфер)", "Image (double-click to copy)");
+                    previewLabel.Text = Lang.T("Картинка (двойной клик - в буфер)", "Image (double-click to copy)");
                 }
                 catch { previewLabel.Text = Lang.T("Не удалось открыть", "Failed to open"); }
             }

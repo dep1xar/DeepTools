@@ -14,7 +14,7 @@ namespace DeepTools
     {
         private const string DefaultRepo = "dep1xar/DeepTools";
 
-        // Разрешённые репозитории для автообновления — защита от подмены через config.txt
+        // Разрешённые репозитории для автообновления - защита от подмены через config.txt
         private static readonly string[] AllowedRepos = new string[]
         {
             "dep1xar/DeepTools",
@@ -175,7 +175,7 @@ namespace DeepTools
             var worker = new System.ComponentModel.BackgroundWorker();
             worker.DoWork += (s, e) => {
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-                // Случайное имя в TEMP — защита от предсказуемого перехвата
+                // Случайное имя в TEMP - защита от предсказуемого перехвата
                 string path = Path.Combine(Path.GetTempPath(), "DeepTools_update_" + Guid.NewGuid().ToString("N") + ".exe");
                 // Валидация URL перед скачиванием
                 Uri uri;
@@ -219,7 +219,7 @@ namespace DeepTools
                     return;
                 }
 
-                // Проверка что скачанный файл — валидный PE (начинается с MZ) — базовая защита от HTML-ошибок
+                // Проверка что скачанный файл - валидный PE (начинается с MZ) - базовая защита от HTML-ошибок
                 try
                 {
                     using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read))

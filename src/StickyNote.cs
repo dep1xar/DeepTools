@@ -381,7 +381,7 @@ namespace DeepTools
 
                 var hint = new Label
                 {
-                    Text = Lang.T("формат ЧЧ:ММ, прошло — завтра", "HH:MM; past time = tomorrow"),
+                    Text = Lang.T("формат ЧЧ:ММ, прошло - завтра", "HH:MM; past time = tomorrow"),
                     ForeColor = Theme.TextDim,
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 7.5F),

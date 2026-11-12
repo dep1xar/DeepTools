@@ -695,7 +695,7 @@ namespace DeepTools
 
             valueLabel = new Label
             {
-                Text = "—",
+                Text = "-",
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),

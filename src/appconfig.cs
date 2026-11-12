@@ -57,7 +57,7 @@ namespace DeepTools
                     }
                     string tmp = FilePath + ".tmp." + Guid.NewGuid().ToString("N");
                     File.WriteAllLines(tmp, lines.ToArray());
-                    // атомарная замена: если оригинал существует — заменяем
+                    // атомарная замена: если оригинал существует - заменяем
                     if (File.Exists(FilePath))
                     {
                         try { File.Replace(tmp, FilePath, null); }
@@ -88,7 +88,7 @@ namespace DeepTools
                 if (!loaded)
                 {
                     // вызвать Load логику inline чтобы не брать lock рекурсивно
-                    // но Load уже берет lock — просто проверим что loaded, иначе загрузим
+                    // но Load уже берет lock - просто проверим что loaded, иначе загрузим
                 }
             }
             // Безопасный путь: проверяем loaded под lock, затем читаем

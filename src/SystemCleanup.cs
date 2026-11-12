@@ -16,7 +16,7 @@ namespace DeepTools
             @"C:\$Windows.~WS"
         };
 
-        // Проверка на reparse point (junction / symlink) — защита от удаления не той папки
+        // Проверка на reparse point (junction / symlink) - защита от удаления не той папки
         private static bool IsReparsePoint(string path)
         {
             try
@@ -34,7 +34,7 @@ namespace DeepTools
             foreach (string d in OldDirs)
             {
                 if (!Directory.Exists(d)) continue;
-                if (IsReparsePoint(d)) continue; // symlink/junction — не считаем и не трогаем
+                if (IsReparsePoint(d)) continue; // symlink/junction - не считаем и не трогаем
                 long size; int count;
                 CleanupEngine.GetDirectorySize(d, out size, out count);
                 total += size;
@@ -91,7 +91,7 @@ namespace DeepTools
                 };
                 p = Process.Start(psi);
                 if (p == null) return;
-                // Асинхронное чтение обоих потоков — защита от deadlock при переполнении буфера stderr
+                // Асинхронное чтение обоих потоков - защита от deadlock при переполнении буфера stderr
                 string stdout = "", stderr = "";
                 var outDone = new System.Threading.ManualResetEvent(false);
                 var errDone = new System.Threading.ManualResetEvent(false);

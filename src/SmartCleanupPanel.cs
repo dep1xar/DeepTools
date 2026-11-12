@@ -530,7 +530,7 @@ namespace DeepTools
             card.Controls.Add(tweaksBtn);
 
             // Полное удаление Яндекс.Браузера: штатный деинсталлятор оставляет
-            // профиль в AppData, задачи и ключи — добираем всё разом
+            // профиль в AppData, задачи и ключи - добираем всё разом
             var yandexBtn = new RoundedButton
             {
                 Text = Lang.T("🧹 Удалить Яндекс", "🧹 Remove Yandex"),
@@ -581,16 +581,16 @@ namespace DeepTools
         {
             BuildMaintCard(y,
                 Lang.T("Кэш шейдеров при смене драйвера GPU", "Shader cache on GPU driver change"),
-                Lang.T("После обновления драйвера старый кэш вызывает фризы — чистим автоматически на старте.",
-                       "After a driver update a stale cache causes stutter — cleared automatically on launch."),
+                Lang.T("После обновления драйвера старый кэш вызывает фризы - чистим автоматически на старте.",
+                       "After a driver update a stale cache causes stutter - cleared automatically on launch."),
                 "shader_auto", false,
                 Lang.T("Очистить сейчас", "Clean now"),
                 () => { long mb = ShaderCacheGuard.CleanNow(); return Lang.T("Кэш шейдеров очищен: ", "Shader cache cleared: ") + mb + Lang.T(" МБ", " MB"); });
 
             BuildMaintCard(y + 70,
                 Lang.T("Авто-очистка standby-памяти", "Auto standby memory cleanup"),
-                Lang.T("Сбрасывает резервный кэш памяти при нехватке RAM — убирает микрофризы в тяжёлых играх.",
-                       "Purges the standby cache when RAM runs low — removes micro-stutter in heavy games."),
+                Lang.T("Сбрасывает резервный кэш памяти при нехватке RAM - убирает микрофризы в тяжёлых играх.",
+                       "Purges the standby cache when RAM runs low - removes micro-stutter in heavy games."),
                 "standby_auto", true,
                 Lang.T("Очистить сейчас", "Clean now"),
                 () => { long mb = StandbyCleaner.Purge(); return Lang.T("Освобождено из standby: ", "Freed from standby: ") + mb + Lang.T(" МБ", " MB"); });

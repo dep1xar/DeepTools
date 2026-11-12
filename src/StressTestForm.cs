@@ -149,7 +149,7 @@ namespace DeepTools
 
             var valueLbl = new Label
             {
-                Text = "—",
+                Text = "-",
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 13F, FontStyle.Bold),

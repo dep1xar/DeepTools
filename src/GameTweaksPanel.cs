@@ -10,7 +10,7 @@ using Microsoft.Win32;
 
 namespace DeepTools
 {
-    // Игровые твики: сетка карточек 2x5 со статус-барами (зелёный = твик
+    // Игровые твики: сетка карточек со статус-барами (зелёный = твик
     // применён, красный = не применён, серый = не применимо на этом ПК).
     //
     // Все значения читаются из реестра, поэтому статус показывает реальное
@@ -34,6 +34,9 @@ namespace DeepTools
             Size = new Size(760, 616);
             Dock = DockStyle.None;
             BackColor = Theme.BgColor;
+            AutoScroll = true;
+            NativeMethods.ApplyDarkScrollbar(this);
+            DarkScroll.Attach(this);
             BuildUi();
 
             // Пока раздел открыт, статусы обновляются сами: игра может запуститься
@@ -63,8 +66,8 @@ namespace DeepTools
 
             var subLbl = new Label
             {
-                Text = Lang.T("Клик по карточке включает или отключает твик, статус — реальное состояние системы. ⟳ — нужна перезагрузка.",
-                              "Click a card to apply or revert a tweak. Status is the real system state. ⟳ — reboot required."),
+                Text = Lang.T("Клик по карточке включает или отключает твик, статус - реальное состояние системы. ⟳ - нужна перезагрузка.",
+                              "Click a card to apply or revert a tweak. Status is the real system state. ⟳ - reboot required."),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
@@ -117,7 +120,7 @@ namespace DeepTools
             revertAllBtn.Click += (s, e) => RevertAll();
             Controls.Add(revertAllBtn);
 
-            // Сетка 2 колонки x 5 строк
+            // Сетка в две колонки, число строк зависит от списка твиков
             int cardW = 348, cardH = 94, gapX = 16, gapY = 8;
             int x1 = 24, x2 = x1 + cardW + gapX;
             int y0 = 96, stepY = cardH + gapY;
@@ -193,6 +196,14 @@ namespace DeepTools
         private const string GameBarKey = @"Software\Microsoft\GameBar";
         private const string ServicesKey = @"SYSTEM\CurrentControlSet\Services\";
         private const string PowerSchemesKey = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes";
+        private const string MmcssKey = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile";
+        private const string BackgroundAppsKey = @"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications";
+        private const string SearchKey = @"Software\Microsoft\Windows\CurrentVersion\Search";
+        private const string AppPrivacyKey = @"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy";
+        private const string ExplorerAdvancedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
+        private const string ExplorerPolicyKey = @"Software\Policies\Microsoft\Windows\Explorer";
+        private const string CopilotKey = @"Software\Policies\Microsoft\Windows\WindowsCopilot";
+        private const string WindowsAiKey = @"SOFTWARE\Policies\Microsoft\Windows\WindowsAI";
 
         private const string BalancedGuid = "381b4222-f694-41f0-9685-ff5bb260df2e";
         private const string HighPerfGuid = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
@@ -243,6 +254,58 @@ namespace DeepTools
                     bool a = SetRegDword(RegHkcu, GameBarKey, "AutoGameModeEnabled", 0);
                     bool b = SetRegDword(RegHkcu, GameBarKey, "AllowAutoGameMode", 0);
                     return a && b;
+                }
+            });
+
+            // MMCSS: профиль Games и планировщик мультимедиа. Windows по
+            // умолчанию резервирует часть CPU под фоновые задачи и режет сеть;
+            // для игр эти значения меняются на противоположные. Все шесть
+            // параметров запоминаются по отдельности, чтобы откат вернул
+            // именно то, что было до нас.
+            list.Add(new TweakDef
+            {
+                Title = Lang.T("Игровой планировщик (MMCSS)", "Game scheduler (MMCSS)"),
+                Desc = Lang.T("Резервирует CPU под игры, отключает сетевой троттлинг и поднимает приоритет профиля Games",
+                              "Reserves CPU for games, disables network throttling and raises the Games task profile"),
+                IsApplicable = () => true,
+                IsApplied = () =>
+                {
+                    string games = MmcssKey + @"\Tasks\Games";
+                    return RegDword(RegHklm, MmcssKey, "SystemResponsiveness") == 10
+                        && RegDword(RegHklm, MmcssKey, "NetworkThrottlingIndex") == -1
+                        && RegDword(RegHklm, games, "GPU Priority") == 8
+                        && RegDword(RegHklm, games, "Priority") == 6
+                        && RegString(RegHklm, games, "Scheduling Category") == "High"
+                        && RegString(RegHklm, games, "SFIO Priority") == "High";
+                },
+                Apply = () =>
+                {
+                    string games = MmcssKey + @"\Tasks\Games";
+                    BackupDword(RegHklm, MmcssKey, "SystemResponsiveness", "gt_mmcss_sr");
+                    BackupDword(RegHklm, MmcssKey, "NetworkThrottlingIndex", "gt_mmcss_net");
+                    BackupDword(RegHklm, games, "GPU Priority", "gt_mmcss_gpu");
+                    BackupDword(RegHklm, games, "Priority", "gt_mmcss_prio");
+                    BackupString(RegHklm, games, "Scheduling Category", "gt_mmcss_sched");
+                    BackupString(RegHklm, games, "SFIO Priority", "gt_mmcss_sfio");
+
+                    bool a = SetRegDword(RegHklm, MmcssKey, "SystemResponsiveness", 10);
+                    bool b = SetRegDword(RegHklm, MmcssKey, "NetworkThrottlingIndex", -1);
+                    bool c = SetRegDword(RegHklm, games, "GPU Priority", 8);
+                    bool d = SetRegDword(RegHklm, games, "Priority", 6);
+                    bool e = SetRegString(RegHklm, games, "Scheduling Category", "High");
+                    bool f = SetRegString(RegHklm, games, "SFIO Priority", "High");
+                    return a && b && c && d && e && f;
+                },
+                Revert = () =>
+                {
+                    string games = MmcssKey + @"\Tasks\Games";
+                    bool a = RevertDword(RegHklm, MmcssKey, "SystemResponsiveness", "gt_mmcss_sr", 10, 20);
+                    bool b = RevertDword(RegHklm, MmcssKey, "NetworkThrottlingIndex", "gt_mmcss_net", -1, 10);
+                    bool c = RevertDword(RegHklm, games, "GPU Priority", "gt_mmcss_gpu", 8, 8);
+                    bool d = RevertDword(RegHklm, games, "Priority", "gt_mmcss_prio", 6, 2);
+                    bool e = RevertString(RegHklm, games, "Scheduling Category", "gt_mmcss_sched", "High", "Medium");
+                    bool f = RevertString(RegHklm, games, "SFIO Priority", "gt_mmcss_sfio", "High", "Normal");
+                    return a && b && c && d && e && f;
                 }
             });
 
@@ -548,6 +611,92 @@ namespace DeepTools
                 Revert = () => RevertDword(RegHklm, PowerThrottlingKey, "PowerThrottlingOff", "gt_powert", 1, 0)
             });
 
+            list.Add(new TweakDef
+            {
+                Title = Lang.T("Отключить фоновые приложения", "Disable background apps"),
+                Desc = Lang.T("Запрещает приложениям из Store работать в фоне: меньше RAM, CPU и пробуждений",
+                              "Stops Store apps from running in the background: less RAM, CPU and wake-ups"),
+                IsApplicable = () => true,
+                IsApplied = () =>
+                    RegDword(RegHkcu, BackgroundAppsKey, "GlobalUserDisabled") == 1
+                    && RegDword(RegHklm, AppPrivacyKey, "LetAppsRunInBackground") == 2,
+                Apply = () =>
+                {
+                    BackupDword(RegHkcu, BackgroundAppsKey, "GlobalUserDisabled", "gt_bgapps_user");
+                    BackupDword(RegHkcu, SearchKey, "BackgroundAppGlobalToggle", "gt_bgapps_toggle");
+                    BackupDword(RegHklm, AppPrivacyKey, "LetAppsRunInBackground", "gt_bgapps_policy");
+
+                    bool a = SetRegDword(RegHkcu, BackgroundAppsKey, "GlobalUserDisabled", 1);
+                    bool b = SetRegDword(RegHkcu, SearchKey, "BackgroundAppGlobalToggle", 0);
+                    bool c = SetRegDword(RegHklm, AppPrivacyKey, "LetAppsRunInBackground", 2);
+                    return a && b && c;
+                },
+                Revert = () =>
+                {
+                    bool a = RevertDword(RegHkcu, BackgroundAppsKey, "GlobalUserDisabled", "gt_bgapps_user", 1, 0);
+                    bool b = RevertDword(RegHkcu, SearchKey, "BackgroundAppGlobalToggle", "gt_bgapps_toggle", 0, 1);
+                    bool c = RevertDword(RegHklm, AppPrivacyKey, "LetAppsRunInBackground", "gt_bgapps_policy", 2, 0);
+                    return a && b && c;
+                }
+            });
+
+            // Виджеты, Copilot и Recall существуют только в Windows 11,
+            // поэтому на Windows 10 карточки честно помечаются как неприменимые
+            list.Add(new TweakDef
+            {
+                Title = Lang.T("Отключить виджеты", "Disable Widgets"),
+                Desc = Lang.T("Убирает ленту виджетов и новостей: меньше фоновой сети и нагрузки на проводник",
+                              "Removes the widgets/news feed: less background network and Explorer load"),
+                IsApplicable = () => OsBuild() >= 22000,
+                IsApplied = () =>
+                    RegDword(RegHkcu, ExplorerAdvancedKey, "TaskbarDa") == 0
+                    && RegDword(RegHkcu, ExplorerPolicyKey, "AllowNewsAndInterests") == 0,
+                Apply = () =>
+                {
+                    BackupDword(RegHkcu, ExplorerAdvancedKey, "TaskbarDa", "gt_widgets_taskbar");
+                    BackupDword(RegHkcu, ExplorerPolicyKey, "AllowNewsAndInterests", "gt_widgets_policy");
+                    bool a = SetRegDword(RegHkcu, ExplorerAdvancedKey, "TaskbarDa", 0);
+                    bool b = SetRegDword(RegHkcu, ExplorerPolicyKey, "AllowNewsAndInterests", 0);
+                    return a && b;
+                },
+                Revert = () =>
+                {
+                    bool a = RevertDword(RegHkcu, ExplorerAdvancedKey, "TaskbarDa", "gt_widgets_taskbar", 0, 1);
+                    bool b = RevertDword(RegHkcu, ExplorerPolicyKey, "AllowNewsAndInterests", "gt_widgets_policy", 0, 1);
+                    return a && b;
+                }
+            });
+
+            list.Add(new TweakDef
+            {
+                Title = Lang.T("Отключить Copilot", "Disable Copilot"),
+                Desc = Lang.T("Убирает кнопку и фоновые процессы Copilot в Windows 11: меньше памяти и сети",
+                              "Removes the Copilot button and its background processes in Windows 11: less RAM and network"),
+                IsApplicable = () => OsBuild() >= 22621,
+                IsApplied = () => RegDword(RegHkcu, CopilotKey, "TurnOffWindowsCopilot") == 1,
+                Apply = () =>
+                {
+                    BackupDword(RegHkcu, CopilotKey, "TurnOffWindowsCopilot", "gt_copilot");
+                    return SetRegDword(RegHkcu, CopilotKey, "TurnOffWindowsCopilot", 1);
+                },
+                Revert = () => RevertDword(RegHkcu, CopilotKey, "TurnOffWindowsCopilot", "gt_copilot", 1, 0)
+            });
+
+            list.Add(new TweakDef
+            {
+                Title = Lang.T("Отключить Recall", "Disable Recall"),
+                Desc = Lang.T("Запрещает Windows 11 сохранять снимки экрана для истории: меньше диска и фоновой работы",
+                              "Stops Windows 11 from saving screen snapshots for Recall: less disk and background work"),
+                IsApplicable = () => OsBuild() >= 26100,
+                IsApplied = () => RegDword(RegHklm, WindowsAiKey, "DisableAIDataAnalysis") == 1,
+                Apply = () =>
+                {
+                    BackupDword(RegHklm, WindowsAiKey, "DisableAIDataAnalysis", "gt_recall");
+                    return SetRegDword(RegHklm, WindowsAiKey, "DisableAIDataAnalysis", 1);
+                },
+                Revert = () => RevertDword(RegHklm, WindowsAiKey, "DisableAIDataAnalysis", "gt_recall", 1, 0)
+            });
+
             return list;
         }
 
@@ -676,7 +825,7 @@ namespace DeepTools
                     if (!Program.IsRunningAsAdmin())
                     {
                         reason += Environment.NewLine + Environment.NewLine
-                            + Lang.T("DeepTools запущен БЕЗ прав администратора — поэтому изменение и не прошло.",
+                            + Lang.T("DeepTools запущен БЕЗ прав администратора - поэтому изменение и не прошло.",
                                      "DeepTools is NOT running as administrator, which is why the change failed.");
                     }
                     DTDialog.Show(reason, "DeepTools");
@@ -733,7 +882,7 @@ namespace DeepTools
                     {
                         using (var brush = new SolidBrush(Theme.Idle))
                             e.Graphics.FillPath(brush, path);
-                        DrawGlyph(e.Graphics, "—", Theme.TextDim);
+                        DrawGlyph(e.Graphics, "-", Theme.TextDim);
                     }
                 }
             }
@@ -873,6 +1022,53 @@ namespace DeepTools
             if (raw == "none" || !int.TryParse(raw, out v)) return DelRegValue(root, path, name);
             if (v == appliedValue) return SetRegDword(root, path, name, fallback);
             return SetRegDword(root, path, name, v);
+        }
+
+        private static string RegString(RegistryKey root, string path, string name)
+        {
+            try
+            {
+                using (var k = root.OpenSubKey(path))
+                {
+                    if (k == null) return null;
+                    return k.GetValue(name) as string;
+                }
+            }
+            catch { return null; }
+        }
+
+        private static bool SetRegString(RegistryKey root, string path, string name, string value)
+        {
+            try
+            {
+                using (var k = root.CreateSubKey(path))
+                {
+                    if (k == null) return false;
+                    k.SetValue(name, value ?? "", RegistryValueKind.String);
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        private static void BackupString(RegistryKey root, string path, string name, string key)
+        {
+            string v = RegString(root, path, name);
+            AppConfig.Set(key, v == null ? "none" : v);
+        }
+
+        private static bool RevertString(RegistryKey root, string path, string name, string key, string appliedValue, string fallback)
+        {
+            string raw = AppConfig.Get(key, "none");
+            if (raw == "none") return DelRegValue(root, path, name);
+            if (raw == appliedValue) return SetRegString(root, path, name, fallback);
+            return SetRegString(root, path, name, raw);
+        }
+
+        private static int OsBuild()
+        {
+            try { return Environment.OSVersion.Version.Build; }
+            catch { return 0; }
         }
 
         private static void BackupMultiSz(RegistryKey root, string path, string name, string key)

@@ -130,7 +130,7 @@ namespace DeepTools
 
             if (items.Count == 0)
             {
-                string msg = Lang.T("История пуста — скопируй что-нибудь", "History is empty — copy something");
+                string msg = Lang.T("История пуста - скопируй что-нибудь", "History is empty - copy something");
                 using (var f = new Font("Segoe UI", 10F))
                 using (var b = new SolidBrush(Theme.TextDim))
                 {

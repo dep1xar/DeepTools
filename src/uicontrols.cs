@@ -26,7 +26,7 @@ namespace DeepTools
             AutoSize = false;
             Size = new Size(190, 38);
             TextAlign = ContentAlignment.MiddleLeft;
-            // Segoe UI Emoji fallback для эмодзи — без него они пиксельные/квадраты на старых Win
+            // Segoe UI Emoji fallback для эмодзи - без него они пиксельные/квадраты на старых Win
             Font = new Font("Segoe UI", 10F);
             UseCompatibleTextRendering = false; // GDI ClearType вместо GDI+
             BackColor = Color.Transparent;
@@ -42,7 +42,7 @@ namespace DeepTools
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            // Включаем ClearType сглаживание текста — убирает "пиксельность"
+            // Включаем ClearType сглаживание текста - убирает "пиксельность"
             e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             base.OnPaint(e);

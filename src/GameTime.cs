@@ -149,7 +149,7 @@ namespace DeepTools
             if (gpuT > 0) stats += (stats == "" ? "" : ", ") + Lang.T("макс. GPU ", "max GPU ") + gpuT + "°C";
 
             TrayNotify.Info(
-                name + " — " + FormatDuration((int)durationSec),
+                name + " - " + FormatDuration((int)durationSec),
                 stats == "" ? Lang.T("Сессия записана в статистику", "Session saved to statistics") : stats);
         }
 
@@ -668,7 +668,7 @@ namespace DeepTools
 
             var hint = new Label
             {
-                Text = Lang.T("Полноэкранные мессенджеры, браузеры и терминалы не попадают в статистику игр. Если это всё-таки игра — верни её кнопкой ↩",
+                Text = Lang.T("Полноэкранные мессенджеры, браузеры и терминалы не попадают в статистику игр. Если это всё-таки игра - верни её кнопкой ↩",
                               "Fullscreen messengers, browsers and terminals are kept out of game statistics. If it really is a game, bring it back with ↩"),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
@@ -781,8 +781,8 @@ namespace DeepTools
                     TextAlign = ContentAlignment.MiddleCenter,
                     Cursor = Cursors.Hand
                 };
-                DarkTip.Set(back, Lang.T("Это всё-таки игра — вернуть в статистику",
-                                         "This is a game after all — bring it back"));
+                DarkTip.Set(back, Lang.T("Это всё-таки игра - вернуть в статистику",
+                                         "This is a game after all - bring it back"));
                 back.MouseEnter += (s, e) => back.ForeColor = Theme.Accent;
                 back.MouseLeave += (s, e) => back.ForeColor = Theme.TextDim;
                 back.Click += (s, e) =>

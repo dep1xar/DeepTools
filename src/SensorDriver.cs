@@ -38,8 +38,8 @@ namespace DeepTools
                 Process.Start(psi);
 
                 DTDialog.Show(
-                    Lang.T("Пройди установку PawnIO, затем перезапусти DeepTools — температуры должны появиться.",
-                           "Complete the PawnIO setup, then restart DeepTools — temperatures should appear."),
+                    Lang.T("Пройди установку PawnIO, затем перезапусти DeepTools - температуры должны появиться.",
+                           "Complete the PawnIO setup, then restart DeepTools - temperatures should appear."),
                     "DeepTools", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
@@ -66,7 +66,7 @@ namespace DeepTools
 
                 using (s)
                 {
-                    // Случайное имя — защита от предсказуемой подмены в TEMP (TOCTOU)
+                    // Случайное имя - защита от предсказуемой подмены в TEMP (TOCTOU)
                     string path = Path.Combine(Path.GetTempPath(), "PawnIO_setup_" + Guid.NewGuid().ToString("N") + ".exe");
                     using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
                     {

@@ -286,7 +286,7 @@ namespace DeepTools
             }
         }
 
-        // DPI awareness — чтобы интерфейс не был "пиксельным" на 125%/150%/175% масштабе
+        // DPI awareness - чтобы интерфейс не был "пиксельным" на 125%/150%/175% масштабе
         [DllImport("user32.dll")]
         public static extern bool SetProcessDPIAware();
 

@@ -63,11 +63,11 @@ namespace DeepTools
     // работает всегда, даже когда вкладка скрыта), читает меню трея и главная страница
     public static class SystemStats
     {
-        public static string CpuLoad = "—";
-        public static string CpuTemp = "—";
-        public static string RamLoad = "—";
-        public static string GpuLoad = "—";
-        public static string GpuTemp = "—";
+        public static string CpuLoad = "-";
+        public static string CpuTemp = "-";
+        public static string RamLoad = "-";
+        public static string GpuLoad = "-";
+        public static string GpuTemp = "-";
 
         // Числовые версии для трекера игровых сессий (-1 = нет данных)
         public static float CpuLoadNum = -1;

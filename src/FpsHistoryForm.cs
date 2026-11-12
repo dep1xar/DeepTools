@@ -101,8 +101,8 @@ namespace DeepTools
 
             if (sessions.Count < 2)
             {
-                trendLbl.Text = Lang.T("Мало сессий с замером FPS — поиграй ещё, график появится сам",
-                                       "Not enough sessions with FPS data — play more, the chart will appear");
+                trendLbl.Text = Lang.T("Мало сессий с замером FPS - поиграй ещё, график появится сам",
+                                       "Not enough sessions with FPS data - play more, the chart will appear");
             }
             else
             {
@@ -117,17 +117,17 @@ namespace DeepTools
                 if (change <= -8)
                 {
                     trendLbl.Text = Lang.T("⚠ FPS просел на ", "⚠ FPS dropped by ") + Math.Abs(change).ToString("0") + "%"
-                        + Lang.T(" — возможна деградация системы (пыль, термопаста, фон)", " — possible system degradation (dust, paste, background apps)");
+                        + Lang.T(" - возможна деградация системы (пыль, термопаста, фон)", " - possible system degradation (dust, paste, background apps)");
                     trendLbl.ForeColor = Theme.Warning;
                 }
                 else if (change >= 8)
                 {
-                    trendLbl.Text = Lang.T("FPS вырос на ", "FPS improved by ") + change.ToString("0") + "%" + Lang.T(" — твики работают ✦", " — your tweaks are working ✦");
+                    trendLbl.Text = Lang.T("FPS вырос на ", "FPS improved by ") + change.ToString("0") + "%" + Lang.T(" - твики работают ✦", " - your tweaks are working ✦");
                     trendLbl.ForeColor = Theme.On;
                 }
                 else
                 {
-                    trendLbl.Text = Lang.T("FPS стабилен — система в порядке", "FPS is stable — the system is fine");
+                    trendLbl.Text = Lang.T("FPS стабилен - система в порядке", "FPS is stable - the system is fine");
                     trendLbl.ForeColor = Theme.On;
                 }
             }

@@ -214,7 +214,7 @@ namespace DeepTools
                 if (!Directory.Exists(ScreenshotsFolder)) Directory.CreateDirectory(ScreenshotsFolder);
 
                 // Захватываем пиксели синхронно (нужен UI-поток),
-                // но сохранение PNG делаем в фоне — это и есть zero-latency:
+                // но сохранение PNG делаем в фоне - это и есть zero-latency:
                 // экран захвачен мгновенно, диск не блокирует игру
                 Rectangle bounds = SystemInformation.VirtualScreen;
                 Bitmap bmp = new Bitmap(bounds.Width, bounds.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
@@ -230,11 +230,11 @@ namespace DeepTools
                 captureHint.Text = Lang.T("Захват выполнен, сохраняем...", "Captured, saving...");
                 captureHint.ForeColor = Theme.TextDim;
 
-                // Копируем в буфер прямо сейчас (до фонового потока — Clipboard не thread-safe)
+                // Копируем в буфер прямо сейчас (до фонового потока - Clipboard не thread-safe)
                 bool copied = false;
                 try { Clipboard.SetImage(bmp); copied = true; } catch { }
 
-                // Сохранение PNG в фоне — игра не ощущает паузы
+                // Сохранение PNG в фоне - игра не ощущает паузы
                 var bw = new System.ComponentModel.BackgroundWorker();
                 bw.DoWork += delegate(object s2, System.ComponentModel.DoWorkEventArgs e2) {
                     bmp.Save(fullPath, ImageFormat.Png);

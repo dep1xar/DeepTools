@@ -10,7 +10,7 @@ using Microsoft.Win32;
 namespace DeepTools
 {
     // Деинсталлятор программ: читает список установленного из реестра (Uninstall),
-    // запускает штатный деинсталлятор, а после — ищет и удаляет остаточные папки
+    // запускает штатный деинсталлятор, а после - ищет и удаляет остаточные папки
     // (хвосты) в AppData/ProgramData/Program Files по имени и издателю программы
     public class UninstallerForm : Form
     {
@@ -243,7 +243,7 @@ namespace DeepTools
             list.Items.Clear();
             foreach (AppEntry a in shown)
             {
-                string size = a.SizeKb > 0 ? "  —  " + FormatSize(a.SizeKb) : "";
+                string size = a.SizeKb > 0 ? "  -  " + FormatSize(a.SizeKb) : "";
                 list.Items.Add(a.Name + size);
             }
             list.EndUpdate();
@@ -329,7 +329,7 @@ namespace DeepTools
                 }
                 else
                 {
-                    // без кавычек — exe до первого пробела, но учитываем .exe
+                    // без кавычек - exe до первого пробела, но учитываем .exe
                     int exeIdx = t.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
                     if (exeIdx >= 0)
                     {
@@ -346,13 +346,13 @@ namespace DeepTools
                     }
                 }
                 if (string.IsNullOrWhiteSpace(file)) return false;
-                // Блокируем опасные вставки через cmd-операторы в Rest: но Rest — это аргументы оригинального деинсталлятора, они легитимны
-                // Главное — не запускать через cmd.exe, а напрямую
+                // Блокируем опасные вставки через cmd-операторы в Rest: но Rest - это аргументы оригинального деинсталлятора, они легитимны
+                // Главное - не запускать через cmd.exe, а напрямую
                 // Проверяем что файл существует или это msiexec
                 string low = file.ToLowerInvariant();
                 if (low.Contains("msiexec")) { exe = file; args = rest; return true; }
                 // Разрешаем только существующие файлы или пути с расширением exe/msi/bat/cmd
-                // Если путь не существует — всё равно пробуем запустить напрямую (может быть в PATH), но без cmd.exe
+                // Если путь не существует - всё равно пробуем запустить напрямую (может быть в PATH), но без cmd.exe
                 exe = file; args = rest; return true;
             }
             catch { return false; }
@@ -374,12 +374,12 @@ namespace DeepTools
                 if (TryParseCommand(a.UninstallCmd, out exe, out args))
                 {
                     var psi = new ProcessStartInfo(exe, args) { UseShellExecute = false, CreateNoWindow = true };
-                    // Явно не через cmd.exe — защита от injection через & | && ||
+                    // Явно не через cmd.exe - защита от injection через & | && ||
                     Process.Start(psi);
                 }
                 else
                 {
-                    // Fallback: если парсинг не удался — не используем cmd /c, показываем ошибку
+                    // Fallback: если парсинг не удался - не используем cmd /c, показываем ошибку
                     statusLabel.Text = Lang.T("Не удалось разобрать команду удаления", "Failed to parse uninstall command");
                     return;
                 }
@@ -419,7 +419,7 @@ namespace DeepTools
         private static bool IsProtectedDir(string dirName)
         {
             if (ProtectedFolders.Contains(dirName)) return true;
-            // Папки начинающиеся с Windows — защищённые
+            // Папки начинающиеся с Windows - защищённые
             if (dirName.StartsWith("Windows", StringComparison.OrdinalIgnoreCase)) return true;
             return false;
         }
@@ -443,7 +443,7 @@ namespace DeepTools
             return false;
         }
 
-        // Ищем папки-хвосты по токену имени и издателю — строгий матчинг
+        // Ищем папки-хвосты по токену имени и издателю - строгий матчинг
         private List<string> FindLeftovers(AppEntry a)
         {
             var result = new List<string>();

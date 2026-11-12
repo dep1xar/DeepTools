@@ -144,7 +144,7 @@ namespace DeepTools
             {
                 var val = new Label
                 {
-                    Text = "—",
+                    Text = "-",
                     ForeColor = Theme.Accent,
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 20F, FontStyle.Bold),
@@ -242,8 +242,8 @@ namespace DeepTools
 
             if (hasData)
             {
-                valueLabels[0].Text = r.AvgFps > 0 ? r.AvgFps.ToString() : "—";
-                valueLabels[1].Text = r.LowFps > 0 ? r.LowFps.ToString() : "—";
+                valueLabels[0].Text = r.AvgFps > 0 ? r.AvgFps.ToString() : "-";
+                valueLabels[1].Text = r.LowFps > 0 ? r.LowFps.ToString() : "-";
                 valueLabels[2].Text = r.Stutters.ToString();
 
                 if (r.WorstMs > 0)

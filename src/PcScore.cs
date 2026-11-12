@@ -54,12 +54,12 @@ namespace DeepTools
             // 1. Память
             uint load = MemoryLoad();
             if (load >= 85) { score -= 15; Add(r, Lang.T("Мало свободной RAM (память забита)", "Low free RAM (memory is full)"), "ram", true, 15); }
-            else if (load >= 72) { score -= 7; Add(r, Lang.T("Память загружена — стоит освободить RAM", "Memory is high — free some RAM"), "ram", true, 7); }
+            else if (load >= 72) { score -= 7; Add(r, Lang.T("Память загружена - стоит освободить RAM", "Memory is high - free some RAM"), "ram", true, 7); }
 
             // 2. Температуры (из HealthCheck, если он уже опросил датчики)
             int cpuT = SystemStats.CpuTempNum;
-            if (cpuT >= 85) { score -= 12; Add(r, Lang.T("Высокая температура CPU — возможен троттлинг", "High CPU temperature — possible throttling"), "temp", false, 12); }
-            else if (cpuT >= 75) { score -= 6; Add(r, Lang.T("CPU греется — проверь охлаждение", "CPU running warm — check cooling"), "temp", false, 6); }
+            if (cpuT >= 85) { score -= 12; Add(r, Lang.T("Высокая температура CPU - возможен троттлинг", "High CPU temperature - possible throttling"), "temp", false, 12); }
+            else if (cpuT >= 75) { score -= 6; Add(r, Lang.T("CPU греется - проверь охлаждение", "CPU running warm - check cooling"), "temp", false, 6); }
 
             int gpuT = SystemStats.GpuTempNum;
             if (gpuT >= 85) { score -= 10; Add(r, Lang.T("Высокая температура GPU", "High GPU temperature"), "temp", false, 10); }

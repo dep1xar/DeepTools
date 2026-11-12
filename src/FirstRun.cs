@@ -170,7 +170,7 @@ namespace DeepTools
             y = AddAction(y, "🛡", Lang.T("Отключить телеметрию", "Disable telemetry"),
                 Lang.T("Слежка Windows: три пресета, всё обратимо", "Windows tracking: three presets, fully reversible"), "services");
             y = AddAction(y, "⭯", Lang.T("Разобрать автозагрузку", "Review startup apps"),
-                Lang.T("Отключи лишнее — Windows стартует быстрее", "Disable the extras — Windows boots faster"), "startup");
+                Lang.T("Отключи лишнее - Windows стартует быстрее", "Disable the extras - Windows boots faster"), "startup");
 
             // Единственное действие, которое безопасно сделать прямо из визарда
             var ramBtn = new RoundedButton

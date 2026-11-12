@@ -14,7 +14,7 @@ namespace DeepTools
     // Здесь собираем ВСЁ, что нашлось, показываем списком и сносим одним
     // нажатием: процессы -> задачи -> службы -> реестр -> папки -> ярлыки.
     //
-    // Главный процесс браузера — browser.exe, поэтому его добиваем первым,
+    // Главный процесс браузера - browser.exe, поэтому его добиваем первым,
     // иначе файлы заняты и папка не удалится.
     public class YandexItem
     {
@@ -34,7 +34,7 @@ namespace DeepTools
 
     public static class YandexCleaner
     {
-        // Имена процессов браузера. browser.exe — основной; остальные —
+        // Имена процессов браузера. browser.exe - основной; остальные -
         // прокси-процесс, старые сборки и апдейтер
         private static readonly string[] ProcessNames =
         {
@@ -147,7 +147,7 @@ namespace DeepTools
                         if (name == ProcessNames[n]) { named = true; break; }
                     if (!named) { p.Dispose(); continue; }
 
-                    // browser.exe — слишком общее имя: пускаем только если путь
+                    // browser.exe - слишком общее имя: пускаем только если путь
                     // реально лежит в папке Яндекса
                     string path = "";
                     try { path = p.MainModule != null ? p.MainModule.FileName : ""; }
@@ -173,7 +173,7 @@ namespace DeepTools
                         Kind = "process",
                         Title = p.ProcessName + ".exe  (PID " + p.Id + ")",
                         // PID вместе с именем: к моменту удаления процесс мог
-                        // завершиться, и PID достался бы чужому — сверяем имя
+                        // завершиться, и PID достался бы чужому - сверяем имя
                         Path = p.Id + "|" + name,
                         Size = 0
                     });
@@ -185,7 +185,7 @@ namespace DeepTools
 
         private static void CollectFolders(List<YandexItem> items, List<string> candidates)
         {
-            // Родительские пути обрабатываем первыми — иначе вложенная папка
+            // Родительские пути обрабатываем первыми - иначе вложенная папка
             // попадёт в список раньше родителя и её размер посчитается дважды
             var ordered = new List<string>(candidates);
             ordered.Sort(delegate(string a, string b)
@@ -202,7 +202,7 @@ namespace DeepTools
                 if (string.IsNullOrEmpty(dir)) continue;
                 if (!Directory.Exists(dir)) continue;
                 if (!seen.Add(dir)) continue;
-                // Родительская папка уже в списке — вложенную не дублируем
+                // Родительская папка уже в списке - вложенную не дублируем
                 if (AlreadyCovered(seen, dir))
                 {
                     seen.Remove(dir);
@@ -600,7 +600,7 @@ namespace DeepTools
         {
             long freed = 0;
 
-            // 1. Процессы — первыми, иначе папки заняты
+            // 1. Процессы - первыми, иначе папки заняты
             Report(progress, Lang.T("Закрываем процессы…", "Closing processes…"));
             for (int i = 0; i < items.Count; i++)
             {
@@ -693,7 +693,7 @@ namespace DeepTools
             {
                 using (Process p = Process.GetProcessById(pid))
                 {
-                    // PID мог достаться другому процессу — сверяем имя
+                    // PID мог достаться другому процессу - сверяем имя
                     string name = (p.ProcessName ?? "").ToLowerInvariant();
                     if (!string.IsNullOrEmpty(expectedName) && name != expectedName) return;
 
@@ -753,7 +753,7 @@ namespace DeepTools
         }
 
         // Удаление папки с обходом «только чтение» и занятых файлов.
-        // internal — чтобы можно было покрыть тестом (см. .visualtest)
+        // internal - чтобы можно было покрыть тестом (см. .visualtest)
         internal static bool ForceDelete(string path)
         {
             if (string.IsNullOrEmpty(path)) return true;
@@ -776,7 +776,7 @@ namespace DeepTools
             }
 
             // Последний шанс: rd /s /q. Путь пришёл из наших же констант
-            // и найденных папок Яндекса — подстановки команд нет
+            // и найденных папок Яндекса - подстановки команд нет
             try
             {
                 var psi = new ProcessStartInfo("cmd.exe", "/c rd /s /q \"" + path + "\"")

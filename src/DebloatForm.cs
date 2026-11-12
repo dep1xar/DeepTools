@@ -192,7 +192,7 @@ namespace DeepTools
                 psi.CreateNoWindow = true;
                 p = Process.Start(psi);
                 if (p == null) return "";
-                // Асинхронное чтение обоих потоков — защита от deadlock при переполнении буфера
+                // Асинхронное чтение обоих потоков - защита от deadlock при переполнении буфера
                 var outSb = new System.Text.StringBuilder();
                 var errDone = new System.Threading.ManualResetEvent(false);
                 var outDone = new System.Threading.ManualResetEvent(false);

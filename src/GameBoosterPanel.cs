@@ -584,8 +584,8 @@ namespace DeepTools
 
             MakeOptRow(smartCard, 12,
                 Lang.T("Адаптивный профиль питания", "Adaptive Power Profile"),
-                Lang.T("Ultimate в игре, Balanced в браузере, экономия на простое — автоматически",
-                       "Ultimate in-game, Balanced on browser, saver on idle — automatic"));
+                Lang.T("Ultimate в игре, Balanced в браузере, экономия на простое - автоматически",
+                       "Ultimate in-game, Balanced on browser, saver on idle - automatic"));
             var adaptiveToggle = new ToggleSwitch
             {
                 Location = new Point(646, OptRowToggleY(12)),
@@ -603,8 +603,8 @@ namespace DeepTools
 
             MakeOptRow(smartCard, 12 + optRowStep,
                 Lang.T("Дефрагментация VRAM", "VRAM Defrag"),
-                Lang.T("Сбрасывает фрагментированную видеопамять через DirectX — убирает подвисания в открытых мирах",
-                       "Flushes fragmented video memory via DirectX — eliminates stuttering in open-world games"));
+                Lang.T("Сбрасывает фрагментированную видеопамять через DirectX - убирает подвисания в открытых мирах",
+                       "Flushes fragmented video memory via DirectX - eliminates stuttering in open-world games"));
             var vramBtn = new RoundedButton
             {
                 Text = Lang.T("Очистить VRAM", "Defrag VRAM"),
@@ -644,7 +644,7 @@ namespace DeepTools
             Controls.Add(statusLabel);
         }
 
-        // Строка карточки оптимизаций: заголовок сверху, описание под ним —
+        // Строка карточки оптимизаций: заголовок сверху, описание под ним -
         // фиксированный x=215 ломался на длинных русских названиях
         private void MakeOptRow(Panel card, int y, string title, string desc)
         {

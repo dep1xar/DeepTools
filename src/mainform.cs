@@ -1117,7 +1117,7 @@ namespace DeepTools
 
             var hkHint = new Label
             {
-                Text = Lang.T("Клик по клавише — затем нажми новую. Esc — отмена", "Click a key, then press a new one. Esc cancels"),
+                Text = Lang.T("Клик по клавише - затем нажми новую. Esc - отмена", "Click a key, then press a new one. Esc cancels"),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.25F),

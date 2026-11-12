@@ -136,8 +136,8 @@ namespace DeepTools
 
             statusLabel = new Label
             {
-                Text = Lang.T("Тест пишет и читает временный файл 256 МБ — на HDD займёт около минуты",
-                              "The test writes and reads a 256 MB temp file — takes about a minute on an HDD"),
+                Text = Lang.T("Тест пишет и читает временный файл 256 МБ - на HDD займёт около минуты",
+                              "The test writes and reads a 256 MB temp file - takes about a minute on an HDD"),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
@@ -178,7 +178,7 @@ namespace DeepTools
 
             value = new Label
             {
-                Text = "—",
+                Text = "-",
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 15F, FontStyle.Bold),
@@ -286,7 +286,7 @@ namespace DeepTools
                 if (e.Error != null)
                 {
                     statusLabel.Text = Lang.T("Ошибка теста: ", "Test failed: ") + e.Error.Message;
-                    writeValue.Text = "—"; readValue.Text = "—"; randomValue.Text = "—";
+                    writeValue.Text = "-"; readValue.Text = "-"; randomValue.Text = "-";
                     return;
                 }
 
@@ -298,21 +298,21 @@ namespace DeepTools
 
                 writeValue.Text = write.ToString("0") + " MB/s";
                 readValue.Text = read.ToString("0") + " MB/s" + (cachedRead ? " *" : "");
-                randomValue.Text = randMs >= 0 ? randMs.ToString("0.0") + Lang.T(" мс", " ms") : "—";
+                randomValue.Text = randMs >= 0 ? randMs.ToString("0.0") + Lang.T(" мс", " ms") : "-";
 
                 statusLabel.Text = cachedRead
-                    ? Lang.T("* чтение прошло через кэш Windows — цифра завышена", "* read went through the Windows cache — the number is inflated")
+                    ? Lang.T("* чтение прошло через кэш Windows - цифра завышена", "* read went through the Windows cache - the number is inflated")
                     : Lang.T("Готово. Временный файл удалён.", "Done. Temp file removed.");
 
                 // Грубая классификация по последовательному чтению и латентности 4K
                 string verdict;
-                if (read >= 900) verdict = Lang.T("Похоже на NVMe SSD — летает 🚀", "Looks like an NVMe SSD — it flies 🚀");
-                else if (read >= 300) verdict = Lang.T("Похоже на SATA SSD — вполне бодро", "Looks like a SATA SSD — nice and quick");
+                if (read >= 900) verdict = Lang.T("Похоже на NVMe SSD - летает 🚀", "Looks like an NVMe SSD - it flies 🚀");
+                else if (read >= 300) verdict = Lang.T("Похоже на SATA SSD - вполне бодро", "Looks like a SATA SSD - nice and quick");
                 else if (read >= 60)
                     verdict = randMs > 10
                         ? Lang.T("Похоже на HDD. Для системы и игр лучше поставить SSD", "Looks like an HDD. An SSD would help a lot for the OS and games")
                         : Lang.T("Скорость на уровне HDD", "HDD-level speed");
-                else verdict = Lang.T("⚠ Очень медленно — диск перегружен или умирает, проверь SMART в Health Check", "⚠ Very slow — the disk is overloaded or dying, check SMART in Health Check");
+                else verdict = Lang.T("⚠ Очень медленно - диск перегружен или умирает, проверь SMART в Health Check", "⚠ Very slow - the disk is overloaded or dying, check SMART in Health Check");
 
                 verdictLabel.Text = verdict;
             };

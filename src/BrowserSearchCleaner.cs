@@ -13,10 +13,10 @@ namespace DeepTools
 {
     // Яндекс.Браузер (и его установщик) умеет прописывать поиск Яндекса в другие
     // браузеры и в оболочку Windows. Штатный деинсталлятор этого не убирает:
-    // в Chrome/Edge остаётся поисковик по умолчанию, в Firefox — движок, в IE —
+    // в Chrome/Edge остаётся поисковик по умолчанию, в Firefox - движок, в IE -
     // SearchScope. Здесь находим и аккуратно удаляем только яндексовые записи.
     //
-    // Chromium-браузеры хранят поиск в Preferences (JSON). Firefox — в prefs.js и
+    // Chromium-браузеры хранят поиск в Preferences (JSON). Firefox - в prefs.js и
     // search.json.mozlz4. Перед изменением делается резервная копия
     // *.deeptools.bak. Если браузер запущен, файл не трогаем: он всё равно
     // перезапишет настройки при выходе.
@@ -97,7 +97,7 @@ namespace DeepTools
                         Kind = "search",
                         Title = Lang.T("Поиск Яндекса в ", "Yandex search in ") + browser.Name +
                                 " (" + profile + ")" +
-                                (running ? Lang.T(" — закрой браузер", " — close the browser") : ""),
+                                (running ? Lang.T(" - закрой браузер", " - close the browser") : ""),
                         Path = path,
                         ValueName = "chromium|" + browser.Name + "|" + browser.ProcessName,
                         Size = 0
@@ -150,7 +150,7 @@ namespace DeepTools
             catch { return false; }
         }
 
-        // internal — чтобы можно было покрыть тестом без установленного браузера
+        // internal - чтобы можно было покрыть тестом без установленного браузера
         internal static bool RemoveChromiumPreferences(string path)
         {
             if (!File.Exists(path)) return false;
@@ -193,7 +193,7 @@ namespace DeepTools
                 return RemoveChromiumWebData(Path.Combine(onlyProfileDir, "Web Data"));
             }
 
-            // default_search_provider — это GUID. Сбрасываем его только если
+            // default_search_provider - это GUID. Сбрасываем его только если
             // яндексовым был именно поисковик по умолчанию: если Яндекс был
             // лишь дополнительным движком, настройку пользователя не трогаем.
             if (defaultWasYandex) root.Remove("default_search_provider");
@@ -206,7 +206,7 @@ namespace DeepTools
                 Json.DeserializeObject(File.ReadAllText(path));
 
                 // Chrome/Edge хранят список поисковиков ещё и в SQLite-базе
-                // Web Data. Если она есть и браузер закрыт — убираем оттуда.
+                // Web Data. Если она есть и браузер закрыт - убираем оттуда.
                 try
                 {
                     string profileDir = Path.GetDirectoryName(path);
@@ -223,7 +223,7 @@ namespace DeepTools
         // Chrome/Edge/Brave/Vivaldi/Opera хранят список поисковиков в SQLite
         // (Web Data, таблица keywords). Удаляем только строки с yandex/яндекс.
         // Используется системная winsqlite3.dll из Windows 10/11; если её нет,
-        // молча пропускаем — Preferences уже очищены.
+        // молча пропускаем - Preferences уже очищены.
         internal static bool RemoveChromiumWebData(string path)
         {
             if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
@@ -387,7 +387,7 @@ namespace DeepTools
                     Kind = "search",
                     Title = Lang.T("Поиск Яндекса в Firefox (", "Yandex search in Firefox (") +
                             Path.GetFileName(profile) + ")" +
-                            (running ? Lang.T(" — закрой браузер", " — close the browser") : ""),
+                            (running ? Lang.T(" - закрой браузер", " - close the browser") : ""),
                     Path = profile,
                     ValueName = "firefox|firefox",
                     Size = 0
@@ -854,7 +854,7 @@ namespace DeepTools
             return output;
         }
 
-        // Простейший корректный LZ4-блок: все данные — одна литеральная
+        // Простейший корректный LZ4-блок: все данные - одна литеральная
         // последовательность, без совпадений. Для search.json этого достаточно:
         // файл маленький, а валидность важнее степени сжатия.
         private static byte[] Lz4Compress(byte[] input)

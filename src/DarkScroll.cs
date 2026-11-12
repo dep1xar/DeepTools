@@ -14,7 +14,7 @@ namespace DeepTools
     // нативную полосу прячем через ShowScrollBar.
     //
     // Синхронизация с содержимым. Раньше ползунок перерисовывался асинхронно
-    // (Invalidate по событию Scroll), а панель — своим WM_PAINT. Два контрола
+    // (Invalidate по событию Scroll), а панель - своим WM_PAINT. Два контрола
     // попадали в разные кадры, и ползунок то отставал, то убегал вперёд.
     //
     // Теперь порядок жёсткий: хук на окне панели ловит WM_PAINT уже ПОСЛЕ того,
@@ -36,7 +36,7 @@ namespace DeepTools
         private const int WM_MOUSEWHEEL = 0x020A;
 
         // Реестр живых полос: Attach зовётся до того, как панель получит Parent,
-        // поэтому поиск по Controls ненадёжен — ведём учёт сами
+        // поэтому поиск по Controls ненадёжен - ведём учёт сами
         private static readonly List<DarkScroll> live = new List<DarkScroll>();
 
         private readonly ScrollableControl target;
@@ -73,7 +73,7 @@ namespace DeepTools
                     return;
                 }
 
-                // Содержимое уже нарисовано — ставим ползунок на место синхронно
+                // Содержимое уже нарисовано - ставим ползунок на место синхронно
                 if (msg == WM_PAINT || msg == WM_VSCROLL || msg == WM_HSCROLL || msg == WM_MOUSEWHEEL)
                 {
                     if (owner == null) return;
@@ -173,7 +173,7 @@ namespace DeepTools
         }
 
         // Пересчёт и НЕМЕДЛЕННАЯ перерисовка. Вызывается из хука окна панели
-        // сразу после её отрисовки — поэтому ползунок и содержимое не расходятся
+        // сразу после её отрисовки - поэтому ползунок и содержимое не расходятся
         private void SyncNow()
         {
             if (syncing || IsDisposed) return;
@@ -240,7 +240,7 @@ namespace DeepTools
         private Color ThumbColor()
         {
             if (dragging) return Theme.Accent;
-            // Подходит под все темы: на светлой — темнее, на тёмных — светлее
+            // Подходит под все темы: на светлой - темнее, на тёмных - светлее
             float k = (hovered || IsMouseOver) ? 0.72f : 0.5f;
             return Theme.Lerp(Theme.BgColor, Theme.TextDim, k);
         }
@@ -299,7 +299,7 @@ namespace DeepTools
             }
             else
             {
-                // Клик по треку — прыжок, затем сразу тащим
+                // Клик по треку - прыжок, затем сразу тащим
                 dragging = true;
                 dragGrabY = th / 2;
                 SetFromThumbY(e.Y - dragGrabY, th);
