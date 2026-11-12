@@ -71,6 +71,7 @@ namespace DeepTools
             Hotkeys.Load();
             SetupTrayIcon();
             StartTrayMonitor();
+            RetryTrayAfterLogon();
             BuildShell();
             ShowPanel(panelHome, navHome);
             StartupGuard.Start();
@@ -78,6 +79,10 @@ namespace DeepTools
             TempHistory.Start();
             CoolerAdvisor.Start();
             AutoCleanup.Start();
+            // Задача автозагрузки могла быть создана старой версией с
+            // DisallowStartIfOnBatteries и кавычками в команде - молча
+            // пересоздаём её в фоне, не задерживая показ окна
+            System.Threading.ThreadPool.QueueUserWorkItem(_ => { try { AutoStart.EnsureHealthy(); } catch { } });
             KeepAwake.Restore();
             NotesManager.RestoreAll();
             UpdateChecker.CheckInBackground(true, null);
@@ -226,6 +231,27 @@ namespace DeepTools
                 UpdateTrayIcon();
             }
             catch { }
+        }
+
+        // При запуске из автозагрузки программа может успеть создать окно
+        // раньше, чем Explorer нарисует панель задач. Тогда TaskbarCreated
+        // проходит мимо, и иконка не появляется до ручного перезапуска.
+        // Несколько раз перерегистрируем её уже после старта.
+        private void RetryTrayAfterLogon()
+        {
+            var retryTimer = new System.Windows.Forms.Timer { Interval = 4000 };
+            int attempts = 0;
+            retryTimer.Tick += (s, e) =>
+            {
+                attempts++;
+                RestoreTrayIcon();
+                if (attempts >= 4)
+                {
+                    retryTimer.Stop();
+                    retryTimer.Dispose();
+                }
+            };
+            retryTimer.Start();
         }
 
         private void SetupTrayIcon()

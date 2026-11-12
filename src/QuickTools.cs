@@ -123,6 +123,10 @@ namespace DeepTools
             catch { }
 
             string cmd = exe.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+            // Without an explicit working directory Task Scheduler starts the
+            // app in System32, which breaks code that resolves files relatively.
+            string wd = Path.GetDirectoryName(exe) ?? "";
+            wd = wd.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 
             // Principal по UserId + InteractiveToken: задача должна запускаться
             // в сеансе пользователя (иначе окна не будет видно), но с HighestAvailable
@@ -154,7 +158,7 @@ namespace DeepTools
                 + "    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>\r\n"
                 + "    <Priority>4</Priority>\r\n"
                 + "  </Settings>\r\n"
-                + "  <Actions Context=\"Author\"><Exec><Command>" + cmd + "</Command></Exec></Actions>\r\n"
+                + "  <Actions Context=\"Author\"><Exec><Command>" + cmd + "</Command><WorkingDirectory>" + wd + "</WorkingDirectory></Exec></Actions>\r\n"
                 + "</Task>\r\n";
         }
 
