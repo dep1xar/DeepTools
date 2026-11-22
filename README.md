@@ -22,50 +22,50 @@
 
 ## English
 
-DeepTools is a lightweight all-in-one utility for Windows 10 and 11. It cleans junk, tunes the system for gaming, watches your temperatures, manages startup and services, removes pre-installed bloat, and bundles a set of handy extras - a clicker, screenshot tool, clipboard manager and desktop sticky notes. One executable, no installer, no background services left behind.
+DeepTools is a lightweight all-in-one utility for Windows 10 and 11. It clears junk, tunes the system for gaming, monitors temperatures, manages startup entries and services, removes pre-installed apps, and includes a clicker, a screenshot tool, a clipboard manager and desktop sticky notes. Everything ships as one .exe, with no installer and no background services left behind.
 
 | | |
 |---|---|
 | <img src="assets/screenshot-main.png" alt="DeepTools main window" width="470"> | <img src="assets/screenshot-cleanup.png" alt="SmartCleanup" width="470"> |
-| **Main window** - live CPU, RAM and temperatures | **SmartCleanup** - junk, caches and leftovers |
+| **Main window**: live CPU, RAM and temperatures | **SmartCleanup**: junk, caches and leftovers |
 | <img src="assets/screenshot-booster.png" alt="GameBooster" width="470"> | <img src="assets/screenshot-tweaks.png" alt="Game tweaks" width="470"> |
-| **GameBooster** - power plan, Game DVR, background apps | **Game tweaks** - real system state, one-click revert |
+| **GameBooster**: power plan, Game DVR, background apps | **Game tweaks**: real system state, one-click revert |
 | <img src="assets/screenshot-health.png" alt="Health Check" width="470"> | <img src="assets/screenshot-clicker.png" alt="Autoclicker" width="470"> |
-| **Health Check** - sensors, SMART, miner guard | **Autoclicker** - mouse or keyboard, configurable rate |
+| **Health Check**: sensors, SMART, miner guard | **Autoclicker**: mouse or keyboard, configurable rate |
 
 > [!IMPORTANT]
 > DeepTools requires **administrator rights** to change power plans, services and startup entries, and to read hardware sensors. On launch it asks for elevation via the standard Windows UAC prompt.
 
 ### Why it may be flagged by antivirus
 
-DeepTools is a system tweaker, so it does things real malware also does: elevates via UAC, edits the registry and services, sends synthetic input (the clicker) and loads a kernel driver to read CPU/GPU temperatures. Because the release is **not code-signed yet**, some engines (mostly ML/heuristic detections like [Trojan:Win32/Wacatac.B!ml](https://www.microsoft.com/en-us/wdsi/threats/malware-encyclopedia-description?name=Trojan%3AWin32%2FWacatac.B!ml&threatid=2147735505)) may show a false positive. This is expected for this class of software.
+DeepTools is a system tweaker, so it does some of the same things malware does: it elevates through UAC, edits the registry and services, sends synthetic input for the clicker, and loads a kernel driver to read CPU and GPU temperatures. The release is not code-signed yet, so a few engines, mostly ML and heuristic detections such as [Trojan:Win32/Wacatac.B!ml](https://www.microsoft.com/en-us/wdsi/threats/malware-encyclopedia-description?name=Trojan%3AWin32%2FWacatac.B!ml&threatid=2147735505), may report a false positive.
 
-- The full source is in this repository - you can read and build it yourself.
-- You can verify any release on [VirusTotal](https://www.virustotal.com/).
+- The full source is in this repository, so you can read it and build it yourself.
+- Any release can be checked on [VirusTotal](https://www.virustotal.com/).
 - If Windows SmartScreen warns you, click **More info → Run anyway**.
 
 ### Game Tweaks
 
-A card grid of per-feature game tweaks: HAGS, Game Mode, the MMCSS game scheduler, fullscreen optimizations, PCIe link power management (ASPM), HVCI, Power Throttling, the page file, background telemetry services, background Store apps, Windows 11 widgets, Copilot, Recall and CPU affinity for the running game. Every card reads the **real system state** instead of remembering what you last clicked, one click applies or reverts a tweak, and the ones that need a reboot are marked **⟳**. *Disable all* turns every applied tweak back off in one go.
+A card grid of per-feature game tweaks: HAGS, Game Mode, the MMCSS game scheduler, fullscreen optimizations, PCIe link power management (ASPM), HVCI, Power Throttling, the page file, background telemetry services, background Store apps, Windows 11 widgets, Copilot, Recall, and CPU affinity for the running game. Each card reads the real system state instead of remembering the last click. One click applies or reverts a tweak, tweaks that need a reboot are marked **⟳**, and *Disable all* reverts everything at once.
 
 ### Extra tools
 
-- **Program uninstaller** - lists installed programs and runs their uninstaller, then finds and removes leftover folders.
-- **Sticky notes** - yellow desktop notes that stay on top, live in the tray, and are restored on launch (tray menu → *New note*). Each note has a ⏰ **reminder**: set a time and get a tray notification with the note popping to the front.
-- **Audio switcher** - switch the default playback device (headphones ↔ speakers) in one click from the tray menu.
-- **Power quick actions** - restart straight into BIOS/UEFI, toggle Windows Fast Startup, restart Explorer.
-- **Debloat** - removes pre-installed UWP apps you don't use. Only shows what's actually installed; removal is per-user and always confirmed.
-- **Stress Test** - loads all CPU cores to 100% for 2 minutes and reports peak temperature.
-- **Temperature History** - 24-hour CPU/GPU graph with peak analysis.
-- **Game Time** - tracks your gaming sessions (playtime, average FPS, 1% low, average CPU, peak temps) and reports when you close a game. Works with fullscreen and borderless games. A **Share** button renders a PNG card with your PC spec and top games. A per-game ≡ **FPS history** chart shows average FPS and 1% low across sessions with a trend verdict - so system degradation is visible at a glance. The **≡ Report** button opens frame statistics for the last 30 minutes / hour / 2 hours: average FPS, worst 1% low and **every micro-stutter** (when it happened and how many milliseconds it lasted) on a timeline. Non-games (messengers, browsers, terminals, video editors) are filtered out of the game statistics, and anything already recorded can be removed per game or in one click.
-- **Telemetry off** - disables Windows telemetry via official policies, services and scheduler tasks. Three presets (light/medium/aggressive), live status per tweak, one-click full revert.
-- **Restore point** - offered automatically before risky tweaks (debloat, service presets, telemetry) so you can always roll back.
-- **Crosshair** - customizable on-screen crosshair overlay (cross, dot, circle, T-shape); settings are remembered.
-- **Desktop Widget** - compact always-on-top CPU/RAM/temperature panel.
+- **Program uninstaller**: lists installed programs, runs their uninstaller, then finds and removes leftover folders.
+- **Sticky notes**: yellow desktop notes that stay on top and live in the tray, restored on launch (tray menu → *New note*). Each note can have a ⏰ **reminder**: set a time and the note pops to the front with a tray notification.
+- **Audio switcher**: changes the default playback device (headphones ↔ speakers) from the tray menu.
+- **Power quick actions**: restart straight into BIOS/UEFI, toggle Windows Fast Startup, restart Explorer.
+- **Debloat**: removes pre-installed UWP apps you don't use. It shows only what is actually installed, and removal is per-user and always confirmed.
+- **Stress Test**: loads every CPU core to 100% for 2 minutes and reports the peak temperature.
+- **Temperature History**: 24-hour CPU/GPU graph with peak analysis.
+- **Game Time**: tracks gaming sessions (playtime, average FPS, 1% low, average CPU load, peak temperatures) and reports when you close a game. Works with fullscreen and borderless games. A **Share** button renders a PNG card with your PC spec and top games. The ≡ **FPS history** chart for each game shows average FPS and 1% low across sessions with a trend verdict, so system degradation is visible at a glance. The **≡ Report** button opens frame statistics for the last 30 minutes, hour or 2 hours: average FPS, worst 1% low, and every micro-stutter with its time and duration on a timeline. Messengers, browsers, terminals and video editors are filtered out of game statistics, and recorded sessions can be deleted per game or all at once.
+- **Telemetry off**: disables Windows telemetry through official policies, services and scheduler tasks. Three presets (light, medium, aggressive), live status per tweak, full revert in one click.
+- **Restore point**: offered automatically before risky tweaks (debloat, service presets, telemetry) so you can roll back.
+- **Crosshair**: customizable on-screen crosshair overlay (cross, dot, circle, T-shape). Settings are remembered.
+- **Desktop Widget**: compact always-on-top CPU/RAM/temperature panel.
 
 ### Yandex removal
 
-The **Remove Yandex** button (SmartCleanup) now also removes the Yandex search provider that Yandex Browser leaves behind in **Chrome, Edge, Brave, Vivaldi, Opera, Chromium, Firefox and Internet Explorer**, plus Windows URL/file associations. Close those browsers first so their settings files and `Web Data` databases can be updated; DeepTools creates `.deeptools.bak` backups and removes only Yandex-related entries.
+The **Remove Yandex** button in SmartCleanup also removes the Yandex search provider that Yandex Browser leaves in **Chrome, Edge, Brave, Vivaldi, Opera, Chromium, Firefox and Internet Explorer**, plus Windows URL and file associations. Close those browsers first so DeepTools can update their settings files and `Web Data` databases. It creates `.deeptools.bak` backups and removes only Yandex-related entries.
 
 ### Global hotkeys
 
@@ -80,15 +80,15 @@ The **Remove Yandex** button (SmartCleanup) now also removes the Yandex search p
 
 1. Go to the [Releases](https://github.com/dep1xar/DeepTools/releases) page.
 2. Download the latest `DeepTools.exe`.
-3. Run it. On first launch pick the interface language; then approve the UAC prompt when Windows asks for administrator rights.
+3. Run it. On first launch pick the interface language, then approve the UAC prompt when Windows asks for administrator rights.
 
-No installer, no dependencies to download - all libraries (including the hardware-sensor engine) are embedded into the single `.exe`.
+No installer and nothing else to download: all libraries, including the hardware sensor engine, are embedded in the single `.exe`.
 
 ### Building from source
 
-You need the **.NET Framework 4.x** SDK (ships with Windows / Visual Studio; the compiler lives at `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
+You need the **.NET Framework 4.x** SDK (ships with Windows and Visual Studio; the compiler is at `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
 
-Make sure you downloaded the **whole repository** (Code → Download ZIP): every `.cs` file must be in `src/`, and every `.dll` must sit next to `build.ps1`, otherwise the build fails.
+Download the **whole repository** (Code → Download ZIP): every `.cs` file must be in `src/`, and every `.dll` must sit next to `build.ps1`, otherwise the build fails.
 
 Open a PowerShell window in the project folder and run:
 
@@ -98,13 +98,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 
 The script compiles all `.cs` files from `src/`, embeds the managed DLLs as resources and produces `DeepTools.exe` in the project folder.
 
-The script prints a clearly marked **BUILD OK** or **BUILD FAILED** block at the end, so a problem is never silent:
+It ends with a marked **BUILD OK** or **BUILD FAILED** block, so a problem never passes silently:
 
-- **BUILD FAILED: COMPILATION ERROR** - the compiler messages are printed above the banner.
-- **BUILD FAILED: Missing DLL / Missing file** - the repository was unpacked partially.
-- **BUILD OK, but the exe could not be installed** - `DeepTools.exe` was running. Close it (tray icon → Exit) and run the build again.
+- **BUILD FAILED: COMPILATION ERROR**: compiler messages are printed above the banner.
+- **BUILD FAILED: Missing DLL / Missing file**: the repository was unpacked partially.
+- **BUILD OK, but the exe could not be installed**: `DeepTools.exe` was running. Close it (tray icon → Exit) and run the build again.
 
-If `DeepTools.exe` is currently running, the script renames it to `DeepTools_old.exe` and puts the fresh build in place, so you do not have to close the app first.
+If `DeepTools.exe` is running, the script renames it to `DeepTools_old.exe` and puts the fresh build in place, so you don't have to close the app first.
 
 
 ### System requirements
@@ -115,11 +115,11 @@ If `DeepTools.exe` is currently running, the script renames it to `DeepTools_old
 
 ### Language
 
-DeepTools ships in **English and Russian**. The very first launch asks you to pick a language (and shows a short quick-start wizard); you can change it any time in **Settings → Appearance & language**.
+DeepTools ships in **English and Russian**. The very first launch asks you to pick a language and shows a short quick-start wizard; you can change it any time in **Settings → Appearance & language**.
 
 ### Updates
 
-DeepTools checks GitHub Releases on launch. When an update is available, clicking the tray notification **downloads and installs it automatically** - the app swaps its own exe and restarts.
+DeepTools checks GitHub Releases on launch. When an update is available, clicking the tray notification downloads and installs it: the app swaps its own exe and restarts.
 
 ---
 
@@ -127,50 +127,50 @@ DeepTools checks GitHub Releases on launch. When an update is available, clickin
 
 ## Русский
 
-DeepTools - это лёгкая утилита «всё в одном» для Windows 10 и 11, она чистит мусор, настраивает систему под игры, следит за температурами, позволяет управлять автозагрузкой и службами, удаляет предустановленный хлам и включает набор удобных инструментов: автокликер, скриншотер, менеджер буфера обмена и заметки. Один .exe файл, без установщика и без фоновых служб, остающихся в системе.
+DeepTools собирает в одном `.exe` набор утилит для Windows 10 и 11: чистит мусор, настраивает систему под игры, следит за температурами, управляет автозагрузкой и службами, удаляет предустановленные приложения, а ещё добавляет автокликер, скриншотер, менеджер буфера обмена и заметки на рабочий стол. Установщика нет, фоновых служб после закрытия тоже.
 
 | | |
 |---|---|
 | <img src="assets/screenshot-main.png" alt="Главное окно DeepTools" width="470"> | <img src="assets/screenshot-booster.png" alt="GameBooster" width="470"> |
-| **Главное окно** - CPU, RAM и температуры в реальном времени | **GameBooster** - план питания, Game DVR, фоновые программы |
+| **Главное окно**: CPU, RAM и температуры в реальном времени | **GameBooster**: план питания, Game DVR, фоновые программы |
 | <img src="assets/screenshot-tweaks.png" alt="Игровые твики" width="470"> | <img src="assets/screenshot-health.png" alt="Health Check" width="470"> |
-| **Игровые твики** - реальное состояние системы, откат в один клик | **Health Check** - датчики, SMART, страж майнеров |
+| **Игровые твики**: реальное состояние системы, откат в один клик | **Health Check**: датчики, SMART, страж майнеров |
 
 > [!IMPORTANT]
 > DeepTools нужны **права администратора**, чтобы менять планы питания, службы и автозагрузку, а также читать датчики железа. При запуске программа запрашивает их через стандартное окно UAC.
 
 ### Почему антивирус может ругаться
 
-DeepTools - системный твикер, поэтому он делает то же, что и настоящие вирусы: повышает права через UAC, правит реестр и службы, шлёт синтетический ввод (кликер) и грузит драйвер ядра для чтения температур CPU/GPU. Так как релиз **пока не подписан сертификатом**, некоторые движки (в основном ML/эвристика вроде [Trojan:Win32/Wacatac.B!ml](https://www.microsoft.com/en-us/wdsi/threats/malware-encyclopedia-description?name=Trojan%3AWin32%2FWacatac.B!ml&threatid=2147735505)) могут дать ложное срабатывание. Для такого класса программ это нормально.
+DeepTools работает с системой на том же уровне, что и вирус: повышает права через UAC, правит реестр и службы, шлёт синтетический ввод для кликера и грузит драйвер ядра для чтения температур CPU и GPU. Релиз пока не подписан сертификатом, поэтому часть движков, в основном ML и эвристика вроде [Trojan:Win32/Wacatac.B!ml](https://www.microsoft.com/en-us/wdsi/threats/malware-encyclopedia-description?name=Trojan%3AWin32%2FWacatac.B!ml&threatid=2147735505), может дать ложное срабатывание.
 
-- Весь исходный код - в этом репозитории, можно прочитать и собрать самому.
+- Весь исходный код лежит в этом репозитории, его можно прочитать и собрать самому.
 - Любой релиз можно проверить на [VirusTotal](https://www.virustotal.com/).
-- Если предупреждает Windows SmartScreen - нажми **Подробнее → Выполнить в любом случае**.
-- Иногда антивирус сразу же посылает файл в карантин, тогда **надо добавить его в исключение**
+- Если предупреждает Windows SmartScreen, нажми **Подробнее → Выполнить в любом случае**.
+- Иногда антивирус сразу отправляет файл в карантин. Тогда добавь его в исключения.
 
 
 ### Игровые твики
 
-Сетка карточек с твиками по отдельным фичам: HAGS, Game Mode, игровой планировщик MMCSS, оптимизации во весь экран, энергосбережение шины PCIe (ASPM), HVCI, Power Throttling, файл подкачки, фоновые службы телеметрии, фоновые приложения Store, виджеты Windows 11, Copilot, Recall и привязка активной игры к ядрам. Каждая карточка показывает **реальное состояние системы**, а не «что мы последний раз нажали»; один клик применяет или откатывает твик, а те, которым нужна перезагрузка, помечены **⟳**. Кнопка *Отключить всё* возвращает все применённые твики в обычное состояние.
+Сетка карточек с твиками по отдельным фичам: HAGS, Game Mode, игровой планировщик MMCSS, оптимизации во весь экран, энергосбережение шины PCIe (ASPM), HVCI, Power Throttling, файл подкачки, фоновые службы телеметрии, фоновые приложения Store, виджеты Windows 11, Copilot, Recall и привязка активной игры к ядрам. Карточка показывает реальное состояние системы, а не то, что мы последний раз нажали. Один клик применяет или откатывает твик, твики с перезагрузкой помечены **⟳**, кнопка *Отключить всё* возвращает всё сразу.
 
 ### Дополнительные инструменты
 
-- **Деинсталлятор программ** - список установленного и запуск удаления, затем поиск и удаление остаточных папок.
-- **Заметки-стикеры** - жёлтые заметки поверх стола, живут в трее, восстанавливаются при запуске (меню трея → *Новая заметка*). У каждой есть ⏰ **напоминание**: задай время - придёт уведомление из трея, а заметка выпрыгнет наверх.
-- **Переключатель звука** - смена устройства вывода (наушники ↔ колонки) одним кликом из меню трея.
-- **Быстрые действия питания** - перезагрузка прямо в BIOS/UEFI, тумблер быстрого запуска Windows, перезапуск проводника.
-- **Деблоат** - удаляет предустановленные UWP-приложения. Показывает только реально установленное; удаление для текущего пользователя и всегда с подтверждением.
-- **Стресс-тест** - грузит все ядра CPU на 100% в течение 2 минут и показывает пиковую температуру.
-- **История температур** - график CPU/GPU за 24 часа с разбором пиков.
-- **Время в играх** - считает игровые сессии (время, средний FPS, 1% low, средний CPU, пиковые температуры) и шлёт отчёт при закрытии игры. Работает с полноэкранными и borderless-играми. Кнопка **Поделиться** рендерит PNG-карточку со спекой ПК и топом игр. График ≡ **истории FPS** по каждой игре - средний FPS и 1% low по сессиям с вердиктом тренда: деградация системы видна с одного взгляда. Кнопка **≡ Отчёт** открывает статистику кадров за последние 30 минут / час / 2 часа: средний FPS, худший 1% low и **каждый микрофриз** - когда случился и сколько миллисекунд длился, на таймлайне. Не-игры (мессенджеры, браузеры, терминалы, видеоредакторы) в статистику игр не попадают, а уже записанные сессии можно убрать по одной или одной кнопкой.
-- **Отключение телеметрии** - выключает телеметрию Windows через официальные политики, службы и задачи планировщика. Три пресета (мягко/средне/жёстко), живой статус каждого твика, полный откат одной кнопкой.
-- **Точка восстановления** - автоматически предлагается перед рискованными твиками (деблоат, пресеты служб, телеметрия), чтобы всегда можно было откатиться.
-- **Прицел** - настраиваемый накладной прицел (крест, точка, круг, T-образный); настройки запоминаются.
-- **Виджет на рабочий стол** - компактная плашка CPU/RAM/температуры, всегда поверх окон.
+- **Деинсталлятор программ**: список установленного, запуск штатного удаления, затем поиск и удаление остаточных папок.
+- **Заметки-стикеры**: жёлтые заметки поверх стола, живут в трее и восстанавливаются при запуске (меню трея → *Новая заметка*). У каждой может быть ⏰ **напоминание**: задаёшь время, приходит уведомление из трея, а заметка выпрыгивает наверх.
+- **Переключатель звука**: смена устройства вывода (наушники ↔ колонки) одним кликом из меню трея.
+- **Быстрые действия питания**: перезагрузка прямо в BIOS/UEFI, тумблер быстрого запуска Windows, перезапуск проводника.
+- **Деблоат**: удаляет предустановленные UWP-приложения. Показывает только реально установленное, удаление идёт для текущего пользователя и всегда с подтверждением.
+- **Стресс-тест**: грузит все ядра CPU на 100% две минуты и показывает пиковую температуру.
+- **История температур**: график CPU/GPU за 24 часа с разбором пиков.
+- **Время в играх**: считает игровые сессии (время, средний FPS, 1% low, средний CPU, пиковые температуры) и шлёт отчёт при закрытии игры. Работает с полноэкранными и borderless-играми. Кнопка **Поделиться** рендерит PNG-карточку со спекой ПК и топом игр. График ≡ **истории FPS** по каждой игре показывает средний FPS и 1% low по сессиям с вердиктом тренда, так что деградация системы видна сразу. Кнопка **≡ Отчёт** открывает статистику кадров за последние 30 минут, час или 2 часа: средний FPS, худший 1% low и каждый микрофриз с временем и длительностью на таймлайне. Мессенджеры, браузеры, терминалы и видеоредакторы в статистику игр не попадают, а записанные сессии можно убрать по одной или все сразу.
+- **Отключение телеметрии**: выключает телеметрию Windows через официальные политики, службы и задачи планировщика. Три пресета (мягко, средне, жёстко), живой статус каждого твика, полный откат одной кнопкой.
+- **Точка восстановления**: предлагается автоматически перед рискованными твиками (деблоат, пресеты служб, телеметрия), чтобы всегда можно было откатиться.
+- **Прицел**: настраиваемый накладной прицел (крест, точка, круг, T-образный). Настройки запоминаются.
+- **Виджет на рабочий стол**: компактная плашка CPU/RAM/температуры, всегда поверх окон.
 
 ### Удаление Яндекса
 
-Кнопка **Удалить Яндекс** (SmartCleanup) теперь также убирает поисковую систему Яндекса, которую Яндекс.Браузер оставляет в **Chrome, Edge, Brave, Vivaldi, Opera, Chromium, Firefox и Internet Explorer**, плюс ассоциации ссылок и файлов Windows. Перед удалением закрой эти браузеры, чтобы DeepTools мог обновить их настройки и базы `Web Data`; программа делает резервные копии `.deeptools.bak` и удаляет только записи, связанные с Яндексом.
+Кнопка **Удалить Яндекс** в SmartCleanup убирает и поисковую систему Яндекса, которую Яндекс.Браузер оставляет в **Chrome, Edge, Brave, Vivaldi, Opera, Chromium, Firefox и Internet Explorer**, плюс ассоциации ссылок и файлов Windows. Перед удалением закрой эти браузеры, чтобы DeepTools мог обновить их настройки и базы `Web Data`. Программа делает резервные копии `.deeptools.bak` и удаляет только записи, связанные с Яндексом.
 
 ### Глобальные горячие клавиши
 
@@ -187,13 +187,13 @@ DeepTools - системный твикер, поэтому он делает т
 2. Скачай свежий `DeepTools.exe`.
 3. Запусти. При первом запуске выбери язык, затем подтверди UAC, когда система попросит права администратора.
 
-Без установщика и без докачки зависимостей - все библиотеки (включая движок датчиков) встроены прямо в один `.exe`.
+Установщика нет, докачивать зависимости не нужно: все библиотеки, включая движок датчиков, встроены в один `.exe`.
 
 ### Сборка из исходников
 
-Нужен **.NET Framework 4.x** SDK (идёт с Windows / Visual Studio; компилятор лежит по пути `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
+Нужен **.NET Framework 4.x** SDK (идёт с Windows и Visual Studio; компилятор лежит по пути `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
 
-Убедись, что скачал **весь репозиторий** (Code → Download ZIP): все `.cs` должны лежать в `src/`, а все `.dll` - рядом с `build.ps1`, иначе сборка не пройдёт.
+Скачай **весь репозиторий** (Code → Download ZIP): все `.cs` должны лежать в `src/`, а все `.dll` рядом с `build.ps1`, иначе сборка не пройдёт.
 
 Открой PowerShell в папке проекта и запусти:
 
@@ -203,11 +203,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 
 Скрипт компилирует все `.cs`-файлы из `src/`, встраивает managed-библиотеки как ресурсы и создаёт `DeepTools.exe` в папке проекта.
 
-В конце всегда печатается заметный блок **BUILD OK** или **BUILD FAILED**, поэтому ошибка не проходит молча:
+В конце печатается заметный блок **BUILD OK** или **BUILD FAILED**, так что ошибка не проходит молча:
 
-- **BUILD FAILED: COMPILATION ERROR** - текст ошибок компилятора напечатан над баннером.
-- **BUILD FAILED: Missing DLL / Missing file** - репозиторий распакован не полностью.
-- **BUILD OK, but the exe could not be installed** - `DeepTools.exe` был запущен. Закрой его (трей → Выход) и запусти сборку снова.
+- **BUILD FAILED: COMPILATION ERROR**: текст ошибок компилятора напечатан над баннером.
+- **BUILD FAILED: Missing DLL / Missing file**: репозиторий распакован не полностью.
+- **BUILD OK, but the exe could not be installed**: `DeepTools.exe` был запущен. Закрой его (трей → Выход) и запусти сборку снова.
 
 Если `DeepTools.exe` сейчас запущен, скрипт переименует его в `DeepTools_old.exe` и подставит свежую сборку, так что закрывать программу заранее не обязательно.
 
@@ -220,11 +220,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 
 ### Язык
 
-DeepTools доступен на **русском и английском**. При самом первом запуске программа спрашивает язык (и показывает короткий мастер знакомства); сменить можно в любой момент в **Настройки → Внешний вид и язык**.
+DeepTools доступен на **русском и английском**. При самом первом запуске программа спрашивает язык и показывает короткий мастер знакомства; сменить язык можно в любой момент в **Настройки → Внешний вид и язык**.
 
 ### Обновления
 
-DeepTools проверяет GitHub Releases при запуске. Когда выходит новая версия, клик по уведомлению из трея **скачивает и устанавливает её автоматически** - программа сама подменяет свой exe и перезапускается.
+DeepTools проверяет GitHub Releases при запуске. Когда выходит новая версия, клик по уведомлению из трея скачивает и устанавливает её: программа сама подменяет свой exe и перезапускается.
 
 ---
 
