@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/banner.png" alt="DeepTools - Windows performance & system tools" width="720">
+
 # DeepTools
 
 **Smart tweaker, cleaner and monitoring tool for Windows - in one app.**
