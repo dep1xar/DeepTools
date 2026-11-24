@@ -1,5 +1,5 @@
 using System;
-using System.Management;
+using System.Threading;
 using LibreHardwareMonitor.Hardware;
 
 namespace DeepTools
@@ -14,6 +14,16 @@ namespace DeepTools
         private static bool initStarted = false;
         private static readonly object sync = new object();
 
+        // LibreHardwareMonitor не потокобезопасен: Update() и чтение сенсоров
+        // нельзя делать одновременно из UI, sampler'а и адаптивного профиля.
+        // Раньше это могло закончиться нативным AccessViolation без записи в
+        // crash.log. Теперь все обращения сериализованы, а результат кэшируется
+        // на 1.5 секунды - несколько потребителей не дёргают драйвер без нужды.
+        private static readonly object readSync = new object();
+        private static int cachedTemp = int.MinValue;
+        private static DateTime cachedAt = DateTime.MinValue;
+        private static readonly TimeSpan CacheTime = TimeSpan.FromMilliseconds(1500);
+
         public static void InitAsync()
         {
             lock (sync)
@@ -21,8 +31,9 @@ namespace DeepTools
                 if (initStarted) return;
                 initStarted = true;
             }
-            var t = new System.Threading.Thread(Init);
+            var t = new Thread(Init);
             t.IsBackground = true;
+            t.Name = "CpuSensorInit";
             t.Start();
         }
 
@@ -58,6 +69,20 @@ namespace DeepTools
         // иначе берём максимум по ядрам
         public static int GetTemperature()
         {
+            lock (readSync)
+            {
+                if (cachedTemp != int.MinValue && (DateTime.UtcNow - cachedAt) < CacheTime)
+                    return cachedTemp;
+
+                int result = ReadTemperatureLocked();
+                cachedTemp = result;
+                cachedAt = DateTime.UtcNow;
+                return result;
+            }
+        }
+
+        private static int ReadTemperatureLocked()
+        {
             IHardware hw;
             lock (sync) { hw = cpu; }
 
@@ -70,7 +95,8 @@ namespace DeepTools
                 if (!initStarted) InitAsync();
                 int board0 = FanSensor.ReadBoardCpuTemp();
                 if (board0 > 0) return board0;
-                return GetAcpiTemperature();
+                // WMI-запрос уходит в фон: в UI-потоке он мог подвесить окно
+                return AcpiThermal.Get();
             }
 
             try
@@ -103,34 +129,21 @@ namespace DeepTools
             // MSR процессора, видели просто «н/д»
             int board = FanSensor.ReadBoardCpuTemp();
             if (board > 0) return board;
-            return GetAcpiTemperature();
-        }
-
-        // Запасной датчик через WMI: MSAcpi_ThermalZoneTemperature (десятые доли кельвина)
-        private static int GetAcpiTemperature()
-        {
-            try
-            {
-                var searcher = new ManagementObjectSearcher(
-                    "root\\WMI", "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature");
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    double tenthsKelvin = Convert.ToDouble(obj["CurrentTemperature"]);
-                    double celsius = (tenthsKelvin / 10.0) - 273.15;
-                    if (celsius > 0 && celsius < 150) return (int)Math.Round(celsius);
-                }
-            }
-            catch { }
-            return -1;
+            return AcpiThermal.Get();
         }
 
         public static void Shutdown()
         {
-            lock (sync)
+            lock (readSync)
             {
-                try { if (computer != null) computer.Close(); } catch { }
-                computer = null;
-                cpu = null;
+                lock (sync)
+                {
+                    try { if (computer != null) computer.Close(); } catch { }
+                    computer = null;
+                    cpu = null;
+                }
+                cachedTemp = int.MinValue;
+                cachedAt = DateTime.MinValue;
             }
         }
     }

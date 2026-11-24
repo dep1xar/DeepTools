@@ -27,11 +27,16 @@ namespace DeepTools
             Size = new Size(760, 616);
             BackColor = Theme.BgColor;
 
-            clipboardManager = new ClipboardManager();
-            clipboardManager.HistoryChanged += (s, e) => RefreshHistory();
-
             BuildUi();
-            clipboardManager.Start();
+            // История буфера и слушатель запускаются при первом открытии:
+            // чтение файла истории не задерживает переключение раздела
+            LazyLoad.OnFirstVisible(this, delegate
+            {
+                clipboardManager = new ClipboardManager();
+                clipboardManager.HistoryChanged += (s, e) => RefreshHistory();
+                clipboardManager.Start();
+                RefreshHistory();
+            });
         }
 
         private void BuildUi()
@@ -170,6 +175,9 @@ namespace DeepTools
 
         private void RefreshHistory()
         {
+            // Менеджер создаётся при первом показе раздела
+            if (clipboardManager == null) return;
+
             // Если в поиске что-то есть - показываем результаты поиска, иначе всю историю
             string query = searchBox == null ? "" : searchBox.Text;
             if (!string.IsNullOrWhiteSpace(query))
@@ -185,6 +193,7 @@ namespace DeepTools
 
         private void SearchHistory()
         {
+            if (clipboardManager == null) return;
             string query = searchBox.Text;
 
             if (string.IsNullOrWhiteSpace(query))

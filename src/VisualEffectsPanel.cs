@@ -22,7 +22,7 @@ namespace DeepTools
             BackColor = Theme.BgColor;
 
             BuildUi();
-            LoadCurrentState();
+            LazyLoad.OnFirstVisible(this, LoadCurrentState);
         }
 
         private void BuildUi()

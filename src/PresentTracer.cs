@@ -128,6 +128,11 @@ namespace DeepTools
         // QPC-время каждого Present по PID (держим последние ~4 секунды)
         private static readonly Dictionary<int, List<long>> presents = new Dictionary<int, List<long>>();
 
+        // Жёсткий предел на процесс: если кадры никто не забирает (оверлей
+        // выключен, детект игры не тикает), список не должен расти бесконечно.
+        // 4096 кадров - это ~68 секунд при 60 FPS, при 1000 FPS - 4 секунды
+        private const int MaxPresentsPerPid = 4096;
+
         // Ссылки на делегаты держим в полях, иначе GC соберёт их под нативным колбэком
         private static EventRecordCb recordCb;
         private static BufferCb bufferCb;
@@ -168,6 +173,7 @@ namespace DeepTools
                 // Хвост от прошлого запуска (если процесс убили) - иначе StartTrace
                 // вернёт ERROR_ALREADY_EXISTS
                 StopSession();
+                lock (sync) presents.Clear();
 
                 IntPtr props = AllocProps();
                 try
@@ -272,6 +278,10 @@ namespace DeepTools
                         presents[pid] = list;
                     }
                     list.Add(ts);
+                    // Никто не обязан вызывать SnapshotForPid (оверлей выключен),
+                    // поэтому старые кадры подрезаем прямо здесь
+                    if (list.Count > MaxPresentsPerPid)
+                        list.RemoveRange(0, list.Count - MaxPresentsPerPid / 2);
                 }
             }
             catch { }

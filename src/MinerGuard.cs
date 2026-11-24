@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace DeepTools
 {
@@ -38,6 +39,7 @@ namespace DeepTools
         private static Dictionary<int, TimeSpan> prevCpuTimes;
         private static DateTime prevSampleAt;
         private static HashSet<string> alreadyAlerted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static int tickRunning;
 
         public static bool Enabled
         {
@@ -48,7 +50,20 @@ namespace DeepTools
         public static void Start()
         {
             timer = new System.Windows.Forms.Timer { Interval = 60 * 1000 };
-            timer.Tick += (s, e) => { if (Enabled) Tick(); };
+            // Перечисление процессов и чтение TotalProcessorTime в UI-потоке
+            // под загруженным CPU заметно подвешивало окно. Таймер только
+            // запускает фоновую проверку; повторный запуск не плодит потоки
+            timer.Tick += (s, e) =>
+            {
+                if (!Enabled) return;
+                if (Interlocked.CompareExchange(ref tickRunning, 1, 0) != 0) return;
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try { Tick(); }
+                    catch { }
+                    finally { Interlocked.Exchange(ref tickRunning, 0); }
+                });
+            };
             timer.Start();
         }
 

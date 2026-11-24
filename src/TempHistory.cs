@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 
 namespace DeepTools
 {
@@ -14,6 +15,7 @@ namespace DeepTools
 
         private static System.Windows.Forms.Timer timer;
         private static DateTime lastTrim = DateTime.MinValue;
+        private static int sampleRunning;
 
         public static string LogPath
         {
@@ -28,7 +30,18 @@ namespace DeepTools
         public static void Start()
         {
             timer = new System.Windows.Forms.Timer { Interval = 60 * 1000 };
-            timer.Tick += (s, e) => Sample();
+            // Запись и ежедневная подрезка файла - дисковый I/O; в UI-потоке
+            // он мог совпасть с тяжёлым кадром игры. Таймер только ставит задачу
+            timer.Tick += (s, e) =>
+            {
+                if (Interlocked.CompareExchange(ref sampleRunning, 1, 0) != 0) return;
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try { Sample(); }
+                    catch { }
+                    finally { Interlocked.Exchange(ref sampleRunning, 0); }
+                });
+            };
             timer.Start();
         }
 

@@ -41,7 +41,9 @@ namespace DeepTools
             if ((DateTime.Now - lastShown).TotalMinutes < 5) return;
             lastShown = DateTime.Now;
             pendingClick = null;
-            try { Icon.ShowBalloonTip(6000, title, message, ToolTipIcon.Warning); } catch { }
+            // NotifyIcon живёт в UI-потоке: фон (страж майнеров, sampler)
+            // не должен дёргать его напрямую
+            Ui.Post(delegate { try { Icon.ShowBalloonTip(6000, title, message, ToolTipIcon.Warning); } catch { } });
         }
 
         // Информационное уведомление без кулдауна (отчёт после игры и т.п.)
@@ -55,12 +57,13 @@ namespace DeepTools
         {
             if (Icon == null) return;
             pendingClick = onClick;
-            try { Icon.ShowBalloonTip(8000, title, message, ToolTipIcon.Info); } catch { }
+            Ui.Post(delegate { try { Icon.ShowBalloonTip(8000, title, message, ToolTipIcon.Info); } catch { } });
         }
     }
 
-    // Последние показания мониторинга. Обновляет HealthCheckPanel (его таймер
-    // работает всегда, даже когда вкладка скрыта), читает меню трея и главная страница
+    // Последние показания мониторинга. Обновляет SystemStatsSampler в фоновом
+    // потоке, читают меню трея, главная страница, виджет и Health Check.
+    // Строки пишет только sampler, UI их только читает - блокировок не нужно.
     public static class SystemStats
     {
         public static string CpuLoad = "-";
@@ -68,9 +71,12 @@ namespace DeepTools
         public static string RamLoad = "-";
         public static string GpuLoad = "-";
         public static string GpuTemp = "-";
+        public static string DiskUsage = "-";
 
-        // Числовые версии для трекера игровых сессий (-1 = нет данных)
+        // Числовые версии для трекера игровых сессий, графиков и трея (-1 = нет данных)
         public static float CpuLoadNum = -1;
+        public static float RamLoadNum = -1;
+        public static float GpuLoadNum = -1;
         public static int CpuTempNum = -1;
         public static int GpuTempNum = -1;
     }

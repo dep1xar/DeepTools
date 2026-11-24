@@ -226,7 +226,8 @@ namespace DeepTools
 
             BuildUi();
             LoadPersistedState();
-            RefreshHeavyList();
+            // Обход процессов с WorkingSet64 - уже после появления раздела
+            LazyLoad.OnFirstVisible(this, RefreshHeavyList);
 
             detectTimer.Start();
         }

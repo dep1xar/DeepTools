@@ -40,8 +40,11 @@ namespace DeepTools
 
         private static void Start()
         {
+            if (_thread != null && _thread.IsAlive) return;
             _running = true;
             _thread = new Thread(Loop) { IsBackground = true, Name = "AdaptivePower" };
+            // Ниже Normal: смена плана питания не должна конкурировать с игрой
+            _thread.Priority = ThreadPriority.BelowNormal;
             _thread.Start();
         }
 
@@ -57,7 +60,9 @@ namespace DeepTools
             while (_running)
             {
                 try { Tick(); } catch { }
-                Thread.Sleep(4000);
+                // 10 секунд: план питания меняется редко, а перечисление
+                // процессов и WMI-запрос на ноутбуке - не бесплатные
+                Thread.Sleep(10000);
             }
         }
 
@@ -93,39 +98,53 @@ namespace DeepTools
             // Если PresentTracer видит кадры игры - это игра
             if (PresentTracer.GetAnyFps() > 10) return Context.Game;
 
-            // Иначе смотрим на запущенные процессы
-            Process[] all;
-            try { all = Process.GetProcesses(); }
-            catch { return Context.Idle; }
-
-            bool browserRunning = false;
-            foreach (Process p in all)
+            // GetProcessesByName ищет по имени без полного перечисления процессов,
+            // а каждый массив обязательно освобождаем - иначе хэндлы процессов
+            // копились каждый тик
+            foreach (string b in BrowserProcs)
             {
+                Process[] found = null;
                 try
                 {
-                    string name = p.ProcessName.ToLowerInvariant();
-                    foreach (string b in BrowserProcs)
-                    {
-                        if (name == b) { browserRunning = true; break; }
-                    }
+                    found = Process.GetProcessesByName(b);
+                    if (found.Length > 0) return Context.Browser;
                 }
                 catch { }
+                finally
+                {
+                    if (found != null)
+                        for (int i = 0; i < found.Length; i++)
+                            try { found[i].Dispose(); } catch { }
+                }
             }
 
-            return browserRunning ? Context.Browser : Context.Idle;
+            return Context.Idle;
         }
+
+        // WMI-запрос про батарею небыстрый, а ответ не меняется - кэшируем
+        private static bool? _isLaptop;
 
         private static bool IsLaptop()
         {
+            if (_isLaptop.HasValue) return _isLaptop.Value;
+            bool result = false;
             try
             {
-                var searcher = new System.Management.ManagementObjectSearcher(
-                    "SELECT BatteryStatus FROM Win32_Battery");
-                foreach (System.Management.ManagementObject obj in searcher.Get())
-                    return true;
+                using (var searcher = new System.Management.ManagementObjectSearcher(
+                    "SELECT BatteryStatus FROM Win32_Battery"))
+                using (System.Management.ManagementObjectCollection items = searcher.Get())
+                {
+                    foreach (System.Management.ManagementObject obj in items)
+                    {
+                        using (obj) { }
+                        result = true;
+                        break;
+                    }
+                }
             }
             catch { }
-            return false;
+            _isLaptop = result;
+            return result;
         }
 
         private static void RunPowercfg(string args)
@@ -138,8 +157,14 @@ namespace DeepTools
                     CreateNoWindow = true,
                     RedirectStandardOutput = true
                 };
-                var p = Process.Start(psi);
-                if (p != null) p.WaitForExit(5000);
+                using (Process p = Process.Start(psi))
+                {
+                    if (p != null)
+                    {
+                        p.WaitForExit(5000);
+                        try { p.StandardOutput.ReadToEnd(); } catch { }
+                    }
+                }
             }
             catch { }
         }

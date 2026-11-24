@@ -65,6 +65,7 @@ namespace DeepTools
             proc = p;
             try { procId = p.Id; } catch { procId = 0; }
             try { procName = p.ProcessName; } catch { procName = "game"; }
+            Diagnostics.Log("game start: " + procName + " pid=" + procId);
             start = DateTime.Now;
             cpuSum = 0;
             cpuSamples = 0;
@@ -123,6 +124,7 @@ namespace DeepTools
             int lowFps = worstLowFps;
             proc = null;
             procId = 0;
+            Diagnostics.Log("game finish: " + name + " " + (int)durationSec + " s");
 
             // Отмечаем конец данных: в отчёте это разрыв, а не падение FPS до нуля
             FrameLog.MarkGap(name);

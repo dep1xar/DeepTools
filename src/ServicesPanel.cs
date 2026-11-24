@@ -41,7 +41,8 @@ namespace DeepTools
             BackColor = Theme.BgColor;
 
             BuildUi();
-            RefreshList();
+            // Статусы служб читаются из реестра после первого показа панели
+            LazyLoad.OnFirstVisible(this, RefreshList);
         }
 
         private void BuildUi()

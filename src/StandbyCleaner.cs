@@ -103,8 +103,10 @@ namespace DeepTools
 
         private static void Start()
         {
+            if (_thread != null && _thread.IsAlive) return;
             _running = true;
             _thread = new Thread(Loop) { IsBackground = true, Name = "StandbyCleaner" };
+            _thread.Priority = ThreadPriority.BelowNormal;
             _thread.Start();
         }
 
@@ -114,7 +116,10 @@ namespace DeepTools
             {
                 try
                 {
-                    if (NeedsPurge() && (DateTime.Now - _lastPurge).TotalSeconds > 30)
+                    // Под игрой standby не трогаем: выдернутые страницы игра
+                    // сразу запросит обратно с диска - это фризы, а не помощь
+                    if (!GameActivity.IsGameActive
+                        && NeedsPurge() && (DateTime.Now - _lastPurge).TotalSeconds > 30)
                         Purge();
                 }
                 catch { }

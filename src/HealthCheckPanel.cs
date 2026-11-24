@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.IO;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -137,31 +136,7 @@ namespace DeepTools
 
     public class HealthCheckPanel : Panel
     {
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-        private class MEMORYSTATUSEX
-        {
-            public uint dwLength;
-            public uint dwMemoryLoad;
-            public ulong ullTotalPhys;
-            public ulong ullAvailPhys;
-            public ulong ullTotalPageFile;
-            public ulong ullAvailPageFile;
-            public ulong ullTotalVirtual;
-            public ulong ullAvailVirtual;
-            public ulong ullAvailExtendedVirtual;
-
-            public MEMORYSTATUSEX()
-            {
-                dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
-            }
-        }
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GlobalMemoryStatusEx([In, Out] MEMORYSTATUSEX lpBuffer);
-
         private readonly Timer refreshTimer;
-        private readonly PerformanceCounter cpuCounter;
 
         private Label cpuValueLabel;
         private Label ramValueLabel;
@@ -204,27 +179,30 @@ namespace DeepTools
             alertCpuTemp = ParseTemp(AppConfig.Get("alert_cpu_temp", "90"), 90);
             alertGpuTemp = ParseTemp(AppConfig.Get("alert_gpu_temp", "85"), 85);
 
-            cpuCounter = CreateCpuCounter();
-            CpuSensor.InitAsync();
-            Application.ApplicationExit += (s, e) => CpuSensor.Shutdown();
+            // Все тяжёлые источники (LHM, PerformanceCounter, WMI, NVML) опрашивает
+            // SystemStatsSampler в фоне. Панель только показывает готовые значения
+            // и рисует графики - UI-поток под игрой больше не блокируется.
+            SystemStatsSampler.Start();
             refreshTimer = new Timer { Interval = 2000 };
             refreshTimer.Tick += (s, e) => RefreshMetrics();
 
             BuildUi();
             RefreshMetrics();
-            refreshTimer.Start();
-        }
 
-        private PerformanceCounter CreateCpuCounter()
-        {
-            try { return new PerformanceCounter("Processor", "% Processor Time", "_Total"); }
-            catch { return null; }
-        }
-
-        private PerformanceCounter CreateGpuCounter()
-        {
-            try { return new PerformanceCounter("GPU Engine", "Utilization Percentage", "_Total"); }
-            catch { return null; }
+            // Скрытая панель не тратит время на перерисовку графиков и проверку
+            // порогов: это делает sampler, а панель просыпается при открытии
+            VisibleChanged += (s, e) =>
+            {
+                if (Visible)
+                {
+                    RefreshMetrics();
+                    refreshTimer.Start();
+                }
+                else
+                {
+                    refreshTimer.Stop();
+                }
+            };
         }
 
         private void BuildUi()
@@ -709,30 +687,25 @@ namespace DeepTools
         {
             try
             {
-                float cpuPercent = GetCpuPercent();
-                float ramPercent = GetRamPercent();
+                // Никаких опросов здесь: все значения уже посчитаны фоновым
+                // SystemStatsSampler. Панель только показывает их и рисует графики
+                float cpu = SystemStats.CpuLoadNum;
+                float ram = SystemStats.RamLoadNum;
+                int cpuTemp = SystemStats.CpuTempNum;
+                int gpuTemp = SystemStats.GpuTempNum;
 
-                cpuValueLabel.Text = cpuCounter == null ? Lang.T("н/д", "n/a") : string.Format("{0:0.0}%", cpuPercent);
-                ramValueLabel.Text = string.Format("{0:0.0}%", ramPercent);
-                diskValueLabel.Text = GetDiskUsage();
-                gpuValueLabel.Text = GetGpuUsage();
-                tempValueLabel.Text = GetTempDisplay();
+                cpuValueLabel.Text = SystemStats.CpuLoad;
+                ramValueLabel.Text = SystemStats.RamLoad;
+                diskValueLabel.Text = SystemStats.DiskUsage;
+                gpuValueLabel.Text = SystemStats.GpuLoad;
+                tempValueLabel.Text = SystemStats.GpuTemp;
 
-                int cpuTemp = CpuSensor.GetTemperature();
                 if (cpuTemp >= 0)
                 {
-                    cpuTempValueLabel.Text = cpuTemp + "°C";
+                    cpuTempValueLabel.Text = SystemStats.CpuTemp;
                     cpuTempValueLabel.ForeColor = cpuTemp >= alertCpuTemp ? Theme.Danger
                         : (cpuTemp >= alertCpuTemp - 10 ? Theme.Warning : Theme.TextMain);
                     if (installDriverBtn != null) installDriverBtn.Visible = false;
-
-                    if (alertEnabled && cpuTemp >= alertCpuTemp)
-                    {
-                        TrayNotify.Warn(
-                            Lang.T("Перегрев CPU", "CPU overheating"),
-                            Lang.T("Температура процессора ", "CPU temperature is ") + cpuTemp + "°C. " +
-                            Lang.T("Проверь охлаждение и запылённость.", "Check cooling and dust buildup."));
-                    }
                 }
                 else
                 {
@@ -742,27 +715,18 @@ namespace DeepTools
                     if (installDriverBtn != null) installDriverBtn.Visible = true;
                 }
 
-                if (cpuCounter != null) cpuGraph.AddPoint(cpuPercent);
-                ramGraph.AddPoint(ramPercent);
-
-                // Делимся показаниями с меню трея, главной страницей и трекером игр
-                SystemStats.CpuLoad = cpuValueLabel.Text;
-                SystemStats.CpuTemp = cpuTempValueLabel.Text;
-                SystemStats.RamLoad = ramValueLabel.Text;
-                SystemStats.GpuLoad = gpuValueLabel.Text;
-                SystemStats.GpuTemp = tempValueLabel.Text;
-                SystemStats.CpuLoadNum = cpuCounter == null ? -1 : cpuPercent;
-                SystemStats.CpuTempNum = cpuTemp;
-                SystemStats.GpuTempNum = NvmlGpu.GetTemperature();
-
-                // Тревога перегрева GPU (порог настраивается, кулдаун в TrayNotify)
-                if (alertEnabled && SystemStats.GpuTempNum >= alertGpuTemp)
+                if (gpuTemp >= 0)
                 {
-                    TrayNotify.Warn(
-                        Lang.T("Перегрев GPU", "GPU overheating"),
-                        Lang.T("Температура видеокарты ", "GPU temperature is ") + SystemStats.GpuTempNum + "°C. " +
-                        Lang.T("Проверь охлаждение и запылённость.", "Check cooling and dust buildup."));
+                    tempValueLabel.ForeColor = gpuTemp >= alertGpuTemp ? Theme.Danger
+                        : (gpuTemp >= alertGpuTemp - 10 ? Theme.Warning : Theme.TextMain);
                 }
+                else
+                {
+                    tempValueLabel.ForeColor = Theme.TextDim;
+                }
+
+                if (cpu >= 0) cpuGraph.AddPoint(cpu);
+                if (ram >= 0) ramGraph.AddPoint(ram);
 
                 statusLabel.Text = Lang.T("Данные обновлены", "Data updated");
                 statusLabel.ForeColor = Theme.On;
@@ -772,123 +736,6 @@ namespace DeepTools
                 statusLabel.Text = Lang.T("Не удалось получить все данные", "Failed to get all data");
                 statusLabel.ForeColor = Theme.Warning;
             }
-        }
-
-        // Кэши для медленных источников. Раньше WMI-запрос к ACPI-датчику и
-        // обход дисков шли прямо в UI-поток каждые 2 секунды: WMI мог думать
-        // сотни миллисекунд, и интерфейс заметно подтормаживал (особенно когда
-        // NVML недоступен - у не-NVIDIA карт). Теперь опрос идёт в фоне, а
-        // панель берёт последнее значение
-        private string cachedDiskUsage;
-        private DateTime cachedDiskUsageAt = DateTime.MinValue;
-        private volatile int acpiTempCached = -1;      // -1 = данных нет
-        private DateTime acpiTempAt = DateTime.MinValue;
-        private int acpiQueryRunning;
-
-        private float GetCpuPercent()
-        {
-            if (cpuCounter == null) return 0;
-            try { return cpuCounter.NextValue(); }
-            catch { return 0; }
-        }
-
-        private float GetRamPercent()
-        {
-            try
-            {
-                var state = new MEMORYSTATUSEX();
-                if (!GlobalMemoryStatusEx(state)) return 0;
-                ulong used = state.ullTotalPhys - state.ullAvailPhys;
-                return (float)((double)used * 100 / state.ullTotalPhys);
-            }
-            catch { return 0; }
-        }
-
-        private string GetDiskUsage()
-        {
-            // Обход дисков кэшируем на 30 сек: обращение к уснувшему HDD может
-            // подвесить UI-поток на сотни миллисекунд
-            if (cachedDiskUsage != null && (DateTime.UtcNow - cachedDiskUsageAt).TotalSeconds < 30)
-                return cachedDiskUsage;
-            cachedDiskUsageAt = DateTime.UtcNow;
-
-            string result = Lang.T("н/д", "n/a");
-            try
-            {
-                foreach (DriveInfo drive in DriveInfo.GetDrives())
-                {
-                    if (drive.IsReady && drive.DriveType == DriveType.Fixed)
-                    {
-                        double usedPercent = (double)(drive.TotalSize - drive.TotalFreeSpace) * 100 / drive.TotalSize;
-                        result = string.Format("{0} {1:0}%", drive.Name.Replace("\\", ""), usedPercent);
-                        break;
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            cachedDiskUsage = result;
-            return result;
-        }
-
-        private string GetGpuUsage()
-        {
-            float v = GpuLoad.Get();
-            return v < 0 ? Lang.T("н/д", "n/a") : string.Format("{0:0.0}%", v);
-        }
-
-        private string GetTempDisplay()
-        {
-            // Сначала видеокарта через NVML (как у Afterburner) - это быстро
-            int gpuTemp = NvmlGpu.GetTemperature();
-            if (gpuTemp >= 0) return gpuTemp + "°C";
-
-            // Запасной вариант: ACPI-датчик материнки (есть не на всех системах).
-            // WMI-запрос уводим в фон и кэшируем на 30 сек - в UI-потоке он
-            // подвешивал интерфейс на каждом тике
-            RefreshAcpiTempIfStale();
-            int t = acpiTempCached;
-            return t > 0 ? t + "°C" : Lang.T("н/д", "n/a");
-        }
-
-        private void RefreshAcpiTempIfStale()
-        {
-            if ((DateTime.UtcNow - acpiTempAt).TotalSeconds < 30) return;
-            if (System.Threading.Interlocked.CompareExchange(ref acpiQueryRunning, 1, 0) != 0) return;
-            acpiTempAt = DateTime.UtcNow;
-
-            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-            {
-                int found = -1;
-                try
-                {
-                    using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(
-                        "root\\WMI", "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature"))
-                    using (ManagementObjectCollection results = searcher.Get())
-                    {
-                        foreach (ManagementObject obj in results)
-                        {
-                            try
-                            {
-                                double tenthsOfKelvin = Convert.ToDouble(obj["CurrentTemperature"]);
-                                double celsius = (tenthsOfKelvin / 10.0) - 273.15;
-                                if (celsius > 0 && celsius < 150)
-                                {
-                                    found = (int)Math.Round(celsius);
-                                    break;
-                                }
-                            }
-                            catch { }
-                        }
-                    }
-                }
-                catch { }
-
-                acpiTempCached = found;
-                System.Threading.Interlocked.Exchange(ref acpiQueryRunning, 0);
-            });
         }
     }
 }

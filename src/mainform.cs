@@ -70,6 +70,14 @@ namespace DeepTools
 
             Hotkeys.Load();
             SetupTrayIcon();
+            // Уведомления и фоновые сервисы маршалят действия в это окно
+            Ui.Init(this);
+            // Мониторинг CPU/RAM/температур идёт в отдельном потоке с низким
+            // приоритетом - UI-поток под нагрузкой игры больше не опрашивает
+            // LHM, PerformanceCounter, WMI и NVML
+            SystemStatsSampler.Start();
+            UiWatchdog.Start();
+            StartUiPing();
             StartTrayMonitor();
             RetryTrayAfterLogon();
             BuildShell();
@@ -84,8 +92,6 @@ namespace DeepTools
             // пересоздаём её в фоне, не задерживая показ окна
             System.Threading.ThreadPool.QueueUserWorkItem(_ => { try { AutoStart.EnsureHealthy(); } catch { } });
             KeepAwake.Restore();
-            NotesManager.RestoreAll();
-            UpdateChecker.CheckInBackground(true, null);
             WinKeyBlocker.Init();
             FormClosed += (s, e) => WinKeyBlocker.Shutdown();
             // Замороженные фоновые процессы обязаны проснуться при выходе из программы
@@ -103,8 +109,13 @@ namespace DeepTools
 
             Load += (s, e) => ApplyRoundedRegion();
             Load += (s, e) => RegisterHotkeys();
-            // Прогрев разделов: строим их по одному уже после показа окна
-            Shown += (s, e) => WarmUpPanels();
+            // Заметки и проверка обновлений не нужны для первого кадра: создание
+            // форм заметок и сетевой запрос откладываем до показа окна
+            Shown += (s, e) =>
+            {
+                try { NotesManager.RestoreAll(); } catch { }
+                UpdateChecker.CheckInBackground(true, null);
+            };
             Shown += (s, e) => {
                 // Первый запуск: короткий мастер знакомства
                 if (AppConfig.GetBool("wizard_pending", false))
@@ -115,6 +126,12 @@ namespace DeepTools
                 }
             };
             FormClosing += (s, e) => OnFormClosing(s, e);
+            FormClosed += (s, e) =>
+            {
+                Diagnostics.Log("MainForm closed");
+                UiWatchdog.Stop();
+                SystemStatsSampler.Stop();
+            };
             FormClosed += (s, e) => UnregisterHotkeys();
         }
 
@@ -154,8 +171,18 @@ namespace DeepTools
         // Таймер обновления значка трея: рисуем температуру GPU цифрой.
         // Если NVML недоступен (не NVIDIA) - остаётся обычная иконка
         private System.Windows.Forms.Timer trayStatsTimer;
+        private System.Windows.Forms.Timer uiPingTimer;
         private Icon lastTrayIcon;
         private int lastTrayTemp = int.MinValue;
+
+        // Отметка «UI жив» для сторожа: если таймер не тикает 8 секунд,
+        // в diagnostics.log появится запись о зависании
+        private void StartUiPing()
+        {
+            uiPingTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+            uiPingTimer.Tick += (s, e) => UiWatchdog.Ping();
+            uiPingTimer.Start();
+        }
 
         private void StartTrayMonitor()
         {
@@ -167,7 +194,8 @@ namespace DeepTools
 
         private void UpdateTrayIcon()
         {
-            int temp = NvmlGpu.GetTemperature();
+            // Температуру уже прочитал фоновый sampler: UI-поток только рисует
+            int temp = SystemStats.GpuTempNum;
             if (temp < 0)
             {
                 trayIcon.Text = "DeepTools";
@@ -548,28 +576,26 @@ namespace DeepTools
             var divider = new Panel { Location = new Point(16, 86), Size = new Size(188, 1), BackColor = Theme.BorderColor };
             sidebar.Controls.Add(divider);
 
-            // Навигация сгруппирована по смыслу; кнопки компактные (30px),
-            // чтобы 14 пунктов + 3 заголовка влезли в 616px сайдбара
-            navHome = MakeNavItem("⌂   " + Lang.T("Главная", "Home"), 90);
+            // Меню без заголовков групп: 13 пунктов с небольшим отступом между
+            // смысловыми блоками. Подписи «ОПТИМИЗАЦИЯ / МОНИТОРИНГ / ИНСТРУМЕНТЫ»
+            // дублировали и без того очевидное и добавляли визуальный шум.
+            navHome = MakeNavItem("⌂   " + Lang.T("Главная", "Home"), 96);
 
-            MakeNavGroupLabel(Lang.T("ОПТИМИЗАЦИЯ", "OPTIMIZATION"), 127);
-            navCleanup = MakeNavItem("♻   SmartCleanup", 143);
-            navBooster = MakeNavItem("⚡   GameBooster", 173);
-            navGameTweaks = MakeNavItem("✚   " + Lang.T("Игровые твики", "Game tweaks"), 203);
-            navStartup = MakeNavItem("⭯   " + Lang.T("Автозагрузка", "Startup"), 233);
-            navServices = MakeNavItem("⚙   " + Lang.T("Службы", "Services"), 263);
-            navVisual = MakeNavItem("✦   " + Lang.T("Визуальные эффекты", "Visual effects"), 293);
+            navCleanup = MakeNavItem("♻   SmartCleanup", 136);
+            navBooster = MakeNavItem("⚡   GameBooster", 170);
+            navGameTweaks = MakeNavItem("✚   " + Lang.T("Игровые твики", "Game tweaks"), 204);
+            navStartup = MakeNavItem("⭯   " + Lang.T("Автозагрузка", "Startup"), 238);
+            navServices = MakeNavItem("⚙   " + Lang.T("Службы", "Services"), 272);
+            navVisual = MakeNavItem("✦   " + Lang.T("Визуальные эффекты", "Visual effects"), 306);
 
-            MakeNavGroupLabel(Lang.T("МОНИТОРИНГ", "MONITORING"), 330);
             navHealth = MakeNavItem("❤   Health Check", 346);
-            navSysInfo = MakeNavItem("▤   " + Lang.T("Мой ПК", "My PC"), 376);
+            navSysInfo = MakeNavItem("▤   " + Lang.T("Мой ПК", "My PC"), 380);
 
-            MakeNavGroupLabel(Lang.T("ИНСТРУМЕНТЫ", "TOOLS"), 413);
-            navClicker = MakeNavItem("⊙   Clicker", 429);
-            navScreenshots = MakeNavItem("▣   " + Lang.T("Скриншоты", "Screenshots"), 459);
-            navClipboard = MakeNavItem("❏   " + Lang.T("Буфер обмена", "Clipboard"), 489);
+            navClicker = MakeNavItem("⊙   Clicker", 420);
+            navScreenshots = MakeNavItem("▣   " + Lang.T("Скриншоты", "Screenshots"), 454);
+            navClipboard = MakeNavItem("❏   " + Lang.T("Буфер обмена", "Clipboard"), 488);
 
-            navSettings = MakeNavItem("⚙   " + Lang.T("Настройки", "Settings"), 520);
+            navSettings = MakeNavItem("⚙   " + Lang.T("Настройки", "Settings"), 528);
 
             // Бегущая акцентная полоска: переезжает к активному пункту при
             // переключении раздела вместо мгновенного скачка
@@ -620,27 +646,10 @@ namespace DeepTools
             allPanels.Add(panel);
         }
 
-        // Тяжёлые панели строим не в конструкторе окна, а после первого кадра.
-        // Health Check нужен всегда: его таймер обновляет CPU/RAM/температуры
-        // для главной страницы и меню трея. Остальные разделы создаются при
-        // первом открытии - так окно появляется без задержки.
-        private void WarmUpPanels()
-        {
-            // WM_TIMER обрабатывается только после WM_PAINT, поэтому окно
-            // успевает отрисоваться до сборки панели.
-            var timer = new System.Windows.Forms.Timer { Interval = 500 };
-            timer.Tick += (s, e) =>
-            {
-                timer.Stop();
-                timer.Dispose();
-                if (IsDisposed || !IsHandleCreated) return;
-                try { GetHealth(); } catch { }
-            };
-            timer.Start();
-        }
-
-        // Разделы создаются при первом обращении: и при клике в сайдбаре, и при
-        // прогреве после старта, и по горячей клавише - всегда один и тот же экземпляр
+        // Разделы создаются при первом обращении: и при клике в сайдбаре,
+        // и по горячей клавише - всегда один и тот же экземпляр. Health Check
+        // больше не прогревается на старте: показания для главной и трея
+        // собирает фоновый SystemStatsSampler, а панель строится при открытии
         private ClickerPanel GetClicker()
         {
             if (panelClicker == null) { panelClicker = new ClickerPanel(); RegisterPanel(panelClicker); }
@@ -691,21 +700,6 @@ namespace DeepTools
             sidebar.Controls.Add(item);
             allNavs.Add(item);
             return item;
-        }
-
-        // Тонкий заголовок группы в сайдбаре: «ОПТИМИЗАЦИЯ», «МОНИТОРИНГ»...
-        private void MakeNavGroupLabel(string text, int y)
-        {
-            var lbl = new Label
-            {
-                Text = text,
-                ForeColor = Theme.Lerp(Theme.SidebarColor, Theme.TextDim, 0.55f),
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 6.8F, FontStyle.Bold),
-                Location = new Point(24, y),
-                AutoSize = true
-            };
-            sidebar.Controls.Add(lbl);
         }
 
         // Ленивое создание тяжёлых панелей: строим при первом открытии, а не на
@@ -796,30 +790,13 @@ namespace DeepTools
             navIndTimer.Start();
         }
 
-        // Лёгкий слайд-въезд панели слева при переключении раздела
-        private System.Windows.Forms.Timer slideTimer;
-        private Panel slidingPanel;
-
+        // Раздел показывается сразу, без слайд-анимации. Анимация добавляла
+        // 10-15 кадров перерисовки на каждое переключение: на слабых ПК это
+        // выглядело как «вкладка думает», хотя данные уже готовы.
         private void AnimatePanelIn(Panel panel)
         {
             EnableDoubleBuffer(panel);
-            if (slideTimer == null)
-            {
-                slideTimer = new System.Windows.Forms.Timer { Interval = 12 };
-                slideTimer.Tick += (s, e) => {
-                    if (slidingPanel == null) { slideTimer.Stop(); return; }
-                    int left = slidingPanel.Left;
-                    // Затухание с мелким шагом: раньше панель проезжала 22 px за
-                    // 4 кадра и выглядела как рывок, теперь это плавный доезд
-                    if (left <= 1) { slidingPanel.Left = 0; slideTimer.Stop(); return; }
-                    slidingPanel.Left = left - Math.Max(1, left / 3);
-                };
-            }
-            // Если предыдущая анимация не доиграла - фиксируем прошлую панель
-            if (slidingPanel != null && slidingPanel != panel) slidingPanel.Left = 0;
-            slidingPanel = panel;
-            panel.Left = 26;
-            slideTimer.Start();
+            panel.Left = 0;
         }
 
         private static void EnableDoubleBuffer(Control c)

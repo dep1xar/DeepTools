@@ -41,7 +41,8 @@ namespace DeepTools
             }
 
             BuildUi();
-            RefreshGallery();
+            // Чтение и декодирование всех PNG не должны задерживать открытие
+            LazyLoad.OnFirstVisible(this, RefreshGallery);
         }
 
         private void BuildUi()

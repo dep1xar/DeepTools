@@ -35,8 +35,13 @@ namespace DeepTools
             BackColor = Theme.BgColor;
 
             BuildUi();
-            RefreshList();
-            LoadBootInfo();
+            // Список и время загрузки читаются уже после появления раздела:
+            // клик по меню не ждёт реестр и журнал событий
+            LazyLoad.OnFirstVisible(this, delegate
+            {
+                RefreshList();
+                LoadBootInfo();
+            });
         }
 
         private void BuildUi()

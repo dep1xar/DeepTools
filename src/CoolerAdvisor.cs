@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading;
 
 namespace DeepTools
 {
@@ -15,15 +16,24 @@ namespace DeepTools
         private const int AlertCooldownDays = 3;
 
         private static System.Windows.Forms.Timer timer;
+        private static int checkRunning;
 
         public static void Start()
         {
             // Первая проверка через 5 минут после запуска (датчики уже прогрелись,
             // а старт программы не тормозим), дальше - раз в сутки
             timer = new System.Windows.Forms.Timer { Interval = 5 * 60 * 1000 };
-            timer.Tick += (s, e) => {
+            timer.Tick += (s, e) =>
+            {
                 timer.Interval = 24 * 60 * 60 * 1000;
-                Check();
+                // Чтение недельного журнала температур - не для UI-потока
+                if (Interlocked.CompareExchange(ref checkRunning, 1, 0) != 0) return;
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try { Check(); }
+                    catch { }
+                    finally { Interlocked.Exchange(ref checkRunning, 0); }
+                });
             };
             timer.Start();
         }

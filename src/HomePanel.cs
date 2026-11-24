@@ -90,7 +90,9 @@ namespace DeepTools
             // Приветственная карточка
             var heroCard = Theme.MakeCard(this, new Point(24, 24), new Size(712, 120));
 
-            var heroDot = new Panel { Size = new Size(16, 16), Location = new Point(24, 26), BackColor = Color.Transparent };
+            // Название программы уже есть в шапке окна и в сайдбаре - на главной
+            // вместо третьего «DeepTools» коротко говорим, что здесь можно делать
+            var heroDot = new Panel { Size = new Size(16, 16), Location = new Point(24, 41), BackColor = Color.Transparent };
             heroDot.Paint += (s, e) => {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 using (var glow = new SolidBrush(Color.FromArgb(60, Theme.Accent)))
@@ -100,24 +102,13 @@ namespace DeepTools
             };
             heroCard.Controls.Add(heroDot);
 
-            var heroTitle = new Label
-            {
-                Text = "DeepTools " + AppVersion.Short,
-                ForeColor = Theme.TextMain,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 20F, FontStyle.Bold),
-                Location = new Point(52, 16),
-                AutoSize = true
-            };
-            heroCard.Controls.Add(heroTitle);
-
             var heroSub = new Label
             {
-                Text = Lang.T("Чистка, ускорение и мониторинг компьютера в одном месте", "Cleanup, speedup and monitoring in one place"),
-                ForeColor = Theme.TextDim,
+                Text = Lang.T("Чистка, ускорение и мониторинг компьютера", "Cleanup, speedup and monitoring in one place"),
+                ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 9.5F),
-                Location = new Point(54, 58),
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Location = new Point(54, 32),
                 AutoSize = true
             };
             heroCard.Controls.Add(heroSub);
@@ -129,8 +120,8 @@ namespace DeepTools
                        + Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT) + Lang.T(" - скриншот", " - screenshot"),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 8F),
-                Location = new Point(54, 88),
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(54, 66),
                 AutoSize = true
             };
             heroCard.Controls.Add(heroHint);
@@ -314,7 +305,7 @@ namespace DeepTools
         {
             // Во время игры не трогаем память: EmptyWorkingSet выдернет страницы
             // из-под игры, и она заикнётся - подождём следующего тика
-            if (WinKeyBlocker.GameActive) return;
+            if (GameActivity.IsGameActive) return;
             if (ramCleaning) return;
             FreeRam(true);
         }

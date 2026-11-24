@@ -43,6 +43,7 @@ namespace DeepTools
 
             AppConfig.Load();
             Theme.ApplyNamed(AppConfig.Get("theme", "dark"));
+            Diagnostics.Log("start v" + Application.ProductVersion);
 
             // Самый первый запуск: спрашиваем язык явно, а не угадываем по локали -
             // иначе человек с "чужим" языком системы даже не поймёт, где его сменить.
@@ -110,12 +111,14 @@ namespace DeepTools
                 // Уже запущено - будим то окно (выйдет из трея) и выходим
                 NativeMethods.PostMessage((IntPtr)NativeMethods.HWND_BROADCAST,
                     NativeMethods.WM_SHOW_DEEPTOOLS, IntPtr.Zero, IntPtr.Zero);
+                Diagnostics.Log("second instance, exit");
                 return;
             }
 
             try { Application.Run(new MainForm(isAdmin)); }
             finally
             {
+                Diagnostics.Log("Application.Run finished");
                 // Сначала отпускаем мьютекс: при перезапуске новый экземпляр
                 // ждёт именно его.
                 try { if (_singleInstance != null) { _singleInstance.ReleaseMutex(); _singleInstance.Dispose(); _singleInstance = null; } } catch { }
@@ -147,6 +150,8 @@ namespace DeepTools
         private static void LogCrash(Exception ex)
         {
             if (ex == null) return;
+
+            Diagnostics.LogException("unhandled", ex);
 
             try
             {
