@@ -224,7 +224,7 @@ namespace DeepTools
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
-                Location = new Point(404, 20),
+                Location = new Point(552, 20),
                 Size = new Size(88, 32)
             };
             stressBtn.Click += (s, e) => {
@@ -237,11 +237,13 @@ namespace DeepTools
 
             var tempHistBtn = new RoundedButton
             {
-                Text = Lang.T("📈 24ч", "📈 24h"),
+                // Без эмодзи 📈: на тёмной кнопке GDI рисовал его чёрным
+                // контуром, и текст «24ч» выглядел почерневшим
+                Text = Lang.T("24ч", "24h"),
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
-                Location = new Point(320, 20),
+                Location = new Point(468, 20),
                 Size = new Size(76, 32)
             };
             tempHistBtn.Click += (s, e) => {
@@ -258,7 +260,7 @@ namespace DeepTools
                 ButtonColor = Theme.KeyColor,
                 HoverColor = Theme.KeyHover,
                 TextColor = Theme.TextMain,
-                Location = new Point(500, 20),
+                Location = new Point(648, 20),
                 Size = new Size(88, 32)
             };
             bsodBtn.Click += (s, e) => {

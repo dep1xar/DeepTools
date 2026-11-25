@@ -188,7 +188,6 @@ namespace DeepTools
 
         // ---- Определения твиков ----
 
-        private const string GraphicsDriversKey = @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
         private const string GameConfigStoreKey = @"System\GameConfigStore";
         private const string MemoryManagementKey = @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
         private const string PowerThrottlingKey = @"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling";
@@ -200,10 +199,7 @@ namespace DeepTools
         private const string BackgroundAppsKey = @"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications";
         private const string SearchKey = @"Software\Microsoft\Windows\CurrentVersion\Search";
         private const string AppPrivacyKey = @"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy";
-        private const string ExplorerAdvancedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
-        private const string ExplorerPolicyKey = @"Software\Policies\Microsoft\Windows\Explorer";
         private const string CopilotKey = @"Software\Policies\Microsoft\Windows\WindowsCopilot";
-        private const string WindowsAiKey = @"SOFTWARE\Policies\Microsoft\Windows\WindowsAI";
 
         private const string BalancedGuid = "381b4222-f694-41f0-9685-ff5bb260df2e";
         private const string HighPerfGuid = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
@@ -211,28 +207,6 @@ namespace DeepTools
         private List<TweakDef> BuildDefs()
         {
             var list = new List<TweakDef>();
-
-            // HwSchMode: 1 = HAGS выключен, 2 = включён. В прошлой версии сюда
-            // писался 0 - такого значения Windows не знает, твик ничего не
-            // выключал, а карточка при этом становилась зелёной
-            list.Add(new TweakDef
-            {
-                Title = Lang.T("Отключить HAGS", "Disable HAGS"),
-                Desc = Lang.T("Аппаратное планирование GPU. Влияет по-разному: часть игр получает FPS, часть теряет",
-                              "Hardware GPU scheduling. Mixed results: some games gain FPS, some lose it"),
-                Dangerous = true,
-                NeedsReboot = true,
-                ConfirmRu = "Отключение HAGS меняет планирование GPU и требует перезагрузки. Применить?",
-                ConfirmEn = "Disabling HAGS changes GPU scheduling and needs a reboot. Apply?",
-                IsApplicable = () => true,
-                IsApplied = () => RegDword(RegHklm, GraphicsDriversKey, "HwSchMode") == 1,
-                Apply = () =>
-                {
-                    BackupDword(RegHklm, GraphicsDriversKey, "HwSchMode", "gt_hags");
-                    return SetRegDword(RegHklm, GraphicsDriversKey, "HwSchMode", 1);
-                },
-                Revert = () => RevertDword(RegHklm, GraphicsDriversKey, "HwSchMode", "gt_hags", 1, 2)
-            });
 
             // Game Mode в Windows включён по умолчанию, поэтому «выключен» - это
             // только явный 0, а отсутствие значения считается включённым
@@ -385,22 +359,19 @@ namespace DeepTools
                 }
             });
 
-            // Файл подкачки меняется только со следующей загрузки. Откат раньше
-            // жёстко ставил «1024 4096» даже если у пользователя был свой размер,
-            // поэтому теперь исходный размер запоминается
+            // Файл подкачки меняется только со следующей загрузки. Клик по
+            // карточке открывает окно настройки: там видно текущий размер и
+            // можно выбрать «по системе» или задать свои начальный и максимум.
+            // Откат запоминает исходный размер, а не жёстко ставит «1024 4096».
             list.Add(new TweakDef
             {
-                Title = Lang.T("Авто-файл подкачки", "Auto page file"),
-                Desc = Lang.T("Отдаёт размер файла подкачки системе: меньше крашей и фризов при нехватке RAM",
-                              "Lets Windows size the page file: fewer crashes and stutters when RAM runs short"),
+                Title = Lang.T("Файл подкачки", "Page file"),
+                Desc = Lang.T("Нажмите, чтобы настроить размер: по системе или свой. Меньше крашей при нехватке RAM",
+                              "Click to set the size: system managed or custom. Fewer crashes when RAM runs short"),
                 NeedsReboot = true,
                 IsApplicable = () => true,
                 IsApplied = () => PagingFilesManaged(),
-                Apply = () =>
-                {
-                    BackupMultiSz(RegHklm, MemoryManagementKey, "PagingFiles", "gt_pagefile");
-                    return SetSystemDrivePagefile("0 0");
-                },
+                OpenSettings = PagefileSettingsForm.Open,
                 Revert = () =>
                 {
                     // Если до нас размер был задан вручную - возвращаем именно его
@@ -640,33 +611,8 @@ namespace DeepTools
                 }
             });
 
-            // Виджеты, Copilot и Recall существуют только в Windows 11,
-            // поэтому на Windows 10 карточки честно помечаются как неприменимые
-            list.Add(new TweakDef
-            {
-                Title = Lang.T("Отключить виджеты", "Disable Widgets"),
-                Desc = Lang.T("Убирает ленту виджетов и новостей: меньше фоновой сети и нагрузки на проводник",
-                              "Removes the widgets/news feed: less background network and Explorer load"),
-                IsApplicable = () => OsBuild() >= 22000,
-                IsApplied = () =>
-                    RegDword(RegHkcu, ExplorerAdvancedKey, "TaskbarDa") == 0
-                    && RegDword(RegHkcu, ExplorerPolicyKey, "AllowNewsAndInterests") == 0,
-                Apply = () =>
-                {
-                    BackupDword(RegHkcu, ExplorerAdvancedKey, "TaskbarDa", "gt_widgets_taskbar");
-                    BackupDword(RegHkcu, ExplorerPolicyKey, "AllowNewsAndInterests", "gt_widgets_policy");
-                    bool a = SetRegDword(RegHkcu, ExplorerAdvancedKey, "TaskbarDa", 0);
-                    bool b = SetRegDword(RegHkcu, ExplorerPolicyKey, "AllowNewsAndInterests", 0);
-                    return a && b;
-                },
-                Revert = () =>
-                {
-                    bool a = RevertDword(RegHkcu, ExplorerAdvancedKey, "TaskbarDa", "gt_widgets_taskbar", 0, 1);
-                    bool b = RevertDword(RegHkcu, ExplorerPolicyKey, "AllowNewsAndInterests", "gt_widgets_policy", 0, 1);
-                    return a && b;
-                }
-            });
-
+            // Copilot существует только в Windows 11, поэтому на Windows 10
+            // карточка честно помечается как неприменимая
             list.Add(new TweakDef
             {
                 Title = Lang.T("Отключить Copilot", "Disable Copilot"),
@@ -680,21 +626,6 @@ namespace DeepTools
                     return SetRegDword(RegHkcu, CopilotKey, "TurnOffWindowsCopilot", 1);
                 },
                 Revert = () => RevertDword(RegHkcu, CopilotKey, "TurnOffWindowsCopilot", "gt_copilot", 1, 0)
-            });
-
-            list.Add(new TweakDef
-            {
-                Title = Lang.T("Отключить Recall", "Disable Recall"),
-                Desc = Lang.T("Запрещает Windows 11 сохранять снимки экрана для истории: меньше диска и фоновой работы",
-                              "Stops Windows 11 from saving screen snapshots for Recall: less disk and background work"),
-                IsApplicable = () => OsBuild() >= 26100,
-                IsApplied = () => RegDword(RegHklm, WindowsAiKey, "DisableAIDataAnalysis") == 1,
-                Apply = () =>
-                {
-                    BackupDword(RegHklm, WindowsAiKey, "DisableAIDataAnalysis", "gt_recall");
-                    return SetRegDword(RegHklm, WindowsAiKey, "DisableAIDataAnalysis", 1);
-                },
-                Revert = () => RevertDword(RegHklm, WindowsAiKey, "DisableAIDataAnalysis", "gt_recall", 1, 0)
             });
 
             return list;
@@ -775,6 +706,15 @@ namespace DeepTools
 
             public void RefreshStatus()
             {
+                // У карточек-настроек нет состояния «включено/выключено»:
+                // серая полоска вместо красного креста, который выглядел как ошибка
+                if (def.OpenSettings != null)
+                {
+                    state = 2;
+                    pill.State = state;
+                    return;
+                }
+
                 try
                 {
                     if (!def.IsApplicable()) state = 2;
@@ -792,7 +732,17 @@ namespace DeepTools
 
             private void OnClickCard(object s, EventArgs e)
             {
-                if (working || state == 2) return;
+                if (working) return;
+
+                // Карточка-настройка открывает своё окно вместо переключения
+                if (def.OpenSettings != null)
+                {
+                    try { def.OpenSettings(FindForm()); } catch { }
+                    RefreshStatus();
+                    return;
+                }
+
+                if (state == 2) return;
 
                 bool applied = state == 1;
                 if (!applied && def.Dangerous)
@@ -925,6 +875,9 @@ namespace DeepTools
             public Func<bool> IsApplied = () => false;
             public Func<bool> Apply = () => false;
             public Func<bool> Revert = () => false;
+            // Карточки-настройки (файл подкачки) не переключаются кликом, а
+            // открывают своё окно с параметрами
+            public Action<IWin32Window> OpenSettings;
             // Причина последней неудачи: карточка показывает её вместо
             // общего «нужны права администратора?»
             public string LastError;
@@ -1344,6 +1297,48 @@ namespace DeepTools
                 any = true;
             }
             return any;
+        }
+
+        // Текущий размер системного файла подкачки в виде «0 0» или «1024 4096».
+        // null означает, что записи для системного диска в PagingFiles нет.
+        internal static string CurrentPagefileSpec()
+        {
+            string os = SystemDrive();
+            string[] cur = RegMultiSz(RegHklm, MemoryManagementKey, "PagingFiles");
+            if (cur == null) return null;
+
+            foreach (string entry in cur)
+            {
+                string e = (entry ?? "").Trim();
+                if (e.Length == 0) continue;
+                if (!e.StartsWith(os, StringComparison.OrdinalIgnoreCase)) continue;
+
+                string[] parts = e.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                // Запись без размеров Windows трактует как «по выбору системы»
+                if (parts.Length < 3) return "0 0";
+                return parts[parts.Length - 2] + " " + parts[parts.Length - 1];
+            }
+            return null;
+        }
+
+        // Применяет размер из окна настроек. Исходное значение запоминается
+        // для отката, как и при обычном применении твика.
+        internal static bool ApplyPagefileSpec(string spec, out string error)
+        {
+            error = null;
+            string[] before = RegMultiSz(RegHklm, MemoryManagementKey, "PagingFiles");
+            AppConfig.Set("gt_pagefile", before == null ? "none" : string.Join("|", before));
+
+            if (!SetSystemDrivePagefile(spec))
+            {
+                error = Program.IsRunningAsAdmin()
+                    ? Lang.T("Не удалось записать настройки файла подкачки в реестр.",
+                             "Could not write the page file settings to the registry.")
+                    : Lang.T("Нужны права администратора: DeepTools запущен без них.",
+                             "Administrator rights required: DeepTools is not running as administrator.");
+                return false;
+            }
+            return true;
         }
 
         // ---- Службы ----

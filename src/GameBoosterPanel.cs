@@ -20,7 +20,6 @@ namespace DeepTools
 
         private System.Windows.Forms.Timer detectTimer = new System.Windows.Forms.Timer();
         private Process detectedProcess;
-        private Process lastBoostedProcess;
 
         // Текущая обнаруженная полноэкранная игра (или null). Использует
         // GameTweaksPanel для твиков, привязанных к процессу игры
@@ -41,41 +40,10 @@ namespace DeepTools
 
         private Label statusName;
         private Label warningLabel;
-        private ToggleSwitch autoBoostToggle;
         private ToggleSwitch overlayToggle;
         private OverlayForm overlayForm;
         private RoundedButton boostBtn;
         private Label statusLabel;
-
-        private ToggleSwitch ultimateToggle;
-        private bool ultimateBusy = false;
-
-        // Включение/выключение плана Ultimate Performance. powercfg работает быстро,
-        // но на всякий случай защищаемся от повторного клика во время применения
-        private void OnUltimateToggle()
-        {
-            if (ultimateBusy) return;
-            ultimateBusy = true;
-            bool enable = ultimateToggle.Checked;
-
-            bool ok = enable ? PowerPlan.EnableUltimate() : PowerPlan.RestorePrevious();
-
-            if (ok)
-            {
-                statusLabel.Text = enable
-                    ? Lang.T("План Ultimate Performance активирован, парковка ядер отключена", "Ultimate Performance plan activated, core parking disabled")
-                    : Lang.T("Возвращён прежний план питания", "Previous power plan restored");
-                statusLabel.ForeColor = Theme.On;
-            }
-            else
-            {
-                statusLabel.Text = Lang.T("Не удалось изменить план питания", "Failed to change power plan");
-                statusLabel.ForeColor = Theme.Warning;
-                ultimateToggle.Checked = !enable;
-                ultimateToggle.Invalidate();
-            }
-            ultimateBusy = false;
-        }
 
         private ToggleSwitch dvrToggle;
         private ToggleSwitch gpuPinToggle;
@@ -338,20 +306,6 @@ namespace DeepTools
             };
             detectCard.Controls.Add(boostBtn);
 
-            var autoLabel = new Label
-            {
-                Text = Lang.T("Авто-буст новой игры", "Auto-boost new game"),
-                ForeColor = Theme.TextMain,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 9F),
-                Location = new Point(480, 78),
-                AutoSize = true
-            };
-            detectCard.Controls.Add(autoLabel);
-
-            autoBoostToggle = new ToggleSwitch { Location = new Point(660, 74), Checked = false };
-            detectCard.Controls.Add(autoBoostToggle);
-
             var overlayLabel = new Label
             {
                 Text = Lang.T("FPS-оверлей (FPS, CPU, GPU, RAM в углу экрана)", "FPS overlay (FPS, CPU, GPU, RAM in screen corner)"),
@@ -477,35 +431,28 @@ namespace DeepTools
                 sx += 36;
             }
 
-            // Карточка оптимизаций: план питания, Game DVR, дискретная GPU
+            // Карточка оптимизаций: Game DVR и дискретная GPU
             const int optRowStep = 50;
-            var powerCard = Theme.MakeCard(this, new Point(24, 278), new Size(712, 12 + optRowStep * 3 + 8));
+            var powerCard = Theme.MakeCard(this, new Point(24, 278), new Size(712, 12 + optRowStep * 2 + 8));
 
-            MakeOptRow(powerCard, 12, "Ultimate Performance",
-                Lang.T("Скрытый план питания Windows для максимальной производительности + отключение парковки ядер CPU",
-                       "Hidden Windows power plan for maximum performance + CPU core parking disabled"));
-            ultimateToggle = new ToggleSwitch { Location = new Point(646, OptRowToggleY(12)), Checked = PowerPlan.IsUltimateActive() };
-            ultimateToggle.CheckedChanged += (s, e) => OnUltimateToggle();
-            powerCard.Controls.Add(ultimateToggle);
-
-            MakeOptRow(powerCard, 12 + optRowStep, Lang.T("Отключить Game DVR", "Disable Game DVR"),
+            MakeOptRow(powerCard, 12, Lang.T("Отключить Game DVR", "Disable Game DVR"),
                 Lang.T("Фоновая запись Xbox Game Bar захватывает кадры даже без записи - реальный минус к FPS",
                        "Xbox Game Bar background capture grabs frames even when idle - a real FPS cost"));
-            dvrToggle = new ToggleSwitch { Location = new Point(646, OptRowToggleY(12 + optRowStep)), Checked = GameOptimizer.IsDvrDisabled() };
+            dvrToggle = new ToggleSwitch { Location = new Point(646, OptRowToggleY(12)), Checked = GameOptimizer.IsDvrDisabled() };
             dvrToggle.CheckedChanged += (s, e) => OnDvrToggle();
             powerCard.Controls.Add(dvrToggle);
 
-            MakeOptRow(powerCard, 12 + optRowStep * 2, Lang.T("Дискретная GPU для игр", "Discrete GPU for games"),
+            MakeOptRow(powerCard, 12 + optRowStep, Lang.T("Дискретная GPU для игр", "Discrete GPU for games"),
                 Lang.T("Обнаруженная игра автоматически закрепляется за мощной видеокартой (для ноутбуков с двумя GPU)",
                        "The detected game is auto-pinned to the powerful GPU (for laptops with dual GPUs)"));
-            gpuPinToggle = new ToggleSwitch { Location = new Point(646, OptRowToggleY(12 + optRowStep * 2)), Checked = AppConfig.GetBool("gpu_auto_pin", false) };
+            gpuPinToggle = new ToggleSwitch { Location = new Point(646, OptRowToggleY(12 + optRowStep)), Checked = AppConfig.GetBool("gpu_auto_pin", false) };
             gpuPinToggle.CheckedChanged += (s, e) => {
                 AppConfig.SetBool("gpu_auto_pin", gpuPinToggle.Checked);
                 lastGpuPinnedPath = null; // чтобы применилось к уже запущенной игре
             };
             powerCard.Controls.Add(gpuPinToggle);
 
-            var heavyCard = Theme.MakeCard(this, new Point(24, 462), new Size(712, 152));
+            var heavyCard = Theme.MakeCard(this, new Point(24, powerCard.Bottom + 12), new Size(712, 152));
 
             var heavyTitle = new Label
             {
@@ -789,12 +736,6 @@ namespace DeepTools
                 statusName.ForeColor = Theme.On;
                 boostBtn.Enabled = true;
                 warningLabel.Visible = false;
-
-                if (autoBoostToggle.Checked && (lastBoostedProcess == null || lastBoostedProcess.Id != proc.Id))
-                {
-                    BoostProcess(proc);
-                    lastBoostedProcess = proc;
-                }
 
                 if (gpuPinToggle.Checked) TryPinGpu(proc);
             }
