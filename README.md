@@ -7,7 +7,7 @@
 **Smart tweaker, cleaner and monitoring tool for Windows - in one app.**
 **Умный твикер, чистильщик и монитор для Windows - всё в одном.**
 
-[![Version](https://img.shields.io/badge/version-2.2.2-blue)](https://github.com/dep1xar/DeepTools/releases)
+[![Version](https://img.shields.io/badge/version-2.3.0-blue)](https://github.com/dep1xar/DeepTools/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D6)](#)
 [![.NET](https://img.shields.io/badge/.NET%20Framework-4.x-512BD4)](#)
 [![GitHub stars](https://img.shields.io/github/stars/dep1xar/DeepTools?style=flat&color=2EE6A8)](https://github.com/dep1xar/DeepTools/stargazers)
@@ -46,7 +46,7 @@ DeepTools is a system tweaker, so it does some of the same things malware does: 
 
 ### Game Tweaks
 
-A card grid of per-feature game tweaks: HAGS, Game Mode, the MMCSS game scheduler, fullscreen optimizations, PCIe link power management (ASPM), HVCI, Power Throttling, the page file, background telemetry services, background Store apps, Windows 11 widgets, Copilot, Recall, and CPU affinity for the running game. Each card reads the real system state instead of remembering the last click. One click applies or reverts a tweak, tweaks that need a reboot are marked **⟳**, and *Disable all* reverts everything at once.
+A card grid of per-feature game tweaks: Game Mode, the MMCSS game scheduler, fullscreen optimizations, PCIe link power management (ASPM), HVCI, Power Throttling, the page file, unneeded background services, background Store apps, Copilot, the balanced power plan, and CPU affinity for the running game. Each card reads the real system state instead of remembering the last click. One click applies or reverts a tweak, tweaks that need a reboot are marked **⟳**, and *Disable all* reverts everything at once. The page file card opens a dialog where you can keep a system-managed size or set your own.
 
 ### Extra tools
 
@@ -151,7 +151,7 @@ DeepTools работает с системой на том же уровне, ч
 
 ### Игровые твики
 
-Сетка карточек с твиками по отдельным фичам: HAGS, Game Mode, игровой планировщик MMCSS, оптимизации во весь экран, энергосбережение шины PCIe (ASPM), HVCI, Power Throttling, файл подкачки, фоновые службы телеметрии, фоновые приложения Store, виджеты Windows 11, Copilot, Recall и привязка активной игры к ядрам. Карточка показывает реальное состояние системы, а не то, что мы последний раз нажали. Один клик применяет или откатывает твик, твики с перезагрузкой помечены **⟳**, кнопка *Отключить всё* возвращает всё сразу.
+Сетка карточек с твиками по отдельным фичам: Game Mode, игровой планировщик MMCSS, оптимизации во весь экран, энергосбережение шины PCIe (ASPM), HVCI, Power Throttling, файл подкачки, лишние фоновые службы, фоновые приложения Store, Copilot, сбалансированный план питания и привязка активной игры к ядрам. Карточка показывает реальное состояние системы, а не то, что мы последний раз нажали. Один клик применяет или откатывает твик, твики с перезагрузкой помечены **⟳**, кнопка *Отключить всё* возвращает всё сразу. Карточка файла подкачки открывает окно настройки: размер по системе или свой.
 
 ### Дополнительные инструменты
 

@@ -280,10 +280,10 @@ namespace DeepTools
             AddMetricCard(summaryCard, Lang.T("Темп. CPU", "CPU temp"), 480, 20, out cpuTempValueLabel);
             AddMetricCard(summaryCard, Lang.T("Темп. GPU", "GPU temp"), 596, 20, out tempValueLabel);
 
-            var graphsRow = new Panel { Location = new Point(24, 172), Size = new Size(712, 210), BackColor = Color.Transparent };
+            var graphsRow = new Panel { Location = new Point(24, 172), Size = new Size(712, 196), BackColor = Color.Transparent };
             Controls.Add(graphsRow);
 
-            var cpuGraphCard = Theme.MakeCard(graphsRow, new Point(0, 0), new Size(350, 210));
+            var cpuGraphCard = Theme.MakeCard(graphsRow, new Point(0, 0), new Size(350, 196));
             var cpuGraphTitle = new Label
             {
                 Text = Lang.T("Нагрузка CPU (последние 2 минуты)", "CPU load (last 2 minutes)"),
@@ -294,10 +294,10 @@ namespace DeepTools
                 AutoSize = true
             };
             cpuGraphCard.Controls.Add(cpuGraphTitle);
-            cpuGraph = new LoadGraph { Location = new Point(16, 40), Size = new Size(318, 154), LineColor = Theme.Accent };
+            cpuGraph = new LoadGraph { Location = new Point(16, 40), Size = new Size(318, 140), LineColor = Theme.Accent };
             cpuGraphCard.Controls.Add(cpuGraph);
 
-            var ramGraphCard = Theme.MakeCard(graphsRow, new Point(362, 0), new Size(350, 210));
+            var ramGraphCard = Theme.MakeCard(graphsRow, new Point(362, 0), new Size(350, 196));
             var ramGraphTitle = new Label
             {
                 Text = Lang.T("Нагрузка RAM (последние 2 минуты)", "RAM load (last 2 minutes)"),
@@ -308,34 +308,30 @@ namespace DeepTools
                 AutoSize = true
             };
             ramGraphCard.Controls.Add(ramGraphTitle);
-            ramGraph = new LoadGraph { Location = new Point(16, 40), Size = new Size(318, 154), LineColor = Color.FromArgb(90, 160, 240) };
+            ramGraph = new LoadGraph { Location = new Point(16, 40), Size = new Size(318, 140), LineColor = Color.FromArgb(90, 160, 240) };
             ramGraphCard.Controls.Add(ramGraph);
 
-            var disksCard = Theme.MakeCard(this, new Point(24, 396), new Size(712, 112));
+            var disksCard = Theme.MakeCard(this, new Point(24, 382), new Size(712, 112));
 
-            // Тумблер стража майнеров - алерт, если что-то грузит CPU в простое
+            // Нижняя карточка: страж майнеров, тревога перегрева и пороги.
+            // Раньше эти элементы висели прямо на фоне и налезали на описание
+            // датчиков - теперь у них своя карточка и ровные колонки
+            var bottomCard = Theme.MakeCard(this, new Point(24, 502), new Size(712, 88));
+
             var minerLabel = new Label
             {
-                Text = Lang.T("Страж майнеров (алерт при нагрузке в простое)", "Miner guard (alert on load while idle)"),
+                Text = Lang.T("Страж майнеров", "Miner guard"),
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(24, 516),
+                Location = new Point(18, 12),
                 AutoSize = true
             };
-            Controls.Add(minerLabel);
+            bottomCard.Controls.Add(minerLabel);
 
-            var minerToggle = new ToggleSwitch { Location = new Point(330, 512), Checked = MinerGuard.Enabled };
+            var minerToggle = new ToggleSwitch { Location = new Point(130, 8), Checked = MinerGuard.Enabled };
             minerToggle.CheckedChanged += (s, e) => { MinerGuard.Enabled = minerToggle.Checked; };
-            Controls.Add(minerToggle);
-
-            // Тревога перегрева: тумблер + настраиваемые пороги CPU/GPU
-            var alertToggle = new ToggleSwitch { Location = new Point(400, 512), Checked = alertEnabled };
-            alertToggle.CheckedChanged += (s, e) => {
-                alertEnabled = alertToggle.Checked;
-                AppConfig.SetBool("alert_enabled", alertEnabled);
-            };
-            Controls.Add(alertToggle);
+            bottomCard.Controls.Add(minerToggle);
 
             var alertLabel = new Label
             {
@@ -343,16 +339,24 @@ namespace DeepTools
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(452, 516),
+                Location = new Point(250, 12),
                 AutoSize = true
             };
-            Controls.Add(alertLabel);
+            bottomCard.Controls.Add(alertLabel);
 
-            MakeTempStepper("CPU", 508, 512, alertCpuTemp, v => {
+            // Тревога перегрева: тумблер + настраиваемые пороги CPU/GPU
+            var alertToggle = new ToggleSwitch { Location = new Point(312, 8), Checked = alertEnabled };
+            alertToggle.CheckedChanged += (s, e) => {
+                alertEnabled = alertToggle.Checked;
+                AppConfig.SetBool("alert_enabled", alertEnabled);
+            };
+            bottomCard.Controls.Add(alertToggle);
+
+            MakeTempStepper(bottomCard, "CPU", 420, 8, alertCpuTemp, v => {
                 alertCpuTemp = v;
                 AppConfig.Set("alert_cpu_temp", v.ToString());
             });
-            MakeTempStepper("GPU", 624, 512, alertGpuTemp, v => {
+            MakeTempStepper(bottomCard, "GPU", 542, 8, alertGpuTemp, v => {
                 alertGpuTemp = v;
                 AppConfig.Set("alert_gpu_temp", v.ToString());
             });
@@ -398,15 +402,15 @@ namespace DeepTools
             var futureDesc = new Label
             {
                 Text = Lang.T(
-                    "Темп. CPU читается через LibreHardwareMonitor (при перегреве выше порога придёт уведомление из трея, пороги настраиваются выше). Темп. GPU - через драйвер NVIDIA (NVML), на ПК без NVIDIA используется ACPI-датчик Windows.",
-                    "CPU temp is read via LibreHardwareMonitor (a tray alert fires above the threshold; thresholds are configurable above). GPU temp comes from the NVIDIA driver (NVML); PCs without NVIDIA fall back to the Windows ACPI sensor."),
+                    "Темп. CPU - LibreHardwareMonitor, GPU - драйвер NVIDIA (NVML) или ACPI.\nПороги тревоги настраиваются выше.",
+                    "CPU temp: LibreHardwareMonitor. GPU temp: NVIDIA (NVML) or ACPI.\nAlert thresholds are set above."),
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8F),
-                Location = new Point(24, 548),
-                Size = new Size(500, 34)
+                Location = new Point(18, 44),
+                Size = new Size(508, 34)
             };
-            Controls.Add(futureDesc);
+            bottomCard.Controls.Add(futureDesc);
 
             // Кнопка появляется, когда датчик CPU недоступен: предлагает поставить
             // драйвер PawnIO (обходит блокировку «Целостности памяти» в Windows 11)
@@ -417,12 +421,12 @@ namespace DeepTools
                 HoverColor = Theme.AccentHover,
                 TextColor = Theme.BgColor,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Location = new Point(540, 550),
-                Size = new Size(196, 30),
+                Location = new Point(536, 44),
+                Size = new Size(158, 30),
                 Visible = false
             };
             installDriverBtn.Click += (s, e) => SensorDriver.InstallBundled();
-            Controls.Add(installDriverBtn);
+            bottomCard.Controls.Add(installDriverBtn);
 
             statusLabel = new Label
             {
@@ -430,14 +434,14 @@ namespace DeepTools
                 ForeColor = Theme.Accent,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(24, 592),
+                Location = new Point(24, 596),
                 AutoSize = true
             };
             Controls.Add(statusLabel);
         }
 
         // Компактный степпер порога температуры: «CPU − 90° +»
-        private void MakeTempStepper(string title, int x, int y, int initial, Action<int> onChange)
+        private void MakeTempStepper(Control parent, string title, int x, int y, int initial, Action<int> onChange)
         {
             var lbl = new Label
             {
@@ -448,7 +452,7 @@ namespace DeepTools
                 Location = new Point(x, y + 5),
                 AutoSize = true
             };
-            Controls.Add(lbl);
+            parent.Controls.Add(lbl);
 
             int value = initial;
 
@@ -476,8 +480,8 @@ namespace DeepTools
             minusBtn.Click += (s, e) => {
                 if (value > AlertTempMin) { value -= 5; if (value < AlertTempMin) value = AlertTempMin; valLbl.Text = value + "°"; onChange(value); }
             };
-            Controls.Add(minusBtn);
-            Controls.Add(valLbl);
+            parent.Controls.Add(minusBtn);
+            parent.Controls.Add(valLbl);
 
             var plusBtn = new RoundedButton
             {
@@ -492,7 +496,7 @@ namespace DeepTools
             plusBtn.Click += (s, e) => {
                 if (value < AlertTempMax) { value += 5; if (value > AlertTempMax) value = AlertTempMax; valLbl.Text = value + "°"; onChange(value); }
             };
-            Controls.Add(plusBtn);
+            parent.Controls.Add(plusBtn);
         }
 
         // Глубокая проверка: SMART-флаг "скоро откажет" + ошибки дисков в журнале событий
