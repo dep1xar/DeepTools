@@ -14,13 +14,13 @@ namespace DeepTools
 {
     public static class AppVersion
     {
-        // Короткая версия для интерфейса: "v0.5"
+        // Версия для интерфейса: "2.3.0" (без префикса v)
         public static string Short
         {
             get
             {
                 var v = Assembly.GetExecutingAssembly().GetName().Version;
-                return "v" + v.Major + "." + v.Minor;
+                return v.Major + "." + v.Minor + "." + v.Build;
             }
         }
     }

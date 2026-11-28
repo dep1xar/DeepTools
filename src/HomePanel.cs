@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -15,7 +16,7 @@ namespace DeepTools
 
         public QuickCard()
         {
-            Size = new Size(230, 96);
+            Size = new Size(230, 110);
             Cursor = Cursors.Hand;
         }
 
@@ -48,15 +49,117 @@ namespace DeepTools
             using (var titleFont = new Font("Segoe UI", 10F, FontStyle.Bold))
             {
                 TextRenderer.DrawText(g, Title, titleFont,
-                    new Rectangle(14, 46, Width - 28, 20), Theme.TextMain,
+                    new Rectangle(14, 54, Width - 28, 20), Theme.TextMain,
                     TextFormatFlags.Left | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
             }
 
             using (var subFont = new Font("Segoe UI", 8F))
             {
                 TextRenderer.DrawText(g, Subtitle, subFont,
-                    new Rectangle(14, 68, Width - 28, 24), Theme.TextDim,
+                    new Rectangle(14, 78, Width - 28, 26), Theme.TextDim,
                     TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding);
+            }
+        }
+    }
+
+    // Плитка мониторинга: заголовок, крупное значение и график за последние
+    // ~80 секунд. Карточка нейтральная, как остальные, линия - акцент темы
+    public class StatTile : TransparentControl
+    {
+        private const int HistorySize = 40;
+        private readonly List<float> history = new List<float>();
+        private string valueText = "-";
+
+        public string Title = "";
+
+        public StatTile()
+        {
+            Size = new Size(166, 140);
+        }
+
+        public void Push(float value, string text)
+        {
+            valueText = text;
+            if (value >= 0)
+            {
+                history.Add(Math.Max(0f, Math.Min(100f, value)));
+                if (history.Count > HistorySize) history.RemoveAt(0);
+            }
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            var rect = new Rectangle(0, 0, Width - 1, Height - 1);
+            using (var path = Theme.RoundedRect(rect, 14))
+            using (var bg = new SolidBrush(Theme.CardColor))
+            using (var border = new Pen(Theme.BorderColor))
+            {
+                g.FillPath(bg, path);
+                g.DrawPath(border, path);
+            }
+
+            using (var titleFont = new Font("Segoe UI", 8.5F))
+            {
+                TextRenderer.DrawText(g, Title, titleFont,
+                    new Rectangle(14, 11, Width - 28, 18), Theme.TextDim,
+                    TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPadding);
+            }
+
+            using (var valueFont = new Font("Segoe UI", 17F, FontStyle.Bold))
+            {
+                TextRenderer.DrawText(g, valueText, valueFont,
+                    new Rectangle(12, 32, Width - 24, 34), Theme.TextMain,
+                    TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPadding);
+            }
+
+            DrawSpark(g, new Rectangle(12, 82, Width - 24, Height - 94));
+        }
+
+        // Линия с заливкой под ней, фиксированный масштаб 0..100
+        private void DrawSpark(Graphics g, Rectangle area)
+        {
+            if (area.Width < 4 || area.Height < 4) return;
+
+            using (var grid = new Pen(Color.FromArgb(28, Theme.TextDim)))
+            {
+                int mid = area.Top + area.Height / 2;
+                g.DrawLine(grid, area.Left, mid, area.Right, mid);
+            }
+
+            if (history.Count < 2) return;
+
+            float stepX = area.Width / (float)(HistorySize - 1);
+            int offset = HistorySize - history.Count;
+            var points = new PointF[history.Count];
+            for (int i = 0; i < history.Count; i++)
+            {
+                float x = area.Left + (offset + i) * stepX;
+                float y = area.Bottom - history[i] / 100f * area.Height;
+                points[i] = new PointF(x, y);
+            }
+
+            using (var path = new GraphicsPath())
+            {
+                path.AddLine(points[0].X, area.Bottom, points[0].X, points[0].Y);
+                for (int i = 1; i < points.Length; i++) path.AddLine(points[i - 1], points[i]);
+                path.AddLine(points[points.Length - 1].X, points[points.Length - 1].Y,
+                    points[points.Length - 1].X, area.Bottom);
+                path.CloseFigure();
+
+                using (var fill = new LinearGradientBrush(
+                    new Rectangle(area.Left, area.Top, Math.Max(1, area.Width), Math.Max(1, area.Height)),
+                    Color.FromArgb(70, Theme.Accent), Color.FromArgb(4, Theme.Accent), 90f))
+                    g.FillPath(fill, path);
+            }
+
+            using (var pen = new Pen(Theme.Accent, 1.8f))
+            {
+                pen.LineJoin = LineJoin.Round;
+                g.DrawLines(pen, points);
             }
         }
     }
@@ -66,10 +169,10 @@ namespace DeepTools
     {
         public event Action<string> RequestNavigate;
 
-        private Label cpuValue;
-        private Label ramValue;
-        private Label cpuTempValue;
-        private Label gpuTempValue;
+        private StatTile cpuTile;
+        private StatTile ramTile;
+        private StatTile cpuTempTile;
+        private StatTile gpuTempTile;
         private System.Windows.Forms.Timer statsTimer;
         private WidgetForm widget;
 
@@ -87,68 +190,24 @@ namespace DeepTools
 
         private void BuildUi()
         {
-            // Приветственная карточка
-            var heroCard = Theme.MakeCard(this, new Point(24, 24), new Size(712, 120));
+            // Живой мониторинг: значение и график нагрузки за последние ~80 секунд
+            cpuTile = new StatTile()
+            { Title = Lang.T("Загрузка CPU", "CPU load"), Location = new Point(24, 24) };
+            Controls.Add(cpuTile);
 
-            // Название программы уже есть в шапке окна и в сайдбаре - на главной
-            // вместо третьего «DeepTools» коротко говорим, что здесь можно делать
-            var heroDot = new Panel { Size = new Size(16, 16), Location = new Point(24, 41), BackColor = Color.Transparent };
-            heroDot.Paint += (s, e) => {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (var glow = new SolidBrush(Color.FromArgb(60, Theme.Accent)))
-                    e.Graphics.FillEllipse(glow, -4, -4, 24, 24);
-                using (var b = new SolidBrush(Theme.Accent))
-                    e.Graphics.FillEllipse(b, 0, 0, 16, 16);
-            };
-            heroCard.Controls.Add(heroDot);
+            ramTile = new StatTile()
+            { Title = Lang.T("Загрузка RAM", "RAM load"), Location = new Point(206, 24) };
+            Controls.Add(ramTile);
 
-            var heroSub = new Label
-            {
-                Text = Lang.T("Чистка, ускорение и мониторинг компьютера", "Cleanup, speedup and monitoring in one place"),
-                ForeColor = Theme.TextMain,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                Location = new Point(54, 32),
-                AutoSize = true
-            };
-            heroCard.Controls.Add(heroSub);
+            cpuTempTile = new StatTile()
+            { Title = Lang.T("Темп. CPU", "CPU temp"), Location = new Point(388, 24) };
+            Controls.Add(cpuTempTile);
 
-            var heroHint = new Label
-            {
-                Text = Lang.T("Программа живёт в трее: закрытие окна не выключает её. ", "Lives in the tray: closing the window does not exit. ")
-                       + Hotkeys.Get(NativeMethods.HOTKEY_ID_CLICKER) + Lang.T(" - кликер, ", " - clicker, ")
-                       + Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT) + Lang.T(" - скриншот", " - screenshot"),
-                ForeColor = Theme.TextDim,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(54, 66),
-                AutoSize = true
-            };
-            heroCard.Controls.Add(heroHint);
-
-            // Виджет мониторинга поверх всех окон
-            var widgetLabel = new Label
-            {
-                Text = Lang.T("Виджет на экран", "Desktop widget"),
-                ForeColor = Theme.TextMain,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 9F),
-                Location = new Point(540, 24),
-                AutoSize = true
-            };
-            heroCard.Controls.Add(widgetLabel);
-
-            var widgetToggle = new ToggleSwitch { Location = new Point(648, 20), Checked = AppConfig.GetBool("widget_visible", false) };
-            widgetToggle.CheckedChanged += (s, e) => SetWidgetVisible(widgetToggle.Checked);
-            heroCard.Controls.Add(widgetToggle);
+            gpuTempTile = new StatTile()
+            { Title = Lang.T("Темп. GPU", "GPU temp"), Location = new Point(570, 24) };
+            Controls.Add(gpuTempTile);
 
             if (AppConfig.GetBool("widget_visible", false)) SetWidgetVisible(true);
-
-            // Живой мониторинг
-            MakeStatTile(new Point(24, 160), Lang.T("Загрузка CPU", "CPU load"), out cpuValue);
-            MakeStatTile(new Point(206, 160), Lang.T("Загрузка RAM", "RAM load"), out ramValue);
-            MakeStatTile(new Point(388, 160), Lang.T("Темп. CPU", "CPU temp"), out cpuTempValue);
-            MakeStatTile(new Point(570, 160), Lang.T("Темп. GPU", "GPU temp"), out gpuTempValue);
 
             // Быстрые переходы
             var quickTitle = new Label
@@ -157,29 +216,29 @@ namespace DeepTools
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                Location = new Point(24, 268),
+                Location = new Point(24, 192),
                 AutoSize = true
             };
             Controls.Add(quickTitle);
 
             // Иконки только из базовой части юникода (BMP): эмодзи вроде 🧹 или 🚀
             // GDI-отрисовка превращает в пустые квадраты
-            MakeQuickCard(new Point(24, 300), "♻",
+            MakeQuickCard(new Point(24, 224), "♻",
                 Lang.T("Очистить мусор", "Clean junk"),
                 Lang.T("Temp-файлы и кэш", "Temp files and cache"), "cleanup");
-            MakeQuickCard(new Point(265, 300), "☄",
+            MakeQuickCard(new Point(265, 224), "☄",
                 "GameBooster",
                 Lang.T("Буст игр и Ultimate Performance", "Game boost and Ultimate Performance"), "booster");
-            MakeQuickCard(new Point(506, 300), "❤",
+            MakeQuickCard(new Point(506, 224), "❤",
                 "Health Check",
                 Lang.T("Датчики и диски", "Sensors and disks"), "health");
-            MakeQuickCard(new Point(24, 406), "⚡",
+            MakeQuickCard(new Point(24, 348), "⚡",
                 Lang.T("Автокликер", "Autoclicker"),
                 Lang.T("Мышь и клавиатура, ", "Mouse and keyboard, ") + Hotkeys.Get(NativeMethods.HOTKEY_ID_CLICKER), "clicker");
-            MakeQuickCard(new Point(265, 406), "◉",
+            MakeQuickCard(new Point(265, 348), "◉",
                 Lang.T("Скриншоты", "Screenshots"),
                 Lang.T("Снимок экрана по ", "Capture screen with ") + Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT), "screenshots");
-            MakeQuickCard(new Point(506, 406), "⚙",
+            MakeQuickCard(new Point(506, 348), "⚙",
                 Lang.T("Настройки", "Settings"),
                 Lang.T("Тема, язык, права", "Theme, language, rights"), "settings");
 
@@ -189,7 +248,7 @@ namespace DeepTools
                 ButtonColor = Theme.Accent,
                 HoverColor = Theme.AccentHover,
                 TextColor = Theme.BgColor,
-                Location = new Point(24, 516),
+                Location = new Point(24, 482),
                 Size = new Size(190, 34)
             };
             ramBtn.Click += (s, e) => FreeRam(false);
@@ -198,7 +257,7 @@ namespace DeepTools
             // Автоочистка RAM по расписанию: тумблер + выбор интервала.
             // Таймер живёт в HomePanel, а панель создаётся при старте и не умирает -
             // так что расписание работает, даже когда окно свёрнуто в трей
-            ramAutoToggle = new ToggleSwitch { Location = new Point(230, 520), Checked = AppConfig.GetBool("ram_auto_on", false) };
+            ramAutoToggle = new ToggleSwitch { Location = new Point(230, 486), Checked = AppConfig.GetBool("ram_auto_on", false) };
             ramAutoToggle.CheckedChanged += (s, e) => {
                 AppConfig.SetBool("ram_auto_on", ramAutoToggle.Checked);
                 ApplyAutoCleanTimer();
@@ -211,7 +270,7 @@ namespace DeepTools
                 ForeColor = Theme.TextMain,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 9F),
-                Location = new Point(284, 524),
+                Location = new Point(284, 490),
                 AutoSize = true
             };
             Controls.Add(ramAutoLabel);
@@ -225,7 +284,7 @@ namespace DeepTools
                 {
                     Text = minutesVal + Lang.T("м", "m"),
                     Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                    Location = new Point(ix, 518),
+                    Location = new Point(ix, 484),
                     Size = new Size(42, 28),
                     Tag = minutesVal
                 };
@@ -247,17 +306,49 @@ namespace DeepTools
             }
             HighlightIntervalButtons();
 
+            // Виджет мониторинга переехал из убранной шапки: компактно в правом
+            // нижнем углу, чтобы не терять доступ к функции
+            var widgetLabel = new Label
+            {
+                Text = Lang.T("Виджет", "Widget"),
+                ForeColor = Theme.TextMain,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(614, 490),
+                AutoSize = true
+            };
+            Controls.Add(widgetLabel);
+
+            var widgetToggle = new ToggleSwitch { Location = new Point(662, 484), Checked = AppConfig.GetBool("widget_visible", false) };
+            widgetToggle.CheckedChanged += (s, e) => SetWidgetVisible(widgetToggle.Checked);
+            Controls.Add(widgetToggle);
+
             ramResultLabel = new Label
             {
                 Text = "",
                 ForeColor = Theme.TextDim,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 9F),
-                Location = new Point(24, 560),
+                Location = new Point(24, 526),
                 Size = new Size(690, 18),
                 AutoEllipsis = true
             };
             Controls.Add(ramResultLabel);
+
+            // Подсказка из убранной шапки: окно можно закрыть, программа останется
+            // в трее, а хоткеи работают всегда
+            var hintLabel = new Label
+            {
+                Text = Lang.T("Программа живёт в трее: закрытие окна не выключает её. ", "Lives in the tray: closing the window does not exit. ")
+                       + Hotkeys.Get(NativeMethods.HOTKEY_ID_CLICKER) + Lang.T(" - кликер, ", " - clicker, ")
+                       + Hotkeys.Get(NativeMethods.HOTKEY_ID_SCREENSHOT) + Lang.T(" - скриншот", " - screenshot"),
+                ForeColor = Theme.TextDim,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(24, 560),
+                AutoSize = true
+            };
+            Controls.Add(hintLabel);
 
             autoCleanTimer = new System.Windows.Forms.Timer();
             autoCleanTimer.Tick += (s, e) => AutoCleanTick();
@@ -335,33 +426,6 @@ namespace DeepTools
             worker.RunWorkerAsync();
         }
 
-        private void MakeStatTile(Point loc, string title, out Label valueLabel)
-        {
-            var card = Theme.MakeCard(this, loc, new Size(166, 84));
-
-            var titleLbl = new Label
-            {
-                Text = title,
-                ForeColor = Theme.TextDim,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(14, 12),
-                AutoSize = true
-            };
-            card.Controls.Add(titleLbl);
-
-            valueLabel = new Label
-            {
-                Text = "-",
-                ForeColor = Theme.TextMain,
-                BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
-                Location = new Point(12, 36),
-                AutoSize = true
-            };
-            card.Controls.Add(valueLabel);
-        }
-
         private void MakeQuickCard(Point loc, string icon, string title, string subtitle, string key)
         {
             var card = new QuickCard
@@ -392,10 +456,10 @@ namespace DeepTools
         private void RefreshStats()
         {
             if (!Visible) return;
-            cpuValue.Text = SystemStats.CpuLoad;
-            ramValue.Text = SystemStats.RamLoad;
-            cpuTempValue.Text = SystemStats.CpuTemp;
-            gpuTempValue.Text = SystemStats.GpuTemp;
+            cpuTile.Push(SystemStats.CpuLoadNum, SystemStats.CpuLoad);
+            ramTile.Push(SystemStats.RamLoadNum, SystemStats.RamLoad);
+            cpuTempTile.Push(SystemStats.CpuTempNum, SystemStats.CpuTemp);
+            gpuTempTile.Push(SystemStats.GpuTempNum, SystemStats.GpuTemp);
         }
     }
 }
