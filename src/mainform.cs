@@ -550,6 +550,12 @@ namespace DeepTools
             sidebar = new Panel { Location = new Point(0, 34), Size = new Size(220, 616), BackColor = Theme.SidebarColor };
             Controls.Add(sidebar);
 
+            if (Theme.IsGlass)
+            {
+                titleBar.Paint += (s, e) => Theme.PaintGlassChrome(e.Graphics, titleBar.ClientSize, false);
+                sidebar.Paint += (s, e) => Theme.PaintGlassChrome(e.Graphics, sidebar.ClientSize, true);
+            }
+
             var brandPanel = new Panel { Location = new Point(0, 0), Size = new Size(220, 80), BackColor = Color.Transparent };
             var brandTitle = new Label
             {
@@ -912,8 +918,8 @@ namespace DeepTools
 
             string curTheme = AppConfig.Get("theme", "dark");
             var themeBtns = new System.Collections.Generic.List<RoundedButton>();
-            string[] tKeys = { "dark", "neon", "graphite", "rust", "light" };
-            string[] tNames = { Lang.T("Тёмная", "Dark"), Lang.T("Неон", "Neon"), Lang.T("Графит", "Graphite"), Lang.T("Оранж", "Orange"), Lang.T("Светлая", "Light") };
+            string[] tKeys = { "dark", "neon", "graphite", "rust", "light", "glass" };
+            string[] tNames = { Lang.T("Тёмная", "Dark"), Lang.T("Неон", "Neon"), Lang.T("Графит", "Graphite"), Lang.T("Оранж", "Orange"), Lang.T("Светлая", "Light"), Lang.T("Стекло", "Glass") };
             int txp = 70;
             for (int i = 0; i < tKeys.Length; i++)
             {

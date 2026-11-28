@@ -418,9 +418,24 @@ namespace DeepTools
             Color track = Theme.Lerp(Theme.KeyHover, Theme.Accent, anim);
 
             using (var path = RoundedRect(new Rectangle(0, 0, Width - 1, Height - 1), Height / 2))
-            using (var brush = new SolidBrush(track))
             {
-                g.FillPath(brush, path);
+                if (Theme.IsGlass)
+                {
+                    using (var brush = new LinearGradientBrush(
+                        new Rectangle(0, 0, Width, Height + 1),
+                        Theme.Lighten(track, 0.18f),
+                        Theme.Lerp(track, Color.Black, 0.14f), 90f))
+                    {
+                        g.FillPath(brush, path);
+                    }
+                }
+                else
+                {
+                    using (var brush = new SolidBrush(track))
+                    {
+                        g.FillPath(brush, path);
+                    }
+                }
             }
 
             int d = Height - 6;
@@ -659,6 +674,11 @@ namespace DeepTools
         public static Color AccentHover = Color.FromArgb(70, 240, 160);
         public static Color DangerHover = Color.FromArgb(220, 50, 50);
 
+        // Стеклянная тема: карточки рисуются вертикальным градиентом, а не
+        // плоской заливкой. В остальных темах оба цвета равны CardColor
+        public static Color CardTop = Color.FromArgb(22, 28, 43);
+        public static Color CardBottom = Color.FromArgb(22, 28, 43);
+
         // Семантические цвета состояния: включено / выключено / не применимо.
         // Их нельзя брать от акцента темы: в тёплых темах (rust) акцент оранжевый и
         // почти не отличается от красного, из-за чего статус-полоски сливались.
@@ -670,18 +690,24 @@ namespace DeepTools
         // Текущая тема: нужно контролам, которые красятся системно (скроллбары, комбобоксы)
         public static bool IsLight = false;
 
+        // Стеклянная тема: карточки и кнопки рисуются с градиентом и бликом,
+        // сайдбар получает подсветку кромки. Флаг читают кастомные контролы
+        public static bool IsGlass = false;
+
         public static void Apply(bool light) { ApplyNamed(light ? "light" : "dark"); }
 
-        // Именованные темы 2.0: dark (по умолчанию), neon, graphite, light
+        // Именованные темы: dark (по умолчанию), neon, graphite, rust, light, glass
         public static void ApplyNamed(string name)
         {
             IsLight = (name == "light");
+            IsGlass = (name == "glass");
             switch (name)
             {
                 case "light": ApplyLight(); break;
                 case "neon": ApplyNeon(); break;
                 case "graphite": ApplyGraphite(); break;
                 case "rust": ApplyRust(); break;
+                case "glass": ApplyGlass(); break;
                 default: ApplyDark(); break;
             }
         }
@@ -805,6 +831,34 @@ namespace DeepTools
             Idle = Color.FromArgb(52, 52, 60);
         }
 
+        // «Стекло»: холодная палитра, полупрозрачные на вид поверхности и
+        // ледяной акцент. Прозрачность настоящая в WinForms недоступна, поэтому
+        // объём дают градиенты карточек, блики на кромках и глянцевые кнопки
+        private static void ApplyGlass()
+        {
+            BgColor = Color.FromArgb(10, 15, 26);
+            CardColor = Color.FromArgb(30, 42, 61);
+            CardTop = Color.FromArgb(46, 61, 88);
+            CardBottom = Color.FromArgb(23, 32, 49);
+            SidebarColor = Color.FromArgb(13, 19, 32);
+            BorderColor = Color.FromArgb(66, 92, 124);
+            Accent = Color.FromArgb(118, 206, 255);
+            Danger = Color.FromArgb(240, 110, 120);
+            Warning = Color.FromArgb(245, 190, 90);
+            TextMain = Color.FromArgb(238, 245, 253);
+            TextDim = Color.FromArgb(150, 170, 196);
+            InputColor = Color.FromArgb(22, 31, 47);
+            KeyColor = Color.FromArgb(44, 59, 83);
+            KeyHover = Color.FromArgb(58, 78, 108);
+            NavActiveBg = Color.FromArgb(40, 62, 92);
+            NavHoverBg = Color.FromArgb(22, 31, 47);
+            AccentHover = Color.FromArgb(165, 226, 255);
+            DangerHover = Color.FromArgb(255, 140, 148);
+            On = Color.FromArgb(60, 220, 160);
+            Off = Color.FromArgb(240, 110, 120);
+            Idle = Color.FromArgb(58, 78, 108);
+        }
+
         public static GraphicsPath RoundedRect(Rectangle r, int radius)
         {
             var path = new GraphicsPath();
@@ -827,22 +881,134 @@ namespace DeepTools
             return Color.FromArgb(r, g, bl);
         }
 
+        // Осветление цвета к белому - блик на стекле
+        public static Color Lighten(Color c, float t)
+        {
+            return Lerp(c, Color.White, t);
+        }
+
         public static Panel MakeCard(Control parent, Point loc, Size size)
         {
-            var card = new Panel { Location = loc, Size = size, BackColor = CardColor };
-            card.Paint += (s, e) => {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                var rect = new Rectangle(0, 0, card.Width - 1, card.Height - 1);
-                using (var path = RoundedRect(rect, 12))
-                using (var brush = new SolidBrush(CardColor))
-                using (var pen = new Pen(BorderColor))
-                {
-                    e.Graphics.FillPath(brush, path);
-                    e.Graphics.DrawPath(pen, path);
-                }
-            };
+            var card = new GlassCard { Location = loc, Size = size };
             parent.Controls.Add(card);
             return card;
+        }
+
+        // Фон шапки и сайдбара в стеклянной теме: мягкий градиент и светлая
+        // кромка. В остальных темах панели остаются плоскими
+        public static void PaintGlassChrome(Graphics g, Size size, bool sidebar)
+        {
+            if (!IsGlass || size.Width <= 0 || size.Height <= 0) return;
+
+            Color top = sidebar ? Color.FromArgb(24, 34, 52) : Color.FromArgb(18, 26, 41);
+            Color bottom = sidebar ? Color.FromArgb(11, 16, 27) : Color.FromArgb(12, 18, 30);
+            using (var brush = new LinearGradientBrush(
+                new Rectangle(0, 0, size.Width, size.Height + 1), top, bottom, 90f))
+            {
+                g.FillRectangle(brush, 0, 0, size.Width, size.Height);
+            }
+
+            using (var pen = new Pen(Color.FromArgb(sidebar ? 34 : 26, 255, 255, 255)))
+            {
+                if (sidebar) g.DrawLine(pen, size.Width - 1, 0, size.Width - 1, size.Height);
+                else g.DrawLine(pen, 0, size.Height - 1, size.Width, size.Height - 1);
+            }
+        }
+    }
+
+    // Карточка с «стеклянной» отрисовкой: вертикальный градиент, блик по верхней
+    // кромке и тонкая тень снизу. Углы закрашиваются цветом родителя, поэтому
+    // скругление остаётся ровным на любой теме и при вложенных карточках
+    public class GlassCard : Panel
+    {
+        public GlassCard()
+        {
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            BackColor = Theme.CardColor;
+        }
+
+        private static int Radius { get { return Theme.IsGlass ? 16 : 12; } }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+            // Всё, что вне скругления, должно совпадать с фоном под карточкой
+            Color under = (Parent != null && Parent.BackColor.A == 255) ? Parent.BackColor : Theme.BgColor;
+            using (var back = new SolidBrush(under)) g.FillRectangle(back, ClientRectangle);
+            if (Width < 8 || Height < 8) return;
+
+            var rect = new Rectangle(0, 0, Width - 1, Height - 1);
+            using (var path = Theme.RoundedRect(rect, Radius))
+            {
+                if (Theme.IsGlass)
+                {
+                    using (var brush = new LinearGradientBrush(
+                        new Rectangle(0, 0, Width, Height + 1), Theme.CardTop, Theme.CardBottom, 90f))
+                    {
+                        g.FillPath(brush, path);
+                    }
+                }
+                else
+                {
+                    using (var brush = new SolidBrush(Theme.CardColor)) g.FillPath(brush, path);
+                }
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            if (Width < 8 || Height < 8) return;
+
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var rect = new Rectangle(0, 0, Width - 1, Height - 1);
+            using (var path = Theme.RoundedRect(rect, Radius))
+            {
+                if (Theme.IsGlass)
+                {
+                    // Кромка светится сверху и гаснет книзу - как грань стекла
+                    using (var edge = new LinearGradientBrush(rect,
+                        Color.FromArgb(150, 200, 232, 255),
+                        Color.FromArgb(90, Theme.BorderColor), 90f))
+                    using (var pen = new Pen(edge))
+                    {
+                        g.DrawPath(pen, path);
+                    }
+
+                    // Блик по верхней кромке: ярче в центре, растворяется к углам
+                    var hlRect = new Rectangle(Radius, 1, Math.Max(1, Width - Radius * 2), 1);
+                    using (var hl = new LinearGradientBrush(hlRect, Color.Transparent, Color.Transparent, 0f))
+                    {
+                        var blend = new ColorBlend(3);
+                        blend.Colors = new[] {
+                            Color.FromArgb(0, 255, 255, 255),
+                            Color.FromArgb(58, 255, 255, 255),
+                            Color.FromArgb(0, 255, 255, 255)
+                        };
+                        blend.Positions = new[] { 0f, 0.5f, 1f };
+                        hl.InterpolationColors = blend;
+                        g.FillRectangle(hl, hlRect);
+                    }
+
+                    // Внутренняя тень снизу: карточка «стоит» над фоном
+                    using (var shadow = new Pen(Color.FromArgb(46, 0, 0, 0)))
+                    {
+                        g.DrawLine(shadow, Radius, Height - 2, Width - Radius, Height - 2);
+                    }
+                }
+                else
+                {
+                    using (var pen = new Pen(Theme.BorderColor))
+                    {
+                        g.DrawPath(pen, path);
+                    }
+                }
+            }
         }
     }
 
@@ -914,9 +1080,30 @@ namespace DeepTools
             // Радиус не больше половины высоты, иначе углы ломаются на маленьких кнопках
             int radius = Math.Min(CornerRadius, (Height - 1) / 2);
             using (var path = Theme.RoundedRect(rect, radius))
-            using (var brush = new SolidBrush(currentColor))
             {
-                e.Graphics.FillPath(brush, path);
+                if (Theme.IsGlass)
+                {
+                    // Стеклянная кнопка: светлее сверху, темнее снизу, плюс блик
+                    using (var brush = new LinearGradientBrush(
+                        new Rectangle(0, 0, Width, Height + 1),
+                        Theme.Lighten(currentColor, 0.22f),
+                        Theme.Lerp(currentColor, Color.Black, 0.14f), 90f))
+                    {
+                        e.Graphics.FillPath(brush, path);
+                    }
+
+                    e.Graphics.SetClip(path);
+                    using (var hl = new Pen(Color.FromArgb(95, 255, 255, 255)))
+                        e.Graphics.DrawLine(hl, radius, 1, Width - radius, 1);
+                    e.Graphics.ResetClip();
+                }
+                else
+                {
+                    using (var brush = new SolidBrush(currentColor))
+                    {
+                        e.Graphics.FillPath(brush, path);
+                    }
+                }
             }
 
             // TextRenderer вместо Graphics.DrawString: даёт ClearType-сглаживание как у
